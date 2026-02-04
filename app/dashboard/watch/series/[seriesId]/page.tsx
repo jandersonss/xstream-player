@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
+import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import { ArrowLeft, Play, Calendar, Star, Clock, List, Heart } from 'lucide-react';
 import Loader from '@/components/Loader';
 
@@ -43,6 +44,7 @@ import { useData } from '@/app/context/DataContext';
 export default function WatchSeriesPage() {
     const { credentials } = useAuth();
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+    const { updateProgress, getProgress } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
     const params = useParams();
     const router = useRouter();
@@ -53,6 +55,7 @@ export default function WatchSeriesPage() {
     const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [activeSeason, setActiveSeason] = useState<string>("1");
+    const [resumeTime, setResumeTime] = useState(0);
 
     useEffect(() => {
         if (!credentials || !seriesId) return;
@@ -106,6 +109,35 @@ export default function WatchSeriesPage() {
         loadSeriesInfo();
     }, [credentials, seriesId, getCachedDetail, saveCachedDetail]);
 
+    // Check progress for episode when selected
+    useEffect(() => {
+        if (selectedEpisode) {
+            const progress = getProgress(selectedEpisode.id);
+            if (progress && progress.progress > 10) {
+                setResumeTime(progress.progress);
+            } else {
+                setResumeTime(0);
+            }
+        }
+    }, [selectedEpisode, getProgress]);
+
+    const handleProgress = (currentTime: number, duration: number) => {
+        if (!series || !selectedEpisode) return;
+        updateProgress({
+            streamId: selectedEpisode.id, // We use episode ID as the primary key for progress
+            type: 'series',
+            progress: currentTime,
+            duration: duration,
+            timestamp: Date.now(),
+            name: `${series.info.name} - Ep ${selectedEpisode.episode_num}`,
+            image: series.info.cover,
+            episodeId: selectedEpisode.id,
+            seriesId: seriesId,
+            seasonNum: Number(selectedEpisode.season),
+            episodeNum: Number(selectedEpisode.episode_num)
+        });
+    };
+
     if (loading) return <Loader />;
 
     if (error || !series) {
@@ -138,6 +170,8 @@ export default function WatchSeriesPage() {
                         src={streamUrl}
                         poster={series.info.cover}
                         autoPlay={true}
+                        initialTime={resumeTime}
+                        onProgress={handleProgress}
                     />
                 </div>
             </div>

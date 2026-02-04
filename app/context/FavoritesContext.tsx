@@ -24,23 +24,52 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
     const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
 
-    // Load from LocalStorage on mount
+    // Load from Backend on mount
     useEffect(() => {
-        const stored = localStorage.getItem('xstream_favorites');
-        if (stored) {
+        const loadFavorites = async () => {
             try {
-                setFavorites(JSON.parse(stored));
+                const res = await fetch('/api/favorites');
+                if (res.ok) {
+                    const data = await res.json();
+                    setFavorites(data);
+                }
             } catch (e) {
-                console.error("Failed to parse favorites", e);
+                console.error("Failed to fetch favorites from backend", e);
+                // Fallback to localStorage if backend fails
+                const stored = localStorage.getItem('xstream_favorites');
+                if (stored) {
+                    try {
+                        setFavorites(JSON.parse(stored));
+                    } catch (e) {
+                        console.error("Failed to parse localStorage favorites", e);
+                    }
+                }
+            } finally {
+                setIsLoaded(true);
             }
-        }
-        setIsLoaded(true);
+        };
+        loadFavorites();
     }, []);
 
-    // Save to LocalStorage whenever favorites change
+    // Save to Backend whenever favorites change
     useEffect(() => {
         if (isLoaded) {
+            // Update localStorage as a local cache/backup
             localStorage.setItem('xstream_favorites', JSON.stringify(favorites));
+
+            // Sync with backend
+            const syncFavorites = async () => {
+                try {
+                    await fetch('/api/favorites', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify(favorites)
+                    });
+                } catch (e) {
+                    console.error("Failed to sync favorites to backend", e);
+                }
+            };
+            syncFavorites();
         }
     }, [favorites, isLoaded]);
 
