@@ -1,17 +1,8 @@
+import "./polyfills";
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { ClientProviders } from "@/components/ClientProviders";
-
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
-});
-
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
+import ErrorBoundary from "@/components/ErrorBoundary";
 
 export const metadata: Metadata = {
   title: "XStream Player",
@@ -25,10 +16,12 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en">
-      <body className={`${geistSans.variable} ${geistMono.variable}`}>
-        <ClientProviders>
-          {children}
-        </ClientProviders>
+      <body className="antialiased font-sans">
+        <ErrorBoundary>
+          <ClientProviders>
+            {children}
+          </ClientProviders>
+        </ErrorBoundary>
       </body>
     </html>
   );
