@@ -8,9 +8,19 @@ interface VideoPlayerProps {
     src: string;
     poster?: string;
     autoPlay?: boolean;
+    initialTime?: number;
+    onProgress?: (currentTime: number, duration: number) => void;
+    onMetadata?: (duration: number) => void;
 }
 
-export default function VideoPlayer({ src, poster, autoPlay = true }: VideoPlayerProps) {
+export default function VideoPlayer({
+    src,
+    poster,
+    autoPlay = true,
+    initialTime = 0,
+    onProgress,
+    onMetadata
+}: VideoPlayerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -33,6 +43,16 @@ export default function VideoPlayer({ src, poster, autoPlay = true }: VideoPlaye
 
         let hls: Hls;
 
+        const setupVideo = () => {
+            if (initialTime > 0) {
+                console.log('[VideoPlayer] Seeking to initial time:', initialTime);
+                video.currentTime = initialTime;
+            }
+            if (autoPlay) {
+                video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+            }
+        };
+
         if (isHLS && Hls.isSupported()) {
             console.log('[VideoPlayer] Initializing HLS.js for:', src);
             hls = new Hls({
@@ -45,11 +65,8 @@ export default function VideoPlayer({ src, poster, autoPlay = true }: VideoPlaye
             hls.attachMedia(video);
 
             hls.on(Hls.Events.MANIFEST_PARSED, (event, data) => {
-                console.log('[VideoPlayer] HLS Manifest parsed. Quality levels:', data.levels.length);
-                if (autoPlay) {
-                    console.log('[VideoPlayer] Attempting autoplay...');
-                    video.play().catch(e => console.warn('[VideoPlayer] Autoplay blocked or failed:', e));
-                }
+                console.log('[VideoPlayer] HLS Manifest parsed.');
+                setupVideo();
             });
 
             hls.on(Hls.Events.ERROR, (event, data) => {
@@ -58,15 +75,12 @@ export default function VideoPlayer({ src, poster, autoPlay = true }: VideoPlaye
                     setError(`Stream error: ${data.details}. Retrying...`);
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
-                            console.log('[VideoPlayer] Network error, trying to recover...');
                             hls.startLoad();
                             break;
                         case Hls.ErrorTypes.MEDIA_ERROR:
-                            console.log('[VideoPlayer] Media error, trying to recover...');
                             hls.recoverMediaError();
                             break;
                         default:
-                            console.log('[VideoPlayer] Fatal error, destroying HLS instance.');
                             hls.destroy();
                             setError('Fatal playback error.');
                             break;
@@ -75,19 +89,14 @@ export default function VideoPlayer({ src, poster, autoPlay = true }: VideoPlaye
             });
         } else {
             // Direct video file or native HLS (Safari)
-            console.log(`[VideoPlayer] Using native playback ${isDirectVideo ? '(Direct Video)' : '(Native HLS/Other)'} for:`, src);
             video.src = src;
-            if (autoPlay) {
-                video.addEventListener('loadedmetadata', () => {
-                    console.log('[VideoPlayer] Native Playback: Metadata loaded, playing...');
-                    video.play().catch(e => console.warn('[VideoPlayer] Native autoplay failed:', e));
-                }, { once: true });
-            }
+            video.addEventListener('loadedmetadata', () => {
+                if (onMetadata) onMetadata(video.duration);
+                setupVideo();
+            }, { once: true });
+
             video.addEventListener('error', (e) => {
                 const error = video.error;
-                console.error('[VideoPlayer] Native Video Error:', error);
-
-                // If it failed because we tried to play it natively but it's an HLS stream in a non-Safari browser
                 if (!isDirectVideo && !Hls.isSupported()) {
                     setError('Your browser does not support HLS playback.');
                 } else {
@@ -98,15 +107,26 @@ export default function VideoPlayer({ src, poster, autoPlay = true }: VideoPlaye
 
         // Event listeners for UI state
         const updatePlayState = () => setIsPlaying(!video.paused);
+        const handleTimeUpdate = () => {
+            if (onProgress) onProgress(video.currentTime, video.duration);
+        };
+        const handleLoadedMetadata = () => {
+            if (onMetadata) onMetadata(video.duration);
+        };
+
         video.addEventListener('play', updatePlayState);
         video.addEventListener('pause', updatePlayState);
+        video.addEventListener('timeupdate', handleTimeUpdate);
+        video.addEventListener('loadedmetadata', handleLoadedMetadata);
 
         return () => {
             if (hls) hls.destroy();
             video.removeEventListener('play', updatePlayState);
             video.removeEventListener('pause', updatePlayState);
+            video.removeEventListener('timeupdate', handleTimeUpdate);
+            video.removeEventListener('loadedmetadata', handleLoadedMetadata);
         };
-    }, [src, autoPlay]);
+    }, [src, autoPlay, initialTime]);
 
     const togglePlay = () => {
         if (videoRef.current) {

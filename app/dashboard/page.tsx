@@ -2,14 +2,22 @@
 
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
+import { useWatchProgress } from '../context/WatchProgressContext';
 import Link from 'next/link';
-import { Tv, Film, Layers, Clock, Calendar, User } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Play, Tv, Film, Layers, Clock, Calendar, User } from 'lucide-react';
+import { useEffect, useState, useMemo } from 'react';
 
 export default function Dashboard() {
     const { user, server } = useAuth();
     const { lastSync } = useData();
+    const { progressMap } = useWatchProgress();
     const [greeting, setGreeting] = useState('Welcome back');
+
+    const continueWatching = useMemo(() => {
+        return Object.values(progressMap)
+            .sort((a, b) => b.timestamp - a.timestamp)
+            .slice(0, 10);
+    }, [progressMap]);
 
     useEffect(() => {
         const hour = new Date().getHours();
@@ -51,13 +59,53 @@ export default function Dashboard() {
                 </div>
             </div>
 
+            {/* Continue Watching Section */}
+            {continueWatching.length > 0 && (
+                <div className="space-y-4">
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                        <Clock size={20} className="text-red-500" />
+                        Continuar Assistindo
+                    </h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
+                        {continueWatching.map((item) => (
+                            <Link
+                                key={item.streamId}
+                                href={item.type === 'movie' ? `/dashboard/watch/movie/${item.streamId}` : `/dashboard/watch/series/${item.seriesId || item.streamId}`}
+                                data-focusable="true"
+                                className="group relative aspect-video rounded-xl overflow-hidden border border-white/10 hover:border-red-600 transition-all focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105"
+                            >
+                                <img
+                                    src={item.image || 'https://via.placeholder.com/300x169?text=Sem+Capa'}
+                                    alt={item.name}
+                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                />
+                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
+                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <div className="bg-red-600 p-3 rounded-full shadow-xl">
+                                        <Play size={24} fill="currentColor" className="text-white" />
+                                    </div>
+                                </div>
+                                <div className="absolute bottom-0 left-0 w-full p-3">
+                                    <p className="text-white text-xs font-bold truncate mb-1">{item.name}</p>
+                                    <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
+                                        <div
+                                            className="h-full bg-red-600"
+                                            style={{ width: `${Math.min(100, (item.progress / item.duration) * 100)}%` }}
+                                        ></div>
+                                    </div>
+                                </div>
+                            </Link>
+                        ))}
+                    </div>
+                </div>
+            )}
+
             {/* Main Categories Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                 <Link
                     href="/dashboard/live"
                     data-focusable="true"
                     tabIndex={0}
-                    autoFocus
                     className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
                 >
                     <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>

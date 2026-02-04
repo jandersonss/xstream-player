@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
+import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import { ArrowLeft, Play, Calendar, Star, Clock, Heart } from 'lucide-react';
 import Loader from '@/components/Loader';
@@ -32,6 +33,7 @@ import { useData } from '@/app/context/DataContext';
 export default function WatchMoviePage() {
     const { credentials } = useAuth();
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+    const { updateProgress, getProgress } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
     const params = useParams();
     const router = useRouter();
@@ -41,12 +43,19 @@ export default function WatchMoviePage() {
     const [loading, setLoading] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [resumeTime, setResumeTime] = useState(0);
 
     useEffect(() => {
         if (!credentials || !streamId) return;
 
         const loadMovieInfo = async () => {
             try {
+                // Check progress
+                const progress = getProgress(streamId);
+                if (progress && progress.progress > 10) { // Only resume if more than 10s
+                    setResumeTime(progress.progress);
+                }
+
                 // Try cache first
                 const cached = await getCachedDetail(streamId);
                 if (cached) {
@@ -82,7 +91,7 @@ export default function WatchMoviePage() {
         };
 
         loadMovieInfo();
-    }, [credentials, streamId, getCachedDetail, saveCachedDetail]);
+    }, [credentials, streamId, getCachedDetail, saveCachedDetail, getProgress]);
 
     const handlePlay = () => {
         setIsPlaying(true);
@@ -102,6 +111,21 @@ export default function WatchMoviePage() {
                 rating: movie.info.rating
             });
         }
+    };
+
+    const handleProgress = (currentTime: number, duration: number) => {
+        if (!movie) return;
+        // Save progress every 10 seconds or when significantly changed
+        // To keep it simple, the Context handles debounce.
+        updateProgress({
+            streamId: movie.movie_data.stream_id,
+            type: 'movie',
+            progress: currentTime,
+            duration: duration,
+            timestamp: Date.now(),
+            name: movie.info.name,
+            image: movie.info.movie_image
+        });
     };
 
     if (loading) return <Loader />;
@@ -136,6 +160,8 @@ export default function WatchMoviePage() {
                         src={streamUrl}
                         poster={movie.info.movie_image}
                         autoPlay={true}
+                        initialTime={resumeTime}
+                        onProgress={handleProgress}
                     />
                 </div>
             </div>
