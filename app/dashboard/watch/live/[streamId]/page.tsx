@@ -33,18 +33,12 @@ export default function WatchLivePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10"></div>
             </div>
 
-            <button
-                onClick={() => router.back()}
-                className="absolute top-6 left-6 z-[60] bg-black/50 hover:bg-white/20 p-3 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-600"
-                title="Voltar"
-            >
-                <ArrowLeft size={28} />
-            </button>
-
             <div className="relative flex-1 flex items-center justify-center">
                 <VideoPlayer
                     src={streamUrl}
                     autoPlay={true}
+                    onBack={() => router.back()}
+                    enterFullscreen={true}
                 />
             </div>
         </div>

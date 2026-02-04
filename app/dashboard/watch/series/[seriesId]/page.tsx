@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
@@ -121,6 +121,52 @@ export default function WatchSeriesPage() {
         }
     }, [selectedEpisode, getProgress]);
 
+    // Auto-play from continue watching
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        if (searchParams.get('autoplay') === 'true' && series && !selectedEpisode) {
+            const episodeId = searchParams.get('episode');
+            console.log('[Series Auto-play] Looking for episode:', episodeId);
+
+            if (episodeId && episodeId !== '') {
+                // Find the episode by ID
+                let foundEpisode = null;
+                let foundSeason = null;
+
+                for (const season in series.episodes) {
+                    const episode = series.episodes[season].find(ep => String(ep.id) === String(episodeId));
+                    if (episode) {
+                        foundEpisode = episode;
+                        foundSeason = season;
+                        console.log('[Series Auto-play] Found episode:', episode.title, 'in season:', season);
+                        break;
+                    }
+                }
+
+                if (foundEpisode && foundSeason) {
+                    setActiveSeason(foundSeason);
+                    setSelectedEpisode(foundEpisode);
+                } else {
+                    console.warn('[Series Auto-play] Episode not found, using first episode of first season');
+                    // Fallback: use first episode of first season
+                    const firstSeason = Object.keys(series.episodes)[0];
+                    if (firstSeason && series.episodes[firstSeason].length > 0) {
+                        setActiveSeason(firstSeason);
+                        setSelectedEpisode(series.episodes[firstSeason][0]);
+                    }
+                }
+            } else {
+                console.log('[Series Auto-play] No episode ID provided, using first episode');
+                // No episode ID, use first episode of first season
+                const firstSeason = Object.keys(series.episodes)[0];
+                if (firstSeason && series.episodes[firstSeason].length > 0) {
+                    setActiveSeason(firstSeason);
+                    setSelectedEpisode(series.episodes[firstSeason][0]);
+                }
+            }
+        }
+    }, [searchParams, series, selectedEpisode]);
+
     const handleProgress = (currentTime: number, duration: number) => {
         if (!series || !selectedEpisode) return;
         updateProgress({
@@ -156,15 +202,32 @@ export default function WatchSeriesPage() {
         const extension = selectedEpisode.container_extension;
         const streamUrl = `${hostUrl}/series/${username}/${password}/${selectedEpisode.id}.${extension}`;
 
+        // Navigation logic
+        const allEpisodes: Episode[] = [];
+        Object.keys(series.episodes)
+            .sort((a, b) => Number(a) - Number(b))
+            .forEach(season => {
+                allEpisodes.push(...series.episodes[season]);
+            });
+
+        const currentIndex = allEpisodes.findIndex(e => e.id === selectedEpisode.id);
+        const hasNext = currentIndex < allEpisodes.length - 1;
+        const hasPrevious = currentIndex > 0;
+
+        const playNext = () => {
+            if (hasNext) {
+                setSelectedEpisode(allEpisodes[currentIndex + 1]);
+            }
+        };
+
+        const playPrevious = () => {
+            if (hasPrevious) {
+                setSelectedEpisode(allEpisodes[currentIndex - 1]);
+            }
+        };
+
         return (
             <div className="fixed inset-0 bg-black z-50 flex flex-col">
-                <button
-                    onClick={() => setSelectedEpisode(null)}
-                    className="absolute top-6 left-6 z-[60] bg-black/50 hover:bg-white/20 p-3 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-600"
-                    title="Voltar"
-                >
-                    <ArrowLeft size={28} />
-                </button>
                 <div className="relative flex-1 flex items-center justify-center">
                     <VideoPlayer
                         src={streamUrl}
@@ -172,6 +235,12 @@ export default function WatchSeriesPage() {
                         autoPlay={true}
                         initialTime={resumeTime}
                         onProgress={handleProgress}
+                        onNext={hasNext ? playNext : undefined}
+                        onPrevious={hasPrevious ? playPrevious : undefined}
+                        hasNext={hasNext}
+                        hasPrevious={hasPrevious}
+                        enterFullscreen={true}
+                        onBack={() => setSelectedEpisode(null)}
                     />
                 </div>
             </div>
