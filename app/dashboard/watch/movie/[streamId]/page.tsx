@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { useParams, useRouter } from 'next/navigation';
+import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
@@ -93,6 +93,14 @@ export default function WatchMoviePage() {
         loadMovieInfo();
     }, [credentials, streamId, getCachedDetail, saveCachedDetail, getProgress]);
 
+    // Auto-play from continue watching
+    const searchParams = useSearchParams();
+    useEffect(() => {
+        if (searchParams.get('autoplay') === 'true' && movie && !isPlaying) {
+            setIsPlaying(true);
+        }
+    }, [searchParams, movie]);
+
     const handlePlay = () => {
         setIsPlaying(true);
     };
@@ -148,13 +156,6 @@ export default function WatchMoviePage() {
 
         return (
             <div className="fixed inset-0 bg-black z-50 flex flex-col">
-                <button
-                    onClick={() => setIsPlaying(false)}
-                    className="absolute top-6 left-6 z-[60] bg-black/50 hover:bg-white/20 p-3 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-600"
-                    title="Voltar"
-                >
-                    <ArrowLeft size={28} />
-                </button>
                 <div className="relative flex-1 flex items-center justify-center">
                     <VideoPlayer
                         src={streamUrl}
@@ -162,6 +163,8 @@ export default function WatchMoviePage() {
                         autoPlay={true}
                         initialTime={resumeTime}
                         onProgress={handleProgress}
+                        enterFullscreen={true}
+                        onBack={() => setIsPlaying(false)}
                     />
                 </div>
             </div>

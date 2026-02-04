@@ -70,7 +70,7 @@ export default function Dashboard() {
                         {continueWatching.map((item) => (
                             <Link
                                 key={item.streamId}
-                                href={item.type === 'movie' ? `/dashboard/watch/movie/${item.streamId}` : `/dashboard/watch/series/${item.seriesId || item.streamId}`}
+                                href={item.type === 'movie' ? `/dashboard/watch/movie/${item.streamId}?autoplay=true` : `/dashboard/watch/series/${item.seriesId || item.streamId}?autoplay=true&episode=${item.episodeId || ''}`}
                                 data-focusable="true"
                                 className="group relative aspect-video rounded-xl overflow-hidden border border-white/10 hover:border-red-600 transition-all focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105"
                             >

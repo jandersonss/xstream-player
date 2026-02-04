@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 
 export interface WatchProgress {
     streamId: string | number;
@@ -71,24 +71,38 @@ export const WatchProgressProvider = ({ children }: { children: ReactNode }) => 
                 }
             };
 
-            const timeoutId = setTimeout(syncProgress, 2000); // 2s debounce to avoid too many writes
+            const timeoutId = setTimeout(syncProgress, 5000); // 5s debounce to avoid too many writes
             return () => clearTimeout(timeoutId);
         }
     }, [progressMap, isLoaded]);
 
-    const updateProgress = (progress: WatchProgress) => {
-        setProgressMap(prev => ({
-            ...prev,
-            [progress.streamId]: progress
-        }));
-    };
+    const updateProgress = useCallback((progress: WatchProgress) => {
+        setProgressMap(prev => {
+            const existing = prev[progress.streamId];
+            // Only update if progress has changed significantly (more than 5 seconds)
+            // or if it's a new entry
+            if (!existing || Math.abs(existing.progress - progress.progress) > 5 || existing.episodeId !== progress.episodeId) {
+                return {
+                    ...prev,
+                    [progress.streamId]: progress
+                };
+            }
+            return prev;
+        });
+    }, []);
 
-    const getProgress = (streamId: string | number) => {
+    const getProgress = useCallback((streamId: string | number) => {
         return progressMap[String(streamId)];
-    };
+    }, [progressMap]);
+
+    const value = useMemo(() => ({
+        progressMap,
+        updateProgress,
+        getProgress
+    }), [progressMap, updateProgress, getProgress]);
 
     return (
-        <WatchProgressContext.Provider value={{ progressMap, updateProgress, getProgress }}>
+        <WatchProgressContext.Provider value={value}>
             {children}
         </WatchProgressContext.Provider>
     );
