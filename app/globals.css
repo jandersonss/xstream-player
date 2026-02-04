@@ -1,130 +1,59 @@
-@import "tailwindcss";
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
 
-@theme {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-primary: var(--primary);
-  --color-card: var(--card-bg);
-  --color-glass: var(--glass-bg);
-}
-
+/* 
+  FALLBACKS CRÍTICOS PARA WEBOS 4 (CHROME 60)
+  Garante que o fundo seja preto mesmo se o processamento falhar.
+*/
 :root {
   --background: #0a0a0a;
-  /* Deeper dark */
   --foreground: #ededed;
   --primary: #e50914;
-  /* Netflix Red */
   --secondary: #262626;
   --accent: #404040;
   --text-muted: #a3a3a3;
   --card-bg: #171717;
   --glass-bg: rgba(23, 23, 23, 0.8);
-
-  --font-main: 'Inter', system-ui, sans-serif;
-}
-
-
-
-html,
-body {
-  max-width: 100vw;
-  overflow-x: hidden;
-  height: 100%;
+  --font-main: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
 }
 
 body {
-  color: var(--foreground);
-  background: var(--background);
+  margin: 0;
+  padding: 0;
+  background-color: #0a0a0a !important;
+  color: #ededed !important;
   font-family: var(--font-main);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  line-height: 1.6;
 }
 
-a {
-  color: inherit;
-  text-decoration: none;
-  cursor: pointer;
+html,
+body {
+  height: 100%;
+  width: 100%;
+  overflow-x: hidden;
 }
 
-/* Scrollbar Styling */
+/* TV Focus Styles */
+[data-focusable="true"]:focus {
+  outline: 4px solid #e50914 !important;
+  outline-offset: 4px !important;
+  transform: scale(1.05) !important;
+  z-index: 50 !important;
+  box-shadow: 0 0 20px rgba(229, 9, 20, 0.8) !important;
+}
+
+/* Scrollbar para navegadores antigos baseados em WebKit (Chrome 60) */
 ::-webkit-scrollbar {
   width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: var(--background);
+  background: #0a0a0a;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: var(--secondary);
+  background: #262626;
   border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: var(--accent);
-}
-
-/* Utilities */
-.container {
-  max-width: 1400px;
-  margin: 0 auto;
-  padding: 0 20px;
-}
-
-.btn {
-  padding: 0.8rem 1.5rem;
-  border-radius: 4px;
-  font-weight: 600;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  border: none;
-  font-size: 1rem;
-}
-
-.btn-primary {
-  background: var(--primary);
-  color: white;
-}
-
-.btn-primary:hover {
-  background: #f40612;
-}
-
-.input-group {
-  margin-bottom: 1.5rem;
-}
-
-.input-field {
-  width: 100%;
-  padding: 1rem;
-  background: #333;
-  border: none;
-  border-radius: 4px;
-  color: white;
-  font-size: 1rem;
-}
-
-.input-field:focus {
-  outline: none;
-  background: #454545;
-}
-
-/* TV Navigation Focus Styles */
-[data-focusable="true"]:focus {
-  outline: 4px solid #e50914;
-  outline-offset: 4px;
-  transform: scale(1.02);
-  z-index: 50;
-  box-shadow: 0 0 20px rgba(229, 9, 20, 0.6);
-}
-
-/* Hide scrollbar but keep functionality for TV */
-.scrollbar-hide::-webkit-scrollbar {
-  display: none;
-}
-
-.scrollbar-hide {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
 }
