@@ -40,4 +40,6 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
-/data
+# data persistence
+data/*
+!data/.keep
