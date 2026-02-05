@@ -1,5 +1,7 @@
 # Xstream Player
 
+![App Screenshot](docs/screenshots/app-screenshot.png)
+
 Uma aplicação web moderna para reprodução de conteúdo IPTV via API Xstream Codes, desenvolvida com Next.js e React.
 
 ## ⚠️ AVISO DE SEGURANÇA IMPORTANTE
@@ -19,6 +21,8 @@ Uma aplicação web moderna para reprodução de conteúdo IPTV via API Xstream 
 *   Interface moderna e responsiva.
 *   Persistência de dados local para facilitar o acesso.
 *   Reprodução de canais ao vivo, filmes e séries (VOD).
+*   Integração com TMDB para metadados ricos (posters, sinopses, avaliações) e sugestões diárias.
+*   Funcionalidade "Continue Assistindo" para retomar conteúdos de onde parou.
 
 ## 🚀 Como Instalar e Rodar
 
