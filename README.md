@@ -43,28 +43,43 @@ Uma aplicação web moderna para reprodução de conteúdo IPTV via API Xstream 
 
 ### Docker
 
-Para rodar com Docker, você pode criar um container apontando para o binário do Next.js. Certifique-se de configurar a persistência de dados.
+1.  Construa a imagem:
+    ```bash
+    docker build -t xstream-player .
+    ```
 
-## 💾 Persistência de Dados e Docker
+2.  Rode o container com persistência de dados (essencial para salvar login):
+    ```bash
+    docker run -d \
+      -p 3000:3000 \
+      -v $(pwd)/data:/app/data \
+      --name xstream-player \
+      xstream-player
+    ```
 
-A aplicação utiliza a pasta `/data` na raiz do projeto para armazenar as configurações da conta logada (`config.json`). 
+    Ou se preferir usar a imagem do Docker Hub (se disponível):
+    ```bash
+    docker run -d \
+      -p 3000:3000 \
+      -v $(pwd)/data:/app/data \
+      --name xstream-player \
+      jandersonss/xstream-player:latest
+    ```
 
-Se você estiver utilizando Docker ou qualquer outro sistema de containerização, é **essencial** realizar o bind deste volume para garantir que seus dados de login permaneçam persistentes após o reinício do container.
+## 💾 Persistência de Dados
 
-**Exemplo de uso no Docker:**
-```bash
-docker run -d \
-  -p 3000:3000 \
-  -v /caminho/local/data:/app/data \
-  --name xstream-player \
-  imagem-do-xstream-player
-```
+A aplicação utiliza a pasta `/data` na raiz do projeto para armazenar as configurações da conta logada (`config.json`).
 
-No `docker-compose.yml`:
+É **essencial** realizar o bind deste volume (`-v $(pwd)/data:/app/data`) para garantir que seus dados de login permaneçam persistentes após o reinício do container.
+
+### Docker Compose
+
+Exemplo de `docker-compose.yml`:
 ```yaml
 services:
   xstream-player:
-    image: seu-usuario/xstream-player
+    image: xstream-player
+    build: .
     ports:
       - "3000:3000"
     volumes:
