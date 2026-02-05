@@ -14,6 +14,7 @@ const nextConfig: NextConfig = {
     ],
   },
   transpilePackages: ['lucide-react', 'framer-motion', 'idb', 'next'],
+  output: "standalone",
 };
 
 export default nextConfig;
