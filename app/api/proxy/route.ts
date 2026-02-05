@@ -24,11 +24,38 @@ export async function POST(request: Request) {
 
         // console.log(`Proxying action: ${action} to ${baseUrl}`);
 
-        const response = await fetch(apiUrl);
+        let response;
+        let lastError;
+        const maxRetries = 3;
+
+        for (let i = 0; i <= maxRetries; i++) {
+            try {
+                response = await fetch(apiUrl);
+
+                // Break if success or if it's a client error (4xx) which typically shouldn't be retried
+                // We only retry on 5xx server errors or network exceptions
+                if (response.ok || response.status < 500) {
+                    break;
+                }
+
+                if (i < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            } catch (error) {
+                lastError = error;
+                if (i < maxRetries) {
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                }
+            }
+        }
+
+        if (!response) {
+            throw lastError || new Error('Fetch failed after retries');
+        }
 
         if (!response.ok) {
             return NextResponse.json(
-                { error: `Upstream error: ${response.statusText}` },
+                { error: `Upstream error: ${response.statusText}`, details: response.status === 504 ? 'Gateway Timeout' : undefined },
                 { status: response.status }
             );
         }

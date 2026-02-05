@@ -3,20 +3,81 @@
 import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useWatchProgress } from '../context/WatchProgressContext';
+import { useTMDb } from '../context/TMDbContext';
 import Link from 'next/link';
-import { Play, Tv, Film, Layers, Clock, Calendar, User } from 'lucide-react';
+import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, TrendingUp } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
+import ContentCarousel from '@/components/ContentCarousel';
+import TMDbSettingsModal from '@/components/TMDbSettingsModal';
+import {
+    getTMDbImageUrl,
+    getDailySeed,
+    shuffleWithSeed,
+    generateDailyCarousels,
+    titlesMatch,
+    findBestMatch,
+    prepareForMatching,
+    TMDbMovie,
+    TMDbTVShow
+} from '../lib/tmdb';
+import {
+    CachedStream,
+    CachedCategory,
+    saveCarouselCache,
+    getCarouselCache,
+    clearExpiredCarouselCache
+} from '../lib/db';
+
+interface EnrichedStream extends CachedStream {
+    tmdbData?: {
+        poster: string;
+        backdrop: string;
+        rating: number;
+        overview: string;
+        year: number;
+    };
+}
 
 export default function Dashboard() {
     const { user, server } = useAuth();
-    const { lastSync } = useData();
+    const { lastSync, getCachedCategories, getAllCachedStreams } = useData();
     const { progressMap } = useWatchProgress();
+    const {
+        isConfigured,
+        fetchMovieGenres,
+        fetchTVGenres,
+        fetchMoviesByYear,
+        fetchMoviesByGenre,
+        fetchTVByGenre,
+        fetchTrending
+    } = useTMDb();
+
     const [greeting, setGreeting] = useState('Welcome back');
+    const [showSettings, setShowSettings] = useState(false);
+    interface CarouselData {
+        id: string;
+        title: string;
+        type: 'movie' | 'series';
+        data: EnrichedStream[];
+    }
+
+    const [carouselData, setCarouselData] = useState<CarouselData[]>([]);
+    const [isLoadingCarousels, setIsLoadingCarousels] = useState(false);
 
     const continueWatching = useMemo(() => {
         return Object.values(progressMap)
             .sort((a, b) => b.timestamp - a.timestamp)
-            .slice(0, 10);
+            .slice(0, 10)
+            .map(item => ({
+                id: item.streamId,
+                name: item.name,
+                image: item.image || 'https://via.placeholder.com/300x169?text=Sem+Capa',
+                progress: item.progress,
+                duration: item.duration,
+                href: item.type === 'movie'
+                    ? `/dashboard/watch/movie/${item.streamId}?autoplay=true`
+                    : `/dashboard/watch/series/${item.seriesId || item.streamId}?autoplay=true&episode=${item.episodeId || ''}`
+            }));
     }, [progressMap]);
 
     useEffect(() => {
@@ -26,10 +87,233 @@ export default function Dashboard() {
         else setGreeting('Boa noite');
     }, []);
 
+    // Load carousels based on TMDb configuration
+    // Load carousels based on TMDb configuration
+    useEffect(() => {
+        const loadCarousels = async () => {
+            setIsLoadingCarousels(true);
+            const allCarousels: CarouselData[] = [];
+
+            try {
+                // Always load IPTV carousels
+                const iptvCarousels = await fetchIPTVCarousels();
+                allCarousels.push(...iptvCarousels);
+
+                if (isConfigured) {
+                    // TMDb configured: Load TMDB carousels filtered by IPTV availability
+                    const tmdbCarousels = await fetchTMDbCarousels();
+                    allCarousels.unshift(...tmdbCarousels);
+                }
+
+                setCarouselData(allCarousels);
+            } catch (error) {
+                console.error('Failed to load carousels:', error);
+            } finally {
+                setIsLoadingCarousels(false);
+            }
+        };
+
+        loadCarousels();
+    }, [isConfigured]);
+
+    const fetchTMDbCarousels = async (): Promise<CarouselData[]> => {
+        // Daily cache key (YYYY-MM-DD)
+        const today = new Date();
+        const dateKey = today.toISOString().split('T')[0];
+
+        // Check cache first
+        try {
+            const cachedData = await getCarouselCache(dateKey);
+            if (cachedData && cachedData.length > 0) {
+                console.log('Using cached carousels for', dateKey);
+                // Clean up old caches in background
+                clearExpiredCarouselCache(dateKey).catch(console.error);
+                return cachedData;
+            }
+        } catch (error) {
+            console.warn('Failed to read carousel cache:', error);
+        }
+
+        // Get all IPTV content for matching
+        const [allMovies, allSeries] = await Promise.all([
+            getAllCachedStreams('movie'),
+            getAllCachedStreams('series')
+        ]);
+
+        // OPTIMIZATION: Prepare databases for matching (normalize once)
+        console.time('prepareMatching');
+        const preparedMovies = prepareForMatching(allMovies);
+        const preparedSeries = prepareForMatching(allSeries);
+        console.timeEnd('prepareMatching');
+
+        // Fetch genres
+        const [movieGenres, tvGenres] = await Promise.all([
+            fetchMovieGenres(),
+            fetchTVGenres()
+        ]);
+
+        // Generate daily carousels
+        const carousels = generateDailyCarousels(movieGenres, tvGenres, 4);
+
+        // Fetch and filter TMDb content
+        const dataPromises = carousels.map(async (carousel) => {
+            let tmdbItems: (TMDbMovie | TMDbTVShow)[] = [];
+
+            try {
+                if (carousel.type === 'trending') {
+                    tmdbItems = await fetchTrending();
+                } else if (carousel.type === 'movie') {
+                    if (carousel.year) {
+                        tmdbItems = await fetchMoviesByYear(carousel.year);
+                    } else if (carousel.genreId) {
+                        tmdbItems = await fetchMoviesByGenre(carousel.genreId);
+                    }
+                } else if (carousel.type === 'tv' && carousel.genreId) {
+                    tmdbItems = await fetchTVByGenre(carousel.genreId);
+                }
+            } catch (error) {
+                console.error(`Failed to fetch TMDb data for ${carousel.id}:`, error);
+                return {
+                    id: carousel.id,
+                    title: carousel.title,
+                    type: carousel.type === 'tv' ? 'series' as const : 'movie' as const,
+                    data: [] as EnrichedStream[]
+                };
+            }
+
+            // Filter TMDb items to only those available in IPTV
+            const filteredItems: EnrichedStream[] = [];
+            const matchedStreamIds = new Set<number | string>(); // Track matched items to avoid duplicates
+
+            for (const tmdbItem of tmdbItems) {
+                // Determine the correct database and type for THIS item
+                // This fixes the issue where trending (mixed) items were all searched in movies DB
+                let isMovie = false;
+                if (carousel.type === 'trending') {
+                    // For trending, check the media_type if available or infer from title
+                    isMovie = 'title' in tmdbItem;
+                } else {
+                    // For specific carousels, use the carousel type
+                    isMovie = carousel.type === 'movie';
+                }
+
+                // If trending item is a 'person' or other type, skip
+                if (!('title' in tmdbItem) && !('name' in tmdbItem)) continue;
+
+                // Select correct PREPARED DB
+                const preparedDatabase = isMovie ? preparedMovies : preparedSeries;
+                const tmdbTitle = isMovie ? (tmdbItem as TMDbMovie).title : (tmdbItem as TMDbTVShow).name;
+
+                // Find BEST matching IPTV item using prepared DB
+                const matchResult = findBestMatch<EnrichedStream>(tmdbTitle, preparedDatabase, 0.85);
+
+                if (matchResult && !matchedStreamIds.has(matchResult.item.id)) {
+                    const iptvMatch = matchResult.item;
+
+                    // Mark this stream as matched
+                    matchedStreamIds.add(iptvMatch.id);
+
+                    filteredItems.push({
+                        ...iptvMatch,
+                        tmdbData: {
+                            poster: getTMDbImageUrl(tmdbItem.poster_path),
+                            backdrop: getTMDbImageUrl(tmdbItem.backdrop_path),
+                            rating: tmdbItem.vote_average,
+                            overview: tmdbItem.overview,
+                            year: isMovie
+                                ? new Date((tmdbItem as TMDbMovie).release_date || '').getFullYear()
+                                : new Date((tmdbItem as TMDbTVShow).first_air_date || '').getFullYear()
+                        }
+                    });
+                }
+
+                // Limit to 20 items per carousel
+                if (filteredItems.length >= 20) break;
+            }
+
+            return {
+                id: carousel.id,
+                title: carousel.title,
+                type: carousel.type === 'tv' ? 'series' as const : 'movie' as const,
+                data: filteredItems
+            };
+        });
+
+        const results = await Promise.all(dataPromises);
+
+        // Filter out empty carousels
+        const validResults = results.filter(r => r.data.length > 0);
+
+        // Cache the results
+        if (validResults.length > 0) {
+            saveCarouselCache(dateKey, validResults).catch(console.error);
+        }
+
+        return validResults;
+    };
+
+    const fetchIPTVCarousels = async (): Promise<CarouselData[]> => {
+        // Load categories
+        const [movieCategories, seriesCategories] = await Promise.all([
+            getCachedCategories('movie'),
+            getCachedCategories('series')
+        ]);
+
+        // Generate daily selection (max 4 carousels)
+        const seed = getDailySeed();
+        const allCategories = [
+            ...movieCategories.map(cat => ({ type: 'movie' as const, category: cat })),
+            ...seriesCategories.map(cat => ({ type: 'series' as const, category: cat }))
+        ];
+
+        const shuffled = shuffleWithSeed(allCategories, seed);
+        const selected = shuffled.slice(0, 4);
+
+        // Load content for each category
+        const dataPromises = selected.map(async ({ type, category }) => {
+            const streams = await getAllCachedStreams(type);
+            const categoryStreams = streams
+                .filter(s => s.category_id === category.category_id)
+                .slice(0, 20);
+
+            return {
+                id: `${type}-${category.category_id}`,
+                title: category.category_name,
+                type,
+                data: categoryStreams
+            };
+        });
+
+        const results = await Promise.all(dataPromises);
+
+        // Filter out empty carousels
+        return results.filter(r => r.data.length > 0);
+    };
+
     const formatDate = (timestamp: string) => {
         if (!timestamp) return 'Ilimitado';
         const date = new Date(parseInt(timestamp) * 1000);
         return date.toLocaleDateString();
+    };
+
+    const transformStreamToCarouselItem = (stream: EnrichedStream, type: 'movie' | 'series') => {
+        return {
+            id: stream.id,
+            name: stream.name,
+            image: stream.tmdbData?.poster || stream.icon || 'https://via.placeholder.com/300x450?text=Sem+Poster',
+            rating: stream.tmdbData?.rating || stream.rating,
+            year: stream.tmdbData?.year,
+            href: type === 'movie'
+                ? `/dashboard/watch/movie/${stream.id}`
+                : `/dashboard/watch/series/${stream.id}`
+        };
+    };
+
+    const getCarouselIcon = (carouselId: string) => {
+        if (carouselId.includes('trending')) return TrendingUp;
+        if (carouselId.includes('movie') || carouselId.startsWith('new-releases')) return Film;
+        if (carouselId.includes('tv') || carouselId.includes('series')) return Layers;
+        return Play;
     };
 
     return (
@@ -48,6 +332,17 @@ export default function Dashboard() {
                     </div>
                 </div>
                 <div className="flex gap-4">
+                    <button
+                        onClick={() => setShowSettings(true)}
+                        data-focusable="true"
+                        className="bg-[#1f1f1f] px-4 py-2 rounded-lg border border-[#333] hover:border-red-600 flex items-center gap-2 transition-all focus:outline-none focus:ring-4 focus:ring-red-600"
+                    >
+                        <Settings size={16} className="text-red-500" />
+                        <span className="text-sm font-medium text-gray-300">TMDb</span>
+                        {isConfigured && (
+                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
+                        )}
+                    </button>
                     <div className="bg-[#1f1f1f] px-4 py-2 rounded-lg border border-[#333] flex items-center gap-2">
                         <User size={16} className="text-red-500" />
                         <span className="text-sm font-medium text-gray-300">{user?.status === 'Active' ? 'Assinatura Ativa' : user?.status}</span>
@@ -61,44 +356,29 @@ export default function Dashboard() {
 
             {/* Continue Watching Section */}
             {continueWatching.length > 0 && (
-                <div className="space-y-4">
-                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                        <Clock size={20} className="text-red-500" />
-                        Continuar Assistindo
-                    </h2>
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
-                        {continueWatching.map((item) => (
-                            <Link
-                                key={item.streamId}
-                                href={item.type === 'movie' ? `/dashboard/watch/movie/${item.streamId}?autoplay=true` : `/dashboard/watch/series/${item.seriesId || item.streamId}?autoplay=true&episode=${item.episodeId || ''}`}
-                                data-focusable="true"
-                                className="group relative aspect-video rounded-xl overflow-hidden border border-white/10 hover:border-red-600 transition-all focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105"
-                            >
-                                <img
-                                    src={item.image || 'https://via.placeholder.com/300x169?text=Sem+Capa'}
-                                    alt={item.name}
-                                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
-                                />
-                                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>
-                                <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                    <div className="bg-red-600 p-3 rounded-full shadow-xl">
-                                        <Play size={24} fill="currentColor" className="text-white" />
-                                    </div>
-                                </div>
-                                <div className="absolute bottom-0 left-0 w-full p-3">
-                                    <p className="text-white text-xs font-bold truncate mb-1">{item.name}</p>
-                                    <div className="w-full h-1 bg-white/20 rounded-full overflow-hidden">
-                                        <div
-                                            className="h-full bg-red-600"
-                                            style={{ width: `${Math.min(100, (item.progress / item.duration) * 100)}%` }}
-                                        ></div>
-                                    </div>
-                                </div>
-                            </Link>
-                        ))}
-                    </div>
-                </div>
+                <ContentCarousel
+                    title="Continuar Assistindo"
+                    items={continueWatching}
+                    icon={Clock}
+                    showProgress={true}
+                />
             )}
+
+            {/* Dynamic Carousels */}
+            {carouselData.map((carousel) => {
+                const items = carousel.data.map(stream =>
+                    transformStreamToCarouselItem(stream, carousel.type)
+                );
+
+                return (
+                    <ContentCarousel
+                        key={carousel.id}
+                        title={carousel.title}
+                        items={items}
+                        icon={getCarouselIcon(carousel.id)}
+                    />
+                );
+            })}
 
             {/* Main Categories Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -195,12 +475,33 @@ export default function Dashboard() {
 
                 <div className="bg-gradient-to-br from-[#1a1a1a] to-[#222] rounded-xl p-6 border border-[#333] flex flex-col items-center justify-center text-center">
                     <div className="w-16 h-16 bg-[#333] rounded-full flex items-center justify-center mb-4">
-                        <Tv size={32} className="text-gray-500" />
+                        {isConfigured ? (
+                            <Star size={32} className="text-yellow-500" />
+                        ) : (
+                            <Tv size={32} className="text-gray-500" />
+                        )}
                     </div>
-                    <h3 className="text-white font-bold mb-2">Comece a Assistir</h3>
-                    <p className="text-gray-400 text-sm">Selecione uma categoria acima para começar a transmitir.</p>
+                    <h3 className="text-white font-bold mb-2">
+                        {isConfigured ? 'Experiência TMDb Ativa' : 'Configure o TMDb'}
+                    </h3>
+                    <p className="text-gray-400 text-sm">
+                        {isConfigured
+                            ? 'Carrosséis personalizados com conteúdos do TMDb disponíveis no seu IPTV.'
+                            : 'Configure sua chave de API para ver sugestões do TMDb filtradas pelo seu catálogo.'}
+                    </p>
+                    {!isConfigured && (
+                        <button
+                            onClick={() => setShowSettings(true)}
+                            className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white text-sm font-medium transition-colors"
+                        >
+                            Configurar Agora
+                        </button>
+                    )}
                 </div>
             </div>
+
+            {/* TMDb Settings Modal */}
+            <TMDbSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
         </div>
     );
 }

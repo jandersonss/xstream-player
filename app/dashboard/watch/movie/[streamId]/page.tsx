@@ -58,7 +58,7 @@ export default function WatchMoviePage() {
 
                 // Try cache first
                 const cached = await getCachedDetail(streamId);
-                if (cached) {
+                if (cached && cached.info && cached.movie_data) {
                     setMovie(cached);
                     setLoading(false);
                     return;
@@ -75,7 +75,7 @@ export default function WatchMoviePage() {
                 });
 
                 const data = await res.json();
-                if (data && data.info) {
+                if (data && data.info && data.movie_data) {
                     setMovie(data);
                     // Lazy cache the detail
                     await saveCachedDetail(streamId, data);
