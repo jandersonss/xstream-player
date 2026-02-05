@@ -86,6 +86,20 @@ services:
       - ./data:/app/data
 ```
 
+### ⚠️ Importante (Usuários Linux)
+
+Se você estiver rodando no Linux, pode enfrentar problemas de permissão (`EACCES: permission denied`), pois o usuário do container (`uid 1001`) é diferente do seu usuário local.
+
+Para corrigir isso, você precisa ajustar as permissões da pasta `data` na sua máquina local:
+
+```bash
+# Opção 1: Dar permissão de escrita para "outros" (mais fácil)
+chmod -R 777 data/
+
+# Opção 2: Atribuir dono ao uid do container (mais seguro)
+sudo chown -R 1001:1001 data/
+```
+
 ## 🛠️ Tecnologias Utilizadas
 
 *   [Next.js](https://nextjs.org/)
