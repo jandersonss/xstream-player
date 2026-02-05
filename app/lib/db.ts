@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from 'idb';
 
 const DB_NAME = 'xstream_player_db';
-const DB_VERSION = 3;
+const DB_VERSION = 5;
 
 export interface CachedCategory {
     category_id: string;
@@ -61,6 +61,12 @@ export const initDB = async (): Promise<IDBPDatabase> => {
             }
             if (!db.objectStoreNames.contains('details')) {
                 db.createObjectStore('details', { keyPath: 'id' });
+            }
+            if (!db.objectStoreNames.contains('tmdb_cache')) {
+                db.createObjectStore('tmdb_cache', { keyPath: 'key' });
+            }
+            if (!db.objectStoreNames.contains('carousel_cache')) {
+                db.createObjectStore('carousel_cache', { keyPath: 'date' });
             }
         },
     });
@@ -136,4 +142,56 @@ export const clearCache = async () => {
     await db.clear('streams');
     await db.clear('sync_metadata');
     await db.clear('details');
+};
+
+// TMDb Cache functions
+export const saveTMDbCache = async (key: string, data: any) => {
+    const db = await initDB();
+    await db.put('tmdb_cache', { key, data, timestamp: Date.now() });
+};
+
+export const getTMDbCache = async (key: string): Promise<{ data: any; timestamp: number } | undefined> => {
+    const db = await initDB();
+    return db.get('tmdb_cache', key);
+};
+
+export const clearExpiredTMDbCache = async (ttl: number = 1000 * 60 * 60 * 24) => {
+    const db = await initDB();
+    const all = await db.getAll('tmdb_cache');
+    const now = Date.now();
+    const tx = db.transaction('tmdb_cache', 'readwrite');
+    const store = tx.objectStore('tmdb_cache');
+
+    for (const item of all) {
+        if (now - item.timestamp > ttl) {
+            await store.delete(item.key);
+        }
+    }
+    await tx.done;
+};
+
+// Carousel Cache functions (Daily)
+export const saveCarouselCache = async (dateKey: string, data: any[]) => {
+    const db = await initDB();
+    await db.put('carousel_cache', { date: dateKey, data, timestamp: Date.now() });
+};
+
+export const getCarouselCache = async (dateKey: string): Promise<any[] | undefined> => {
+    const db = await initDB();
+    const entry = await db.get('carousel_cache', dateKey);
+    return entry?.data;
+};
+
+export const clearExpiredCarouselCache = async (currentDateKey: string) => {
+    const db = await initDB();
+    const allKeys = await db.getAllKeys('carousel_cache');
+    const tx = db.transaction('carousel_cache', 'readwrite');
+    const store = tx.objectStore('carousel_cache');
+
+    for (const key of allKeys) {
+        if (key !== currentDateKey) {
+            await store.delete(key);
+        }
+    }
+    await tx.done;
 };
