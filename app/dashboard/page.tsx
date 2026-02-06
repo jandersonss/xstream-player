@@ -114,7 +114,7 @@ export default function Dashboard() {
         };
 
         loadCarousels();
-    }, [isConfigured]);
+    }, [isConfigured, lastSync]);
 
     const fetchTMDbCarousels = async (): Promise<CarouselData[]> => {
         // Daily cache key (YYYY-MM-DD)
