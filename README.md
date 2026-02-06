@@ -2,57 +2,68 @@
 
 ![App Screenshot](docs/screenshots/app-screenshot.png)
 
-Uma aplicação web moderna para reprodução de conteúdo IPTV via API Xstream Codes, desenvolvida com Next.js e React.
+A modern web application for IPTV content playback via Xstream Codes API, built with Next.js and React.
 
-## ⚠️ AVISO DE SEGURANÇA IMPORTANTE
+## ⚠️ IMPORTANT SECURITY WARNING
 
-**ESTA APLICAÇÃO É DESTINADA APENAS PARA USO EM REDE PRIVADA.**
+**THIS APPLICATION IS INTENDED FOR PRIVATE NETWORK USE ONLY.**
 
-*   **Não exponha esta aplicação diretamente à internet.**
-*   A aplicação **não possui verificações de segurança robustas** implementadas.
-*   As informações da conta IPTV (URL do host, usuário e senha) são **salvas localmente sem criptografia** no servidor (no arquivo `data/config.json`).
-*   Recomenda-se o uso apenas em ambientes controlados e seguros.
+*   **Do not expose this application directly to the internet.**
+*   The application **does not have robust security checks** implemented.
+*   IPTV account information (host URL, username, and password) is **saved locally unencrypted** on the server (in the `data/config.json` file).
+*   Use only in controlled and secure environments is recommended.
 
 ---
 
-## 📺 Funcionalidades
+## � Motivation
 
-*   Suporte a API Xstream Codes.
-*   Interface moderna e responsiva.
-*   Persistência de dados local para facilitar o acesso.
-*   Reprodução de canais ao vivo, filmes e séries (VOD).
-*   Integração com TMDB para metadados ricos (posters, sinopses, avaliações) e sugestões diárias.
-*   Funcionalidade "Continue Assistindo" para retomar conteúdos de onde parou.
+The idea for this project arose from the limitations found in various IPTV apps across different TV brands and devices. Some of the main problems encountered were:
 
-## 🚀 Como Instalar e Rodar
+*   **Repetitive Login:** The need to connect the IPTV account individually on each TV.
+*   **Lack of Synchronization:** Impossible to stop watching content in the living room and continue from the exact same point in the bedroom.
+*   **Poor User Experience:** Most IPTV players are filled with advertisements, require payment, or simply deliver a subpar interface.
+*   **Lack of Discovery:** Absence of a dynamic experience with content suggestions based on the available library.
 
-### Pré-requisitos
+This project aims to solve these issues by providing a centralized, modern, and ad-free web interface.
 
-*   Node.js (v18 ou superior)
-*   npm ou yarn
+## �📺 Features
 
-### Instalação Local
+*   Xstream Codes API Support.
+*   Modern and responsive interface.
+*   Local data persistence for easy access.
+*   Playback of live channels, movies, and series (VOD).
+*   TMDB integration for rich metadata (posters, overviews, ratings) and daily suggestions.
+*   "Continue Watching" functionality to resume content from where you left off.
 
-1.  Clone o repositório ou baixe os arquivos.
-2.  No terminal, acesse a pasta do projeto.
-3.  Instale as dependências:
+## 🚀 How to Install and Run
+
+### Prerequisites
+
+*   Node.js (v18 or higher)
+*   npm or yarn
+
+### Local Installation
+
+1.  Clone the repository or download the files.
+2.  In the terminal, access the project folder.
+3.  Install dependencies:
     ```bash
     npm install
     ```
-4.  Inicie o servidor de desenvolvimento:
+4.  Start the development server:
     ```bash
     npm run dev
     ```
-5.  Acesse `http://localhost:3000` no seu navegador.
+5.  Access `http://localhost:3000` in your browser.
 
 ### Docker
 
-1.  Construa a imagem:
+1.  Build the image:
     ```bash
     docker build -t xstream-player .
     ```
 
-2.  Rode o container com persistência de dados (essencial para salvar login):
+2.  Run the container with data persistence (essential for saving login):
     ```bash
     docker run -d \
       -p 3000:3000 \
@@ -61,7 +72,7 @@ Uma aplicação web moderna para reprodução de conteúdo IPTV via API Xstream 
       xstream-player
     ```
 
-    Ou se preferir usar a imagem do Docker Hub (se disponível):
+    Or if you prefer to use the Docker Hub image (if available):
     ```bash
     docker run -d \
       -p 3000:3000 \
@@ -70,15 +81,15 @@ Uma aplicação web moderna para reprodução de conteúdo IPTV via API Xstream 
       jandersonss/xstream-player:latest
     ```
 
-## 💾 Persistência de Dados
+## 💾 Data Persistence
 
-A aplicação utiliza a pasta `/data` na raiz do projeto para armazenar as configurações da conta logada (`config.json`).
+The application uses the `/data` folder in the project root to store logged-in account settings (`config.json`).
 
-É **essencial** realizar o bind deste volume (`-v $(pwd)/data:/app/data`) para garantir que seus dados de login permaneçam persistentes após o reinício do container.
+It is **essential** to bind this volume (`-v $(pwd)/data:/app/data`) to ensure your login data remains persistent after container restart.
 
 ### Docker Compose
 
-Exemplo de `docker-compose.yml`:
+Example `docker-compose.yml`:
 ```yaml
 services:
   xstream-player:
@@ -90,21 +101,21 @@ services:
       - ./data:/app/data
 ```
 
-### ⚠️ Importante (Usuários Linux)
+### ⚠️ Important (Linux Users)
 
-Se você estiver rodando no Linux, pode enfrentar problemas de permissão (`EACCES: permission denied`), pois o usuário do container (`uid 1001`) é diferente do seu usuário local.
+If you are running on Linux, you may face permission issues (`EACCES: permission denied`), as the container user (`uid 1001`) is different from your local user.
 
-Para corrigir isso, você precisa ajustar as permissões da pasta `data` na sua máquina local:
+To fix this, you need to adjust permissions for the `data` folder on your local machine:
 
 ```bash
-# Opção 1: Dar permissão de escrita para "outros" (mais fácil)
+# Option 1: Give write permission to "others" (easier)
 chmod -R 777 data/
 
-# Opção 2: Atribuir dono ao uid do container (mais seguro)
+# Option 2: Assign ownership to the container uid (more secure)
 sudo chown -R 1001:1001 data/
 ```
 
-## 🛠️ Tecnologias Utilizadas
+## 🛠️ Technologies Used
 
 *   [Next.js](https://nextjs.org/)
 *   [React](https://reactjs.org/)
@@ -112,3 +123,19 @@ sudo chown -R 1001:1001 data/
 *   [HLS.js](https://github.com/video-dev/hls.js/)
 *   [Framer Motion](https://www.framer.com/motion/)
 *   [Lucide React](https://lucide.dev/)
+
+---
+
+## Donations
+
+**In cryptocurrencies:**
+
+**EVM Networks (ETH, BNB, Arbitrum, Optimism, etc.):**
+`0x67270c1e57bdcc888331198e79f001de7b8a7e88`
+
+**Solana:**
+`4q4LufXBtvvRo4Rc3YfJMhXwagkqiwzJmBbYkZWrJ4ja`
+
+**BTC:** `bc1qz6kjajch0efkc827sal0mncvzam6njjqsfjh3q`
+
+**Pix:** `2e204859-2190-4147-b97f-6d141cbdf324`
