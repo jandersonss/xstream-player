@@ -5,6 +5,7 @@ import { useData } from '../context/DataContext';
 import { useWatchProgress } from '../context/WatchProgressContext';
 import { useTMDb } from '../context/TMDbContext';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, TrendingUp } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import ContentCarousel from '@/components/ContentCarousel';
@@ -59,10 +60,12 @@ export default function Dashboard() {
         title: string;
         type: 'movie' | 'series';
         data: EnrichedStream[];
+        categoryId?: string | number;
     }
 
     const [carouselData, setCarouselData] = useState<CarouselData[]>([]);
     const [isLoadingCarousels, setIsLoadingCarousels] = useState(false);
+    const router = useRouter();
 
     const continueWatching = useMemo(() => {
         return Object.values(progressMap)
@@ -280,7 +283,8 @@ export default function Dashboard() {
                 id: `${type}-${category.category_id}`,
                 title: category.category_name,
                 type,
-                data: categoryStreams
+                data: categoryStreams,
+                categoryId: category.category_id
             };
         });
 
@@ -376,6 +380,9 @@ export default function Dashboard() {
                         title={carousel.title}
                         items={items}
                         icon={getCarouselIcon(carousel.id)}
+                        onViewAll={carousel.categoryId ? () => {
+                            router.push(`/dashboard/${carousel.type === 'movie' ? 'movies' : 'series'}/${carousel.categoryId}`);
+                        } : undefined}
                     />
                 );
             })}
