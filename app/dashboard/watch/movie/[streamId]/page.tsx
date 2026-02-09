@@ -107,8 +107,10 @@ export default function WatchMoviePage() {
     useEffect(() => {
         if (searchParams.get('autoplay') === 'true' && movie && !isPlaying && progressLoaded) {
             setIsPlaying(true);
+            // Clear autoplay search params immediately to prevent loop
+            router.replace(`/dashboard/watch/movie/${streamId}`);
         }
-    }, [searchParams, movie, progressLoaded, isPlaying]);
+    }, [searchParams, movie, progressLoaded, isPlaying, router, streamId]);
 
     const handlePlay = () => {
         setIsPlaying(true);

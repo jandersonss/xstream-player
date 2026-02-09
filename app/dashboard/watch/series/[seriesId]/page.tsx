@@ -159,6 +159,8 @@ export default function WatchSeriesPage() {
                 if (foundEpisode && foundSeason) {
                     setActiveSeason(foundSeason);
                     setSelectedEpisode(foundEpisode);
+                    // Clear autoplay search params immediately to prevent loop
+                    router.replace(`/dashboard/watch/series/${seriesId}`);
                 } else {
                     console.warn('[Series Auto-play] Episode not found, using first episode of first season');
                     // Fallback: use first episode of first season
@@ -166,6 +168,7 @@ export default function WatchSeriesPage() {
                     if (firstSeason && series.episodes[firstSeason].length > 0) {
                         setActiveSeason(firstSeason);
                         setSelectedEpisode(series.episodes[firstSeason][0]);
+                        router.replace(`/dashboard/watch/series/${seriesId}`);
                     }
                 }
             } else {
@@ -175,10 +178,11 @@ export default function WatchSeriesPage() {
                 if (firstSeason && series.episodes[firstSeason].length > 0) {
                     setActiveSeason(firstSeason);
                     setSelectedEpisode(series.episodes[firstSeason][0]);
+                    router.replace(`/dashboard/watch/series/${seriesId}`);
                 }
             }
         }
-    }, [searchParams, series, selectedEpisode]);
+    }, [searchParams, series, selectedEpisode, router, seriesId]);
 
     const handleProgress = (currentTime: number, duration: number) => {
         if (!series || !selectedEpisode) return;
@@ -241,8 +245,6 @@ export default function WatchSeriesPage() {
 
         const handleBackFromPlayer = () => {
             setSelectedEpisode(null);
-            // Clear autoplay search params to prevent loop
-            router.replace(`/dashboard/watch/series/${seriesId}`);
         };
 
         return (

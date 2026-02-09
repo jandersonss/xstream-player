@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import Hls from 'hls.js';
 import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft } from 'lucide-react';
+import { useNavigationOverride } from '@/app/context/NavigationContext';
 
 interface VideoPlayerProps {
     src: string;
@@ -43,6 +44,22 @@ export default function VideoPlayer({
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
     const [isSeeking, setIsSeeking] = useState(false);
+
+    // Register custom back handler via navigation context
+    // This ensures only one handler executes when back is pressed
+    useNavigationOverride(onBack ? () => {
+        console.log('VideoPlayer::Custom back handler triggered');
+        // Exit fullscreen first if in fullscreen
+        if (document.fullscreenElement) {
+            document.exitFullscreen().then(() => {
+                onBack();
+            }).catch(() => {
+                onBack();
+            });
+        } else {
+            onBack();
+        }
+    } : null);
 
     useEffect(() => {
         if (enterFullscreen && containerRef.current && !document.fullscreenElement) {
@@ -260,30 +277,8 @@ export default function VideoPlayer({
         }, 5000);
     };
 
-    useEffect(() => {
-        const handleKeyDown = (e: KeyboardEvent) => {
-            handleInteraction();
-
-            // Handle Escape key
-            if (e.key === 'Escape' && onBack) {
-                e.preventDefault();
-                // Exit fullscreen first if in fullscreen
-                console.log('VideoPlayer::Back', document.fullscreenElement)
-                if (document.fullscreenElement) {
-                    document.exitFullscreen().then(() => {
-                        onBack();
-                    }).catch(() => {
-                        onBack();
-                    });
-                } else {
-                    onBack();
-                }
-            }
-        };
-
-        window.addEventListener('keydown', handleKeyDown);
-        return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [isPlaying, onBack]);
+    // Note: Back navigation (Escape/Backspace) is now handled by the global useTvNavigation hook
+    // via the NavigationContext. The onBack handler is registered above using useNavigationOverride.
 
     const isLive = duration === Infinity || duration === 0;
 

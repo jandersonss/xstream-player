@@ -1,8 +1,10 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import { useNavigationContext } from '@/app/context/NavigationContext';
 
 export const useTvNavigation = () => {
     const router = useRouter();
+    const { getActiveBackHandler } = useNavigationContext();
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
@@ -21,11 +23,19 @@ export const useTvNavigation = () => {
             // Back Navigation
             if (e.key === 'Backspace' || e.key === 'Escape') {
                 e.preventDefault();
-                console.log('TVNavigation::Back', document.fullscreenElement)
                 if (document.fullscreenElement) {
                     return;
                 }
-                router.back();
+
+                // Check if there's a custom back handler registered
+                const customHandler = getActiveBackHandler();
+                if (customHandler) {
+                    console.log('TVNavigation::Using custom back handler');
+                    customHandler();
+                } else {
+                    console.log('TVNavigation::Using default router.back()');
+                    router.back();
+                }
                 return;
             }
 
@@ -38,7 +48,7 @@ export const useTvNavigation = () => {
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [router]);
+    }, [router, getActiveBackHandler]);
 };
 
 function handleDirectionalNav(direction: string) {
