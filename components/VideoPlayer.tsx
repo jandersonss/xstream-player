@@ -153,7 +153,14 @@ export default function VideoPlayer({
             if (!isSeeking) {
                 setCurrentTime(video.currentTime);
             }
-            if (onProgress) onProgress(video.currentTime, video.duration);
+
+            // Guard: Don't send progress if we're at 0 but expecting to seek to an initial time
+            const isAtStart = video.currentTime === 0;
+            const waitingForSeek = initialTime > 0 && !hasAppliedInitialTime.current;
+
+            if (onProgress && (!isAtStart || !waitingForSeek)) {
+                onProgress(video.currentTime, video.duration);
+            }
         };
         const handleLoadedMetadata = () => {
             setDuration(video.duration);
@@ -180,6 +187,32 @@ export default function VideoPlayer({
             video.removeEventListener('ended', handleEnded);
         };
     }, [src, autoPlay]);
+
+    // Dedicated effect to handle initialTime seeking (especially if it arrives late)
+    useEffect(() => {
+        const video = videoRef.current;
+        if (!video || !initialTime || hasAppliedInitialTime.current) return;
+
+        const applySeek = () => {
+            // Only apply if we haven't moved much (avoid jumping back if user already started watching)
+            if (initialTime > 0 && !hasAppliedInitialTime.current && video.currentTime < 5) {
+                console.log('[VideoPlayer] Applying initialTime late:', initialTime);
+                video.currentTime = initialTime;
+                hasAppliedInitialTime.current = true;
+            }
+        };
+
+        if (video.readyState >= 1) {
+            applySeek();
+        } else {
+            const onMetadata = () => {
+                applySeek();
+                video.removeEventListener('loadedmetadata', onMetadata);
+            };
+            video.addEventListener('loadedmetadata', onMetadata);
+            return () => video.removeEventListener('loadedmetadata', onMetadata);
+        }
+    }, [initialTime]);
 
     const togglePlay = () => {
         if (videoRef.current) {
@@ -235,6 +268,7 @@ export default function VideoPlayer({
             if (e.key === 'Escape' && onBack) {
                 e.preventDefault();
                 // Exit fullscreen first if in fullscreen
+                console.log('VideoPlayer::Back', document.fullscreenElement)
                 if (document.fullscreenElement) {
                     document.exitFullscreen().then(() => {
                         onBack();

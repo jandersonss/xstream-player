@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
@@ -33,29 +33,38 @@ import { useData } from '@/app/context/DataContext';
 export default function WatchMoviePage() {
     const { credentials } = useAuth();
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
-    const { updateProgress, getProgress } = useWatchProgress();
+    const { updateProgress, getProgress, isLoaded: progressLoaded, loadingDetails } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
     const params = useParams();
     const router = useRouter();
     const streamId = params.streamId as string;
+    const isDetailLoading = loadingDetails[`movie-${streamId}`];
 
     const [movie, setMovie] = useState<MovieInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [resumeTime, setResumeTime] = useState(0);
+
+    // Calculate resumeTime synchronously based on progressLoaded
+    const resumeTime = useMemo(() => {
+        if (!progressLoaded) return 0;
+        const progress = getProgress(streamId);
+        if (progress && progress.progress > 10) {
+            // Check if progress is near the end (more than 95%)
+            if (progress.duration > 0) {
+                const percentage = (progress.progress / progress.duration) * 100;
+                if (percentage > 95) return 0;
+            }
+            return progress.progress;
+        }
+        return 0;
+    }, [streamId, getProgress, progressLoaded]);
 
     useEffect(() => {
         if (!credentials || !streamId) return;
 
         const loadMovieInfo = async () => {
             try {
-                // Check progress
-                const progress = getProgress(streamId);
-                if (progress && progress.progress > 10) { // Only resume if more than 10s
-                    setResumeTime(progress.progress);
-                }
-
                 // Try cache first
                 const cached = await getCachedDetail(streamId);
                 if (cached && cached.info && cached.movie_data) {
@@ -91,15 +100,15 @@ export default function WatchMoviePage() {
         };
 
         loadMovieInfo();
-    }, [credentials, streamId, getCachedDetail, saveCachedDetail, getProgress]);
+    }, [credentials, streamId, getCachedDetail, saveCachedDetail]);
 
     // Auto-play from continue watching
     const searchParams = useSearchParams();
     useEffect(() => {
-        if (searchParams.get('autoplay') === 'true' && movie && !isPlaying) {
+        if (searchParams.get('autoplay') === 'true' && movie && !isPlaying && progressLoaded) {
             setIsPlaying(true);
         }
-    }, [searchParams, movie]);
+    }, [searchParams, movie, progressLoaded, isPlaying]);
 
     const handlePlay = () => {
         setIsPlaying(true);
@@ -123,8 +132,6 @@ export default function WatchMoviePage() {
 
     const handleProgress = (currentTime: number, duration: number) => {
         if (!movie) return;
-        // Save progress every 10 seconds or when significantly changed
-        // To keep it simple, the Context handles debounce.
         updateProgress({
             streamId: movie.movie_data.stream_id,
             type: 'movie',
@@ -136,7 +143,7 @@ export default function WatchMoviePage() {
         });
     };
 
-    if (loading) return <Loader />;
+    if (loading || !progressLoaded || isDetailLoading) return <Loader />;
 
     if (error || !movie) {
         return (

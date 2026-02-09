@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
@@ -44,18 +44,35 @@ import { useData } from '@/app/context/DataContext';
 export default function WatchSeriesPage() {
     const { credentials } = useAuth();
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
-    const { updateProgress, getProgress } = useWatchProgress();
+    const { updateProgress, getProgress, loadDetail, isLoaded: progressLoaded, loadingDetails } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
     const params = useParams();
     const router = useRouter();
     const seriesId = params.seriesId as string;
+    const isDetailLoading = loadingDetails[`series-${seriesId}`];
 
     const [series, setSeries] = useState<SeriesInfo | null>(null);
     const [loading, setLoading] = useState(true);
     const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [activeSeason, setActiveSeason] = useState<string>("1");
-    const [resumeTime, setResumeTime] = useState(0);
+
+    // Calculate resumeTime synchronously based on selected episode
+    const resumeTime = useMemo(() => {
+        if (selectedEpisode) {
+            const progress = getProgress(selectedEpisode.id);
+            if (progress && progress.progress > 10) {
+                // Check if progress is near the end (more than 95%)
+                const percentage = (progress.progress / progress.duration) * 100;
+                if (percentage > 95) {
+                    return 0;
+                } else {
+                    return progress.progress;
+                }
+            }
+        }
+        return 0;
+    }, [selectedEpisode?.id, getProgress]);
 
     useEffect(() => {
         if (!credentials || !seriesId) return;
@@ -109,17 +126,13 @@ export default function WatchSeriesPage() {
         loadSeriesInfo();
     }, [credentials, seriesId, getCachedDetail, saveCachedDetail]);
 
-    // Check progress for episode when selected
+    // Load detailed progress for this series
     useEffect(() => {
-        if (selectedEpisode) {
-            const progress = getProgress(selectedEpisode.id);
-            if (progress && progress.progress > 10) {
-                setResumeTime(progress.progress);
-            } else {
-                setResumeTime(0);
-            }
+        if (seriesId) {
+            loadDetail('series', seriesId);
         }
-    }, [selectedEpisode, getProgress]);
+    }, [seriesId, loadDetail]);
+
 
     // Auto-play from continue watching
     const searchParams = useSearchParams();
@@ -184,7 +197,7 @@ export default function WatchSeriesPage() {
         });
     };
 
-    if (loading) return <Loader />;
+    if (loading || !progressLoaded || isDetailLoading) return <Loader />;
 
     if (error || !series) {
         return (
@@ -226,6 +239,12 @@ export default function WatchSeriesPage() {
             }
         };
 
+        const handleBackFromPlayer = () => {
+            setSelectedEpisode(null);
+            // Clear autoplay search params to prevent loop
+            router.replace(`/dashboard/watch/series/${seriesId}`);
+        };
+
         return (
             <div className="fixed inset-0 bg-black z-50 flex flex-col">
                 <div className="relative flex-1 flex items-center justify-center">
@@ -240,7 +259,7 @@ export default function WatchSeriesPage() {
                         hasNext={hasNext}
                         hasPrevious={hasPrevious}
                         enterFullscreen={true}
-                        onBack={() => setSelectedEpisode(null)}
+                        onBack={handleBackFromPlayer}
                     />
                 </div>
             </div>
@@ -358,29 +377,46 @@ export default function WatchSeriesPage() {
                     </div>
 
                     <div className="grid gap-4">
-                        {currentEpisodes.map((ep) => (
-                            <button
-                                key={ep.id}
-                                type="button"
-                                onClick={() => setSelectedEpisode(ep)}
-                                data-focusable="true"
-                                tabIndex={0}
-                                className="flex items-center gap-4 p-4 bg-[#1f1f1f] rounded-xl hover:bg-[#2a2a2a] transition-all cursor-pointer group border border-white/5 hover:border-red-500/30 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-[1.02] z-10 w-full text-left"
-                            >
-                                <div className="w-12 h-12 flex items-center justify-center bg-white/10 rounded-full group-hover:bg-red-600 transition-colors flex-shrink-0">
-                                    <Play size={20} fill="currentColor" className="text-white ml-1" />
-                                </div>
-                                <div className="flex-1">
-                                    <h4 className="font-bold text-lg text-white group-hover:text-red-400 transition-colors">
-                                        {ep.episode_num}. {ep.title}
-                                    </h4>
-                                    {ep.info && ep.info.releasedate && <p className="text-sm text-gray-500">{ep.info.releasedate}</p>}
-                                </div>
-                                <div className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded">
-                                    {ep.container_extension}
-                                </div>
-                            </button>
-                        ))}
+                        {currentEpisodes.map((ep) => {
+                            const progress = getProgress(ep.id);
+                            const duration = progress?.duration || 0;
+                            const currentTime = progress?.progress || 0;
+                            const percent = duration > 0 ? (currentTime / duration) * 100 : 0;
+
+                            return (
+                                <button
+                                    key={ep.id}
+                                    type="button"
+                                    onClick={() => setSelectedEpisode(ep)}
+                                    data-focusable="true"
+                                    tabIndex={0}
+                                    className="relative flex items-center gap-4 p-4 bg-[#1f1f1f] rounded-xl hover:bg-[#2a2a2a] transition-all cursor-pointer group border border-white/5 hover:border-red-500/30 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-[1.02] z-10 w-full text-left overflow-hidden"
+                                >
+                                    <div className="w-12 h-12 flex items-center justify-center bg-white/10 rounded-full group-hover:bg-red-600 transition-colors flex-shrink-0">
+                                        <Play size={20} fill="currentColor" className="text-white ml-1" />
+                                    </div>
+                                    <div className="flex-1">
+                                        <h4 className="font-bold text-lg text-white group-hover:text-red-400 transition-colors">
+                                            {ep.episode_num}. {ep.title}
+                                        </h4>
+                                        {ep.info && ep.info.releasedate && <p className="text-sm text-gray-500">{ep.info.releasedate}</p>}
+                                    </div>
+                                    <div className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded">
+                                        {ep.container_extension}
+                                    </div>
+
+                                    {/* Progress Bar */}
+                                    {progress && duration > 0 && currentTime > 0 && (
+                                        <div className="absolute bottom-0 left-0 w-full h-1.5 bg-gray-600/80">
+                                            <div
+                                                className="h-full bg-red-600 transition-all duration-500"
+                                                style={{ width: `${Math.min(percent, 100)}%` }}
+                                            />
+                                        </div>
+                                    )}
+                                </button>
+                            );
+                        })}
                         {currentEpisodes.length === 0 && (
                             <p className="text-gray-500">Nenhum episódio encontrado para esta temporada.</p>
                         )}

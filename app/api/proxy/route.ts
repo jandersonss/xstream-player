@@ -22,7 +22,10 @@ export async function POST(request: Request) {
 
         const apiUrl = `${baseUrl}/player_api.php?${params.toString()}`;
 
-        // console.log(`Proxying action: ${action} to ${baseUrl}`);
+        console.log(`[Proxy] Action: ${action} | URL: ${apiUrl}`);
+        if (Object.keys(otherParams).length > 0) {
+            console.log(`[Proxy] Params:`, JSON.stringify(otherParams));
+        }
 
         let response;
         let lastError;
@@ -32,18 +35,18 @@ export async function POST(request: Request) {
             try {
                 response = await fetch(apiUrl);
 
-                // Break if success or if it's a client error (4xx) which typically shouldn't be retried
-                // We only retry on 5xx server errors or network exceptions
                 if (response.ok || response.status < 500) {
                     break;
                 }
 
                 if (i < maxRetries) {
+                    console.warn(`[Proxy] Retry ${i + 1}/${maxRetries} for ${action} due to status ${response.status}`);
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
             } catch (error) {
                 lastError = error;
                 if (i < maxRetries) {
+                    console.warn(`[Proxy] Retry ${i + 1}/${maxRetries} for ${action} due to error:`, error);
                     await new Promise(resolve => setTimeout(resolve, 1000));
                 }
             }
@@ -52,6 +55,8 @@ export async function POST(request: Request) {
         if (!response) {
             throw lastError || new Error('Fetch failed after retries');
         }
+
+        console.log(`[Proxy] Response: ${response.status} ${response.statusText}`);
 
         if (!response.ok) {
             return NextResponse.json(
@@ -64,13 +69,14 @@ export async function POST(request: Request) {
         let data;
         if (contentType && contentType.includes('application/json')) {
             data = await response.json();
+            const count = Array.isArray(data) ? data.length : 'object';
+            console.log(`[Proxy] Data: ${count} items/type`);
         } else {
-            // Some IPTV APIs return plain text even for successful actions
             const text = await response.text();
+            console.log(`[Proxy] Data: Text (${text.length} chars)`);
             try {
                 data = JSON.parse(text);
             } catch (e) {
-                // If not JSON, return as is or as an object
                 data = text;
             }
         }
@@ -78,7 +84,7 @@ export async function POST(request: Request) {
         return NextResponse.json(data);
 
     } catch (error: any) {
-        console.error('Proxy Action Error:', error);
+        console.error('[Proxy] CRITICAL Error:', error);
         return NextResponse.json(
             { error: 'Internal Server Error', details: error.message },
             { status: 500 }
