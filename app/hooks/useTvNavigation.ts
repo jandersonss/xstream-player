@@ -21,6 +21,10 @@ export const useTvNavigation = () => {
             // Back Navigation
             if (e.key === 'Backspace' || e.key === 'Escape') {
                 e.preventDefault();
+                console.log('TVNavigation::Back', document.fullscreenElement)
+                if (document.fullscreenElement) {
+                    return;
+                }
                 router.back();
                 return;
             }
