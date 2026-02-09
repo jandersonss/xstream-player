@@ -2,7 +2,7 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw } from 'lucide-react';
+import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw, Calendar } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useData } from '../app/context/DataContext';
 
@@ -11,6 +11,7 @@ const menuItems = [
     { name: 'Pesquisar', icon: Search, path: '/dashboard/search' },
     { name: 'Favoritos', icon: Heart, path: '/dashboard/favorites' },
     { name: 'TV ao Vivo', icon: Tv, path: '/dashboard/live' },
+    { name: 'Guia de Canais', icon: Calendar, path: '/dashboard/epg' },
     { name: 'Filmes', icon: Film, path: '/dashboard/movies' },
     { name: 'Séries', icon: Layers, path: '/dashboard/series' },
 ];

@@ -14,6 +14,9 @@ interface DataContextType {
     getAllCachedStreams: (type?: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
     getCachedDetail: (id: string | number) => Promise<any | undefined>;
     saveCachedDetail: (id: string | number, data: any) => Promise<void>;
+    getEPGForChannel: (streamId: string, limit?: number) => Promise<any[]>;
+    getShortEPG: (streamId: string) => Promise<any[]>;
+    getAllChannelsEPG: (categoryId?: string) => Promise<Map<string, any[]>>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -144,6 +147,110 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         await db.saveDetail(id, data);
     }, []);
 
+    // EPG cache - in memory with 30 minute expiration
+    const epgCache = React.useRef<Map<string, { data: any[], timestamp: number }>>(new Map());
+    const EPG_CACHE_DURATION = 30 * 60 * 1000; // 30 minutes
+
+    const getEPGForChannel = useCallback(async (streamId: string, limit: number = 4) => {
+        const cacheKey = `epg_${streamId}_${limit}`;
+        const cached = epgCache.current.get(cacheKey);
+
+        if (cached && (Date.now() - cached.timestamp < EPG_CACHE_DURATION)) {
+            return cached.data;
+        }
+
+        if (!credentials) return [];
+
+        try {
+            const res = await fetch('/api/proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...credentials,
+                    action: 'get_simple_data_table',
+                    stream_id: streamId,
+                    limit: limit
+                })
+            });
+
+            const data = await res.json();
+            const epgData = data?.epg_listings || [];
+
+            epgCache.current.set(cacheKey, { data: epgData, timestamp: Date.now() });
+            return epgData;
+        } catch (error) {
+            console.error('Failed to fetch EPG for channel:', error);
+            return [];
+        }
+    }, [credentials]);
+
+    const getShortEPG = useCallback(async (streamId: string) => {
+        const cacheKey = `short_epg_${streamId}`;
+        const cached = epgCache.current.get(cacheKey);
+
+        if (cached && (Date.now() - cached.timestamp < EPG_CACHE_DURATION)) {
+            return cached.data;
+        }
+
+        if (!credentials) return [];
+
+        try {
+            const res = await fetch('/api/proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...credentials,
+                    action: 'get_short_epg',
+                    stream_id: streamId
+                })
+            });
+
+            const data = await res.json();
+            const epgData = data?.epg_listings || [];
+
+            epgCache.current.set(cacheKey, { data: epgData, timestamp: Date.now() });
+            return epgData;
+        } catch (error) {
+            console.error('Failed to fetch short EPG for channel:', error);
+            return [];
+        }
+    }, [credentials]);
+
+    const getAllChannelsEPG = useCallback(async (categoryId?: string) => {
+        const epgMap = new Map<string, any[]>();
+
+        if (!credentials) return epgMap;
+
+        try {
+            // Get all live streams
+            const streams = categoryId
+                ? await getCachedStreams(categoryId, 'live')
+                : await getAllCachedStreams('live');
+
+            // Fetch EPG for up to 50 channels (to avoid overwhelming the API)
+            const channelsToFetch = streams.slice(0, 50);
+
+            const epgPromises = channelsToFetch.map(async (stream) => {
+                const streamId = String(stream.id);
+                const epgData = await getShortEPG(streamId);
+                return { streamId, epgData };
+            });
+
+            const results = await Promise.all(epgPromises);
+
+            results.forEach(({ streamId, epgData }) => {
+                if (epgData.length > 0) {
+                    epgMap.set(streamId, epgData);
+                }
+            });
+
+            return epgMap;
+        } catch (error) {
+            console.error('Failed to fetch EPG for all channels:', error);
+            return epgMap;
+        }
+    }, [credentials, getCachedStreams, getAllCachedStreams, getShortEPG]);
+
     return (
         <DataContext.Provider value={{
             isSyncing,
@@ -154,7 +261,10 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             getCachedStreams,
             getAllCachedStreams,
             getCachedDetail,
-            saveCachedDetail
+            saveCachedDetail,
+            getEPGForChannel,
+            getShortEPG,
+            getAllChannelsEPG
         }}>
             {children}
         </DataContext.Provider>
