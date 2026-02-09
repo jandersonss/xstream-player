@@ -2,14 +2,14 @@
 
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Search, Heart, LayoutGrid, RefreshCw } from 'lucide-react';
+import { Home, Search, Heart, Calendar, RefreshCw } from 'lucide-react';
 import { useData } from '../app/context/DataContext';
 
 const mobileLinks = [
     { name: 'Início', icon: Home, path: '/dashboard' },
     { name: 'Busca', icon: Search, path: '/dashboard/search' },
+    { name: 'EPG', icon: Calendar, path: '/dashboard/epg' },
     { name: 'Favoritos', icon: Heart, path: '/dashboard/favorites' },
-    { name: 'Navegar', icon: LayoutGrid, path: '/dashboard/live' }, // Categories entry point
 ];
 
 export default function BottomNav() {
