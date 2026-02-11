@@ -307,7 +307,7 @@ export default function Dashboard() {
             image: stream.tmdbData?.poster || stream.icon || 'https://via.placeholder.com/300x450?text=Sem+Poster',
             rating: stream.tmdbData?.rating || stream.rating,
             year: stream.tmdbData?.year,
-            href: type === 'movie'
+            href: stream.type === 'movie'
                 ? `/dashboard/watch/movie/${stream.id}`
                 : `/dashboard/watch/series/${stream.id}`
         };
