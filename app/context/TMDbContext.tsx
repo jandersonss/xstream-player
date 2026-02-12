@@ -22,6 +22,7 @@ interface TMDbContextType {
     fetchTrending: (page?: number) => Promise<(TMDbMovie | TMDbTVShow)[]>;
     searchMovie: (query: string) => Promise<TMDbMovie | null>;
     searchTV: (query: string) => Promise<TMDbTVShow | null>;
+    fetchVideos: (type: 'movie' | 'tv' | 'series', id: number) => Promise<any[]>;
 }
 
 const TMDbContext = createContext<TMDbContextType | undefined>(undefined);
@@ -204,6 +205,25 @@ export const TMDbProvider = ({ children }: { children: ReactNode }) => {
         return data?.results?.[0] || null;
     }, [fetchWithCache]);
 
+    const fetchVideos = useCallback(async (type: 'movie' | 'tv' | 'series', id: number): Promise<any[]> => {
+        const _type = type === 'series' ? 'tv' : type;
+        const endpoint = `/${_type}/${id}/videos`;
+        console.log(`[TMDbContext] Fetching videos for ${_type} ${id} at ${endpoint}`);
+
+        try {
+            const data = await fetchWithCache<{ results: any[] }>(endpoint);
+            if (!data) {
+                console.warn(`[TMDbContext] No data returned for video fetch: ${endpoint}`);
+                return [];
+            }
+            console.log(`[TMDbContext] Found ${data.results?.length || 0} videos for ${id}`);
+            return data.results || [];
+        } catch (error) {
+            console.error(`[TMDbContext] Error fetching videos for ${endpoint}:`, error);
+            return [];
+        }
+    }, [fetchWithCache]);
+
     return (
         <TMDbContext.Provider value={{
             config,
@@ -218,7 +238,8 @@ export const TMDbProvider = ({ children }: { children: ReactNode }) => {
             fetchTVByGenre,
             fetchTrending,
             searchMovie,
-            searchTV
+            searchTV,
+            fetchVideos
         }}>
             {children}
         </TMDbContext.Provider>

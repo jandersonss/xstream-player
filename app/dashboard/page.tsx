@@ -9,6 +9,7 @@ import { useRouter } from 'next/navigation';
 import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, TrendingUp } from 'lucide-react';
 import { useEffect, useState, useMemo } from 'react';
 import ContentCarousel from '@/components/ContentCarousel';
+import HeroSection from '@/components/HeroSection';
 import TMDbSettingsModal from '@/components/TMDbSettingsModal';
 import {
     getTMDbImageUrl,
@@ -28,6 +29,7 @@ import {
     getCarouselCache,
     clearExpiredCarouselCache
 } from '../lib/db';
+import { div } from 'framer-motion/client';
 
 interface EnrichedStream extends CachedStream {
     tmdbData?: {
@@ -321,71 +323,77 @@ export default function Dashboard() {
     };
 
     return (
-        <div className="space-y-8 animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Header Section */}
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-2xl md:text-4xl font-bold text-white mb-2">{greeting}, {user?.username}</h1>
-                    <div className="flex items-center gap-2">
-                        <p className="text-gray-400 text-sm md:text-base">O que você gostaria de assistir hoje?</p>
-                        {lastSync && (
-                            <span className="text-[10px] bg-white/5 border border-white/10 px-2 py-0.5 rounded text-gray-500 uppercase tracking-widest hidden md:inline-block">
-                                Banco de dados sincronizado: {new Date(lastSync).toLocaleDateString()}
-                            </span>
-                        )}
+        <>
+            {/* Hero & Header Container */}
+            < div className="relative w-full -mt-8" > {/* Negative margin to pull up if needed, or remove padding from parent if possible. Assuming parent has padding. */}
+
+                {/* Header Section - Overlay */}
+                <div className="absolute top-0 left-0 right-0 z-50 flex flex-row justify-between items-center px-4 py-6 md:px-12 md:py-10 bg-gradient-to-b from-black/90 via-black/40 to-transparent">
+                    <div>
+                        <h1 className="text-base md:text-xl font-bold text-white/90 drop-shadow-md flex items-center gap-2">
+                            <span className="opacity-70 font-normal hidden sm:inline">{greeting},</span>
+                            {user?.username}
+                        </h1>
+                    </div>
+                    <div className="flex items-center gap-2 md:gap-3">
+                        <button
+                            onClick={() => setShowSettings(true)}
+                            data-focusable="true"
+                            className="bg-black/30 hover:bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/5 hover:border-red-500/50 flex items-center gap-1.5 transition-all group"
+                        >
+                            <Settings size={12} className="text-gray-400 group-hover:text-white transition-colors" />
+                            <span className="font-medium text-[10px] md:text-xs text-gray-300">TMDb</span>
+                            {isConfigured && <span className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>}
+                        </button>
+
+                        <div className="bg-black/30 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
+                            <User size={12} />
+                            <span>{user?.status === 'Active' ? 'Ativo' : user?.status}</span>
+                        </div>
+
+                        <div className="bg-black/30 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
+                            <Calendar size={12} />
+                            <span>{user?.exp_date ? formatDate(user.exp_date) : 'N/A'}</span>
+                        </div>
                     </div>
                 </div>
-                <div className="flex gap-4">
-                    <button
-                        onClick={() => setShowSettings(true)}
-                        data-focusable="true"
-                        className="bg-[#1f1f1f] px-4 py-2 rounded-lg border border-[#333] hover:border-red-600 flex items-center gap-2 transition-all focus:outline-none focus:ring-4 focus:ring-red-600"
-                    >
-                        <Settings size={16} className="text-red-500" />
-                        <span className="text-sm font-medium text-gray-300">TMDb</span>
-                        {isConfigured && (
-                            <span className="w-2 h-2 bg-green-500 rounded-full"></span>
-                        )}
-                    </button>
-                    <div className="bg-[#1f1f1f] px-4 py-2 rounded-lg border border-[#333] flex items-center gap-2">
-                        <User size={16} className="text-red-500" />
-                        <span className="text-sm font-medium text-gray-300">{user?.status === 'Active' ? 'Assinatura Ativa' : user?.status}</span>
-                    </div>
-                    <div className="bg-[#1f1f1f] px-4 py-2 rounded-lg border border-[#333] flex items-center gap-2">
-                        <Calendar size={16} className="text-red-500" />
-                        <span className="text-sm font-medium text-gray-300">Exp: {user?.exp_date ? formatDate(user.exp_date) : 'N/A'}</span>
-                    </div>
-                </div>
-            </div>
+
+                {/* Hero Section */}
+                <HeroSection />
+            </div >
 
             {/* Continue Watching Section */}
-            {continueWatching.length > 0 && (
-                <ContentCarousel
-                    title="Continuar Assistindo"
-                    items={continueWatching}
-                    icon={Clock}
-                    showProgress={true}
-                />
-            )}
+            {
+                continueWatching.length > 0 && (
+                    <ContentCarousel
+                        title="Continuar Assistindo"
+                        items={continueWatching}
+                        icon={Clock}
+                        showProgress={true}
+                    />
+                )
+            }
 
             {/* Dynamic Carousels */}
-            {carouselData.map((carousel) => {
-                const items = carousel.data.map(stream =>
-                    transformStreamToCarouselItem(stream, carousel.type)
-                );
+            {
+                carouselData.map((carousel) => {
+                    const items = carousel.data.map(stream =>
+                        transformStreamToCarouselItem(stream, carousel.type)
+                    );
 
-                return (
-                    <ContentCarousel
-                        key={carousel.id}
-                        title={carousel.title}
-                        items={items}
-                        icon={getCarouselIcon(carousel.id)}
-                        onViewAll={carousel.categoryId ? () => {
-                            router.push(`/dashboard/${carousel.type === 'movie' ? 'movies' : 'series'}/${carousel.categoryId}`);
-                        } : undefined}
-                    />
-                );
-            })}
+                    return (
+                        <ContentCarousel
+                            key={carousel.id}
+                            title={carousel.title}
+                            items={items}
+                            icon={getCarouselIcon(carousel.id)}
+                            onViewAll={carousel.categoryId ? () => {
+                                router.push(`/dashboard/${carousel.type === 'movie' ? 'movies' : 'series'}/${carousel.categoryId}`);
+                            } : undefined}
+                        />
+                    );
+                })
+            }
 
             {/* Main Categories Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
@@ -509,6 +517,6 @@ export default function Dashboard() {
 
             {/* TMDb Settings Modal */}
             <TMDbSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
-        </div>
+        </>
     );
 }
