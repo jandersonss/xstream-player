@@ -28,19 +28,24 @@ export async function POST(request: NextRequest) {
             ...params
         });
 
-        const url = `${TMDB_API_BASE}${endpoint}?${queryParams.toString()}`;
+        // Construct full URL (logging partial for security)
+        const urlString = `${TMDB_API_BASE}${endpoint}?${queryParams.toString()}`;
+        console.log(`[API Route] Fetching from TMDB: ${TMDB_API_BASE}${endpoint}`); // Log base path without params to avoid leaking key in logs if simple console
 
-        const response = await fetch(url);
+        const response = await fetch(urlString);
 
         if (!response.ok) {
+            console.error(`[API Route] TMDB Error ${response.status} for ${endpoint}`);
             const errorData = await response.json().catch(() => ({}));
+            console.error(`[API Route] Error Details:`, errorData);
             return NextResponse.json(
-                { error: errorData.status_message || 'TMDb API request failed' },
+                { error: errorData.status_message || 'TMDb API request failed', details: errorData },
                 { status: response.status }
             );
         }
 
         const data = await response.json();
+        console.log(`[API Route] Success ${endpoint}, items: ${data.results ? data.results.length : 'N/A'}`);
         return NextResponse.json(data);
 
     } catch (error) {
