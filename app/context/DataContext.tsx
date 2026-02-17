@@ -115,6 +115,14 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             const meta = await db.getSyncMetadata('categories');
             if (meta) {
                 setLastSync(meta.lastSync);
+
+                // Check if last sync was more than 24h ago
+                const oneDay = 24 * 60 * 60 * 1000;
+                const now = Date.now();
+                if (credentials && !isSyncing && (now - meta.lastSync > oneDay)) {
+                    console.log('Sincronizando conteúdo automaticamente (diário)...');
+                    syncData();
+                }
             } else if (credentials && !isSyncing) {
                 // Auto sync if no data found but logged in
                 console.log('Sincronizando conteúdo automaticamente...');
