@@ -25,9 +25,10 @@ import { useMemo } from 'react';
 export default function MovieList() {
     const { credentials } = useAuth();
     const { categoryId } = useParams();
-    const { getCachedStreams } = useData();
+    const { getCachedStreams, getCachedCategories } = useData();
 
     const [movies, setMovies] = useState<Movie[]>([]);
+    const [categoryName, setCategoryName] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [sort, setSort] = useSortPreference('movies', 'added');
@@ -37,6 +38,13 @@ export default function MovieList() {
 
         const loadData = async () => {
             try {
+                // Fetch category name
+                const categories = await getCachedCategories('movie');
+                const category = categories.find(c => c.category_id === categoryId);
+                if (category) {
+                    setCategoryName(category.category_name);
+                }
+
                 // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'movie');
                 if (cached && cached.length > 0) {
@@ -70,7 +78,7 @@ export default function MovieList() {
         };
 
         loadData();
-    }, [credentials, categoryId, getCachedStreams]);
+    }, [credentials, categoryId, getCachedStreams, getCachedCategories]);
 
     const sortedMovies = useMemo(() => {
         return [...movies].sort((a, b) => {
@@ -108,7 +116,7 @@ export default function MovieList() {
             <div className="space-y-4">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                     <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
-                    Filmes ({movies.length})
+                    {categoryName || 'Filmes'} ({movies.length})
                 </h3>
 
                 {movies.length === 0 && !error ? (
@@ -153,7 +161,7 @@ export default function MovieList() {
                                     </div>
 
                                     <div className="p-4">
-                                        <h4 className="font-semibold text-gray-200 group-hover:text-white truncate text-base mb-1" title={movie.name}>
+                                        <h4 className="font-semibold text-gray-200 group-hover:text-white line-clamp-2 text-base mb-1" title={movie.name}>
                                             {movie.name}
                                         </h4>
                                         <div className="flex justify-between items-center text-xs text-gray-500">

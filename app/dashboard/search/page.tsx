@@ -249,7 +249,7 @@ export default function SearchPage() {
                                                 </div>
                                             </div>
                                             <div className="p-4">
-                                                <h3 className="text-white font-medium truncate text-sm">{item.name}</h3>
+                                                <h3 className="text-white font-medium line-clamp-2 text-sm">{item.name}</h3>
                                                 {item.rating && (
                                                     <div className="flex items-center gap-1 mt-1">
                                                         <span className="text-yellow-500 text-xs">★</span>
