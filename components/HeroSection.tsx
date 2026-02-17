@@ -34,7 +34,13 @@ interface HeroItem {
     logo?: string;
 }
 
-export default function HeroSection() {
+interface HeroSectionProps {
+    type?: 'all' | 'movie' | 'series';
+}
+
+const NEXT_DELAY = 30000;
+
+export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const { user } = useAuth();
     const { getAllCachedStreams } = useData();
     const { fetchTrending, isConfigured, fetchVideos } = useTMDb();
@@ -51,13 +57,12 @@ export default function HeroSection() {
     const [showVideo, setShowVideo] = useState(false);
     const iframeRef = useRef<HTMLIFrameElement>(null);
 
-    // Auto-advance slide every 10 seconds
     useEffect(() => {
         if (heroItems.length <= 1) return;
 
         const interval = setInterval(() => {
             setCurrentIndex((prev) => (prev + 1) % heroItems.length);
-        }, 15000); // Increased duration to allow trailer viewing
+        }, NEXT_DELAY); // Increased duration to allow trailer viewing
 
         return () => clearInterval(interval);
     }, [heroItems.length]);
@@ -114,7 +119,7 @@ export default function HeroSection() {
 
     const fetchHeroContent = useCallback(async () => {
         const today = new Date();
-        const dateKey = `hero-${today.toISOString().split('T')[0]}`;
+        const dateKey = `hero-${type}-${today.toISOString().split('T')[0]}`;
 
         // 1. Check Cache
         try {
@@ -132,11 +137,16 @@ export default function HeroSection() {
         if (!user) return;
 
         try {
-            // 2. Fetch Sources
-            const [movies, series] = await Promise.all([
-                getAllCachedStreams('movie'),
-                getAllCachedStreams('series')
-            ]);
+            // 2. Fetch Sources based on type
+            let movies: CachedStream[] = [];
+            let series: CachedStream[] = [];
+
+            if (type === 'all' || type === 'movie') {
+                movies = await getAllCachedStreams('movie');
+            }
+            if (type === 'all' || type === 'series') {
+                series = await getAllCachedStreams('series');
+            }
 
             console.log(`HeroSection: Fetched ${movies.length} movies and ${series.length} series`);
 
@@ -155,6 +165,11 @@ export default function HeroSection() {
 
                     for (const item of trending) {
                         const isMovie = 'title' in item;
+
+                        // Filter by requested type
+                        if (type === 'movie' && !isMovie) continue;
+                        if (type === 'series' && isMovie) continue;
+
                         const title = isMovie ? (item as TMDbMovie).title : (item as TMDbTVShow).name;
                         const db = isMovie ? preparedMovies : preparedSeries;
 
@@ -186,14 +201,8 @@ export default function HeroSection() {
             if (potentialItems.length < 5) {
                 console.log('HeroSection: detailed matches < 5, filling with random local content...');
 
-                // Shuffle all movies (movies usually have better visual appeal for hero than series episodes if random)
-                // Filter for items that might have a backdrop or just use icon
-                // Xtream codes usually provides `stream_icon`. `backdrop_path` might be in `data` if extended info was fetched.
-                // But `getAllCachedStreams` is shallow.
-                // We'll prioritize items that have rating > 7 if possible, or just random.
-
                 const allContent = [...movies, ...series];
-                const seed = getDailySeed();
+                const seed = getDailySeed() + (type === 'movie' ? 1 : type === 'series' ? 2 : 0); // Varry seed by type
                 const shuffledLocal = shuffleWithSeed(allContent, seed);
 
                 for (const item of shuffledLocal) {
@@ -228,7 +237,7 @@ export default function HeroSection() {
             console.log(`HeroSection: Total unique items available: ${uniqueItems.length}`);
 
             // D. Shuffle and Pick 5
-            const seed = getDailySeed();
+            const seed = getDailySeed() + (type === 'movie' ? 10 : type === 'series' ? 20 : 0); // Varry seed by type
             const shuffled = shuffleWithSeed(uniqueItems, seed);
             const selected = shuffled.slice(0, 5);
 
@@ -244,7 +253,7 @@ export default function HeroSection() {
         } finally {
             setIsLoading(false);
         }
-    }, [user, isConfigured, getAllCachedStreams, fetchTrending, fetchVideos]);
+    }, [user, isConfigured, getAllCachedStreams, fetchTrending, fetchVideos, type]);
 
     useEffect(() => {
         fetchHeroContent();
@@ -322,7 +331,9 @@ export default function HeroSection() {
                                 ? `/dashboard/watch/movie/${currentItem.id}?autoplay=true`
                                 : `/dashboard/watch/series/${currentItem.id}?autoplay=true`
                             )}
-                            className="flex items-center gap-3 px-8 py-4 bg-white hover:bg-gray-200 text-black rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)]"
+                            className="flex items-center gap-3 px-8 py-4 bg-white hover:bg-gray-200 text-black rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)] focus:outline-none focus:ring-4 focus:ring-white/50"
+                            data-focusable="true"
+                            tabIndex={0}
                         >
                             <Play className="w-6 h-6 fill-black" />
                             Assistir
@@ -330,10 +341,12 @@ export default function HeroSection() {
 
                         <button
                             onClick={() => router.push(currentItem.type === 'movie'
-                                ? `/dashboard/watch/movies/${currentItem.id}` // Assuming detail route exists or structure matches
+                                ? `/dashboard/watch/movie/${currentItem.id}` // Assuming detail route exists or structure matches
                                 : `/dashboard/watch/series/${currentItem.id}`
                             )}
-                            className="flex items-center gap-3 px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white rounded-xl font-bold text-lg transition-all duration-300"
+                            className="flex items-center gap-3 px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white rounded-xl font-bold text-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-white/50"
+                            data-focusable="true"
+                            tabIndex={0}
                         >
                             <Info className="w-6 h-6" />
                             Mais Info
@@ -342,7 +355,9 @@ export default function HeroSection() {
                         {videoKey && (
                             <button
                                 onClick={() => setIsMuted(!isMuted)}
-                                className="ml-auto w-12 h-12 flex items-center justify-center rounded-full border border-white/30 bg-black/30 backdrop-blur-sm text-white hover:bg-white/10 transition-colors"
+                                className="ml-auto w-12 h-12 flex items-center justify-center rounded-full border border-white/30 bg-black/30 backdrop-blur-sm text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
+                                data-focusable="true"
+                                tabIndex={0}
                             >
                                 {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
                             </button>

@@ -28,9 +28,10 @@ import { useSortPreference } from '@/app/hooks/useSortPreference';
 export default function SeriesList() {
     const { credentials } = useAuth();
     const { categoryId } = useParams();
-    const { getCachedStreams } = useData();
+    const { getCachedStreams, getCachedCategories } = useData();
 
     const [seriesList, setSeriesList] = useState<Series[]>([]);
+    const [categoryName, setCategoryName] = useState('');
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [sort, setSort] = useSortPreference('series', 'added');
@@ -40,6 +41,13 @@ export default function SeriesList() {
 
         const loadData = async () => {
             try {
+                // Fetch category name
+                const categories = await getCachedCategories('series');
+                const category = categories.find(c => c.category_id === categoryId);
+                if (category) {
+                    setCategoryName(category.category_name);
+                }
+
                 // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'series');
                 if (cached && cached.length > 0) {
@@ -72,7 +80,7 @@ export default function SeriesList() {
         };
 
         loadData();
-    }, [credentials, categoryId, getCachedStreams]);
+    }, [credentials, categoryId, getCachedStreams, getCachedCategories]);
 
     const sortedSeries = [...seriesList].sort((a, b) => {
         if (sort === 'name-asc') return a.name.localeCompare(b.name);
@@ -111,7 +119,7 @@ export default function SeriesList() {
             <div className="space-y-4">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                     <span className="w-2 h-8 bg-purple-600 rounded-full"></span>
-                    Séries ({seriesList.length})
+                    {categoryName || 'Séries'} ({seriesList.length})
                 </h3>
 
                 {seriesList.length === 0 && !error ? (
@@ -155,7 +163,7 @@ export default function SeriesList() {
                                 </div>
 
                                 <div className="p-4">
-                                    <h4 className="font-semibold text-gray-200 group-hover:text-white truncate text-base mb-1" title={item.name}>
+                                    <h4 className="font-semibold text-gray-200 group-hover:text-white line-clamp-2 text-base mb-1" title={item.name}>
                                         {item.name}
                                     </h4>
                                     <div className="flex justify-between items-center text-xs text-gray-500">

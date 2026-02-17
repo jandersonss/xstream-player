@@ -85,7 +85,7 @@ export default function LiveCategories() {
                 </div>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
                 {sortedCategories.map((cat) => (
                     <Link
                         key={cat.category_id}
@@ -98,7 +98,7 @@ export default function LiveCategories() {
 
                         <div className="relative z-10 flex flex-col items-start gap-4 h-full justify-between">
                             <div>
-                                <h3 className="font-semibold text-gray-200 group-hover:text-white text-lg line-clamp-2 leading-tight">
+                                <h3 className="font-semibold text-gray-200 group-hover:text-white line-clamp-3 leading-tight">
                                     {cat.category_name}
                                 </h3>
                             </div>

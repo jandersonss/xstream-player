@@ -26,9 +26,10 @@ import { useInfiniteScroll } from '@/app/hooks/useInfiniteScroll';
 export default function LiveStreams() {
     const { credentials } = useAuth();
     const { categoryId } = useParams();
-    const { getCachedStreams } = useData();
+    const { getCachedStreams, getCachedCategories } = useData();
 
     const [streams, setStreams] = useState<Stream[]>([]);
+    const [categoryName, setCategoryName] = useState('');
     const [activeStream, setActiveStream] = useState<Stream | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -39,6 +40,13 @@ export default function LiveStreams() {
 
         const loadData = async () => {
             try {
+                // Fetch category name
+                const categories = await getCachedCategories('live');
+                const category = categories.find(c => c.category_id === categoryId);
+                if (category) {
+                    setCategoryName(category.category_name);
+                }
+
                 // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'live');
                 if (cached && cached.length > 0) {
@@ -71,7 +79,7 @@ export default function LiveStreams() {
         };
 
         loadData();
-    }, [credentials, categoryId, getCachedStreams]);
+    }, [credentials, categoryId, getCachedStreams, getCachedCategories]);
 
     const sortedStreams = useMemo(() => {
         return [...streams].sort((a, b) => {
@@ -114,7 +122,7 @@ export default function LiveStreams() {
             <div className="space-y-4">
                 <h3 className="text-xl font-bold text-white flex items-center gap-2">
                     <span className="w-2 h-8 bg-red-600 rounded-full"></span>
-                    Lista de Canais ({streams.length})
+                    {categoryName || 'Canais'} ({streams.length})
                 </h3>
 
                 {streams.length === 0 && !error ? (
@@ -138,7 +146,7 @@ export default function LiveStreams() {
                                         )}
                                     </div>
                                     <div className="min-w-0">
-                                        <h4 className="font-medium truncate text-sm text-gray-300 group-hover:text-white">
+                                        <h4 className="font-medium line-clamp-2 text-sm text-gray-300 group-hover:text-white">
                                             {stream.name}
                                         </h4>
                                         <p className="text-xs text-gray-600 truncate">ID: {stream.stream_id}</p>
