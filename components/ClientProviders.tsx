@@ -7,6 +7,7 @@ import { FavoritesProvider } from '../app/context/FavoritesContext';
 import { DataProvider } from '../app/context/DataContext';
 import { WatchProgressProvider } from '../app/context/WatchProgressContext';
 import { TMDbProvider } from '../app/context/TMDbContext';
+import { SubtitleProvider } from '../app/context/SubtitleContext';
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
     return (
@@ -15,9 +16,11 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
                 <FavoritesProvider>
                     <WatchProgressProvider>
                         <TMDbProvider>
-                            <TvNavigationProvider>
-                                {children}
-                            </TvNavigationProvider>
+                            <SubtitleProvider>
+                                <TvNavigationProvider>
+                                    {children}
+                                </TvNavigationProvider>
+                            </SubtitleProvider>
                         </TMDbProvider>
                     </WatchProgressProvider>
                 </FavoritesProvider>

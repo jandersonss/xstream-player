@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
-import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft, Loader2 } from 'lucide-react';
+import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft, Loader2, Subtitles } from 'lucide-react';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
 
 interface VideoPlayerProps {
@@ -18,6 +18,7 @@ interface VideoPlayerProps {
     hasPrevious?: boolean;
     enterFullscreen?: boolean;
     onBack?: () => void;
+    subtitleUrl?: string;
 }
 
 export default function VideoPlayer({
@@ -32,7 +33,8 @@ export default function VideoPlayer({
     hasNext = false,
     hasPrevious = false,
     enterFullscreen = false,
-    onBack
+    onBack,
+    subtitleUrl
 }: VideoPlayerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -50,10 +52,30 @@ export default function VideoPlayer({
     const [skipIndicator, setSkipIndicator] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [centerPlayPause, setCenterPlayPause] = useState<{ show: boolean; playing: boolean }>({ show: false, playing: false });
+    const [subtitleFontSize, setSubtitleFontSize] = useState(1.5);
+    const [subtitlesEnabled, setSubtitlesEnabled] = useState(!!subtitleUrl);
 
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const skipIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const centerIconTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+    // Load saved font size
+    useEffect(() => {
+        const savedSize = localStorage.getItem('xstream_subtitle_fontsize');
+        if (savedSize) {
+            setSubtitleFontSize(parseFloat(savedSize));
+        }
+    }, []);
+
+    const saveFontSize = (size: number) => {
+        setSubtitleFontSize(size);
+        localStorage.setItem('xstream_subtitle_fontsize', String(size));
+    };
+
+    const changeFontSize = (delta: number) => {
+        const newSize = Math.max(0.8, Math.min(2.5, subtitleFontSize + delta));
+        saveFontSize(newSize);
+    };
 
     // Register custom back handler via navigation context
     useNavigationOverride(onBack ? () => {
@@ -236,6 +258,20 @@ export default function VideoPlayer({
                 case 'm':
                     e.preventDefault();
                     toggleMute();
+                    break;
+                case 'c':
+                    e.preventDefault();
+                    if (subtitleUrl) {
+                        setSubtitlesEnabled(prev => !prev);
+                    }
+                    break;
+                case ']':
+                    e.preventDefault();
+                    changeFontSize(0.1);
+                    break;
+                case '[':
+                    e.preventDefault();
+                    changeFontSize(-0.1);
                     break;
                 case '0':
                 case '1':
@@ -430,9 +466,10 @@ export default function VideoPlayer({
         <div
             ref={containerRef}
             className="relative w-full aspect-video bg-black group overflow-hidden rounded-xl shadow-2xl border border-white/10"
+            style={{ '--subtitle-font-size': `${subtitleFontSize}rem` } as any}
             onMouseMove={handleInteraction}
             onMouseLeave={() => isPlaying && setShowControls(false)}
-            onDoubleClick={toggleFullscreen}
+
             onTouchStart={handleInteraction}
         >
             <video
@@ -441,11 +478,22 @@ export default function VideoPlayer({
                 poster={poster}
                 playsInline
                 onClick={togglePlay}
+                onDoubleClick={toggleFullscreen}
                 onTouchStart={(e) => {
                     e.stopPropagation();
                     handleInteraction();
                 }}
-            />
+            >
+                {subtitleUrl && subtitlesEnabled && (
+                    <track
+                        kind="subtitles"
+                        src={subtitleUrl}
+                        srcLang="pt"
+                        label="Legendas"
+                        default
+                    />
+                )}
+            </video>
 
             {/* Buffering Indicator */}
             {isBuffering && (
@@ -703,8 +751,44 @@ export default function VideoPlayer({
                             )}
                         </div>
 
-                        {/* Fullscreen Button */}
+                        {/* Right Controls */}
                         <div className="flex items-center gap-4">
+                            {/* Subtitle Font Size Controls */}
+                            {subtitleUrl && subtitlesEnabled && (
+                                <div className="flex items-center gap-1 bg-white/5 rounded-lg px-2 py-1">
+                                    <button
+                                        onClick={() => changeFontSize(-0.1)}
+                                        className="text-white/60 hover:text-white p-1 transition-colors"
+                                        title="Diminuir fonte ( [ )"
+                                    >
+                                        <span className="text-xs font-bold">A-</span>
+                                    </button>
+                                    <div className="w-[1px] h-3 bg-white/10 mx-1"></div>
+                                    <button
+                                        onClick={() => changeFontSize(0.1)}
+                                        className="text-white/60 hover:text-white p-1 transition-colors"
+                                        title="Aumentar fonte ( ] )"
+                                    >
+                                        <span className="text-sm font-bold">A+</span>
+                                    </button>
+                                </div>
+                            )}
+
+                            {/* Subtitle Toggle */}
+                            {subtitleUrl && (
+                                <button
+                                    onClick={() => setSubtitlesEnabled(prev => !prev)}
+                                    data-focusable="true"
+                                    tabIndex={0}
+                                    className={`transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 ${subtitlesEnabled ? 'text-emerald-400 hover:text-emerald-300' : 'text-white/40 hover:text-white/70'} hover:scale-110`}
+                                    aria-label={subtitlesEnabled ? 'Desativar legendas' : 'Ativar legendas'}
+                                    title={subtitlesEnabled ? 'Desativar legendas (C)' : 'Ativar legendas (C)'}
+                                >
+                                    <Subtitles size={28} />
+                                </button>
+                            )}
+
+                            {/* Fullscreen Button */}
                             <button
                                 onClick={toggleFullscreen}
                                 data-focusable="true"

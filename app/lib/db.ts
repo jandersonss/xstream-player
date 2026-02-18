@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from 'idb';
 
 const DB_NAME = 'xstream_player_db';
-const DB_VERSION = 5;
+const DB_VERSION = 7;
 
 export interface CachedCategory {
     category_id: string;
@@ -67,6 +67,9 @@ export const initDB = async (): Promise<IDBPDatabase> => {
             }
             if (!db.objectStoreNames.contains('carousel_cache')) {
                 db.createObjectStore('carousel_cache', { keyPath: 'date' });
+            }
+            if (!db.objectStoreNames.contains('user_subtitles')) {
+                db.createObjectStore('user_subtitles', { keyPath: 'streamId' });
             }
         },
     });
@@ -194,4 +197,26 @@ export const clearExpiredCarouselCache = async (currentDateKey: string) => {
         }
     }
     await tx.done;
+};
+// --- User Subtitles ---
+export interface SavedSubtitle {
+    streamId: string;
+    vtt: string;
+    language: string;
+    timestamp: number;
+}
+
+export const saveUserSubtitle = async (subtitle: SavedSubtitle) => {
+    const db = await initDB();
+    await db.put('user_subtitles', subtitle);
+};
+
+export const getUserSubtitle = async (streamId: string): Promise<SavedSubtitle | undefined> => {
+    const db = await initDB();
+    return db.get('user_subtitles', String(streamId));
+};
+
+export const clearUserSubtitle = async (streamId: string) => {
+    const db = await initDB();
+    await db.delete('user_subtitles', String(streamId));
 };

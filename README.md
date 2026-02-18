@@ -34,6 +34,11 @@ This project aims to solve these issues by providing a centralized, modern, and 
 *   Playback of live channels, movies, and series (VOD).
 *   TMDB integration for rich metadata (posters, overviews, ratings) and daily suggestions.
 *   "Continue Watching" functionality to resume content from where you left off.
+*   **Complete Subtitle Support:**
+    *   Integration with OpenSubtitles API.
+    *   **Persistence:** Automatically remembers and loads selected subtitles for each movie or episode.
+    *   **Customization:** Adjust subtitle font size directly in the player (shortcuts `[` and `]`).
+    *   **Accurate Matching:** Uses TMDb IDs to find the perfect subtitle for your content.
 
 ## 🚀 How to Install and Run
 
