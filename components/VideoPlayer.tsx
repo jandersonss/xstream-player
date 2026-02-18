@@ -53,7 +53,15 @@ export default function VideoPlayer({
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [centerPlayPause, setCenterPlayPause] = useState<{ show: boolean; playing: boolean }>({ show: false, playing: false });
     const [subtitleFontSize, setSubtitleFontSize] = useState(1.5);
-    const [subtitlesEnabled, setSubtitlesEnabled] = useState(!!subtitleUrl);
+    const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+
+    // Auto-enable subtitles when a new URL is provided
+    useEffect(() => {
+        if (subtitleUrl) {
+            console.log('[VideoPlayer] received subtitleUrl:', subtitleUrl);
+            setSubtitlesEnabled(true);
+        }
+    }, [subtitleUrl]);
 
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const skipIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -477,6 +485,7 @@ export default function VideoPlayer({
                 className="w-full h-full object-contain cursor-pointer"
                 poster={poster}
                 playsInline
+                // crossOrigin="anonymous" // NEVER use this
                 onClick={togglePlay}
                 onDoubleClick={toggleFullscreen}
                 onTouchStart={(e) => {
@@ -486,10 +495,11 @@ export default function VideoPlayer({
             >
                 {subtitleUrl && subtitlesEnabled && (
                     <track
+                        key={subtitleUrl}
                         kind="subtitles"
                         src={subtitleUrl}
-                        srcLang="pt"
-                        label="Legendas"
+                        srcLang="pt-BR"
+                        label="Português (BR)"
                         default
                     />
                 )}
@@ -548,26 +558,26 @@ export default function VideoPlayer({
             >
                 {/* Top Bar with Back Button */}
                 {onBack && (
-                    <div className="absolute top-0 left-0 w-full p-6 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
+                    <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
                         <button
                             onClick={onBack}
-                            className="bg-black/60 backdrop-blur-md hover:bg-white/20 p-3 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl"
+                            className="bg-black/60 backdrop-blur-md hover:bg-white/20 p-2 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl"
                             title="Voltar"
                             aria-label="Voltar"
                         >
-                            <ArrowLeft size={28} />
+                            <ArrowLeft size={24} />
                         </button>
                     </div>
                 )}
 
                 {/* Bottom Controls */}
-                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent p-6 backdrop-blur-sm">
+                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent px-4 py-2 backdrop-blur-sm">
                     {/* Progress Bar */}
                     {!isLive && (
-                        <div className="mb-6 group/progress">
-                            <div className="relative h-1.5 flex items-center">
+                        <div className="mb-1 group/progress">
+                            <div className="relative h-1 flex items-center">
                                 {/* Track Background */}
-                                <div className="absolute inset-0 bg-white/10 rounded-full" />
+                                <div className="absolute inset-0 bg-white/5 rounded-full" />
 
                                 {/* Buffer Progress */}
                                 <div
@@ -604,16 +614,12 @@ export default function VideoPlayer({
                                     aria-label="Progresso do vídeo"
                                 />
                             </div>
-                            <div className="flex justify-between mt-3 text-sm text-gray-300 font-medium tracking-wider">
-                                <span>{formatTime(currentTime)}</span>
-                                <span>{formatTime(duration)}</span>
-                            </div>
                         </div>
                     )}
 
                     {/* Control Buttons */}
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-4 lg:gap-6">
+                    <div className="flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
                             {/* Previous Episode */}
                             {onPrevious && (hasPrevious || true) && (
                                 <button
@@ -623,7 +629,7 @@ export default function VideoPlayer({
                                     title="Episódio Anterior"
                                     aria-label="Episódio Anterior"
                                 >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                                         <polygon points="19 20 9 12 19 4 19 20"></polygon>
                                         <line x1="5" y1="19" x2="5" y2="5"></line>
                                     </svg>
@@ -637,7 +643,7 @@ export default function VideoPlayer({
                                 title="Voltar 10s"
                                 aria-label="Voltar 10 segundos"
                             >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                                     <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
                                 </svg>
                             </button>
@@ -647,10 +653,10 @@ export default function VideoPlayer({
                                 onClick={togglePlay}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-3 bg-white/10 backdrop-blur-sm"
+                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 bg-white/10 backdrop-blur-sm"
                                 aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
                             >
-                                {isPlaying ? <Pause size={36} fill="currentColor" /> : <Play size={36} fill="currentColor" />}
+                                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
                             </button>
 
                             {/* Skip Forward */}
@@ -660,10 +666,19 @@ export default function VideoPlayer({
                                 title="Avançar 10s"
                                 aria-label="Avançar 10 segundos"
                             >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                                     <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
                                 </svg>
                             </button>
+
+                            {/* Time Display integrated here */}
+                            {!isLive && (
+                                <div className="flex items-center gap-1.5 px-2 text-[11px] font-medium text-gray-400 whitespace-nowrap tabular-nums">
+                                    <span className="text-white">{formatTime(currentTime)}</span>
+                                    <span className="opacity-40">/</span>
+                                    <span>{formatTime(duration)}</span>
+                                </div>
+                            )}
 
                             {/* Next Episode */}
                             {onNext && (hasNext || true) && (
@@ -674,7 +689,7 @@ export default function VideoPlayer({
                                     title="Próximo Episódio"
                                     aria-label="Próximo Episódio"
                                 >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-7 h-7">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
                                         <polygon points="5 4 15 12 5 20 5 4"></polygon>
                                         <line x1="19" y1="5" x2="19" y2="19"></line>
                                     </svg>
@@ -694,7 +709,7 @@ export default function VideoPlayer({
                                     className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
                                     aria-label={isMuted ? 'Ativar som' : 'Silenciar'}
                                 >
-                                    {isMuted || volume === 0 ? <VolumeX size={28} /> : <Volume2 size={28} />}
+                                    {isMuted || volume === 0 ? <VolumeX size={24} /> : <Volume2 size={24} />}
                                 </button>
 
                                 {/* Volume Slider */}
@@ -752,7 +767,7 @@ export default function VideoPlayer({
                         </div>
 
                         {/* Right Controls */}
-                        <div className="flex items-center gap-4">
+                        <div className="flex items-center gap-3">
                             {/* Subtitle Font Size Controls */}
                             {subtitleUrl && subtitlesEnabled && (
                                 <div className="flex items-center gap-1 bg-white/5 rounded-lg px-2 py-1">
@@ -784,7 +799,7 @@ export default function VideoPlayer({
                                     aria-label={subtitlesEnabled ? 'Desativar legendas' : 'Ativar legendas'}
                                     title={subtitlesEnabled ? 'Desativar legendas (C)' : 'Ativar legendas (C)'}
                                 >
-                                    <Subtitles size={28} />
+                                    <Subtitles size={24} />
                                 </button>
                             )}
 
@@ -796,7 +811,7 @@ export default function VideoPlayer({
                                 className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
                                 aria-label={isFullscreen ? 'Sair do modo tela cheia' : 'Modo tela cheia'}
                             >
-                                {isFullscreen ? <Minimize size={28} /> : <Maximize size={28} />}
+                                {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
                             </button>
                         </div>
                     </div>

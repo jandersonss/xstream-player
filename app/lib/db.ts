@@ -26,6 +26,14 @@ export interface SyncMetadata {
     lastSync: number;
 }
 
+// --- User Subtitles (Interface shared for type safety, but storage is server-side) ---
+export interface SavedSubtitle {
+    streamId: string;
+    vtt: string;
+    language: string;
+    timestamp: number;
+}
+
 export const initDB = async (): Promise<IDBPDatabase> => {
     return openDB(DB_NAME, DB_VERSION, {
         upgrade(db, oldVersion, newVersion, transaction) {
@@ -38,7 +46,6 @@ export const initDB = async (): Promise<IDBPDatabase> => {
                 streamStore.createIndex('category_id', 'category_id', { unique: false });
                 streamStore.createIndex('type', 'type', { unique: false });
             } else {
-                // Store exists, but maybe indexes are missing from a previous version
                 const streamStore = transaction.objectStore('streams');
                 if (!streamStore.indexNames.contains('category_id')) {
                     streamStore.createIndex('category_id', 'category_id', { unique: false });
@@ -47,7 +54,6 @@ export const initDB = async (): Promise<IDBPDatabase> => {
                     streamStore.createIndex('type', 'type', { unique: false });
                 }
 
-                // Force clear old data to ensure type consistency for indexes
                 if (oldVersion < 3) {
                     streamStore.clear();
                     if (db.objectStoreNames.contains('categories')) {
@@ -68,9 +74,7 @@ export const initDB = async (): Promise<IDBPDatabase> => {
             if (!db.objectStoreNames.contains('carousel_cache')) {
                 db.createObjectStore('carousel_cache', { keyPath: 'date' });
             }
-            if (!db.objectStoreNames.contains('user_subtitles')) {
-                db.createObjectStore('user_subtitles', { keyPath: 'streamId' });
-            }
+            // Note: user_subtitles store was migrated to server-side in v7
         },
     });
 };
@@ -147,7 +151,6 @@ export const clearCache = async () => {
     await db.clear('details');
 };
 
-// TMDb Cache functions
 export const saveTMDbCache = async (key: string, data: any) => {
     const db = await initDB();
     await db.put('tmdb_cache', { key, data, timestamp: Date.now() });
@@ -173,7 +176,6 @@ export const clearExpiredTMDbCache = async (ttl: number = 1000 * 60 * 60 * 24) =
     await tx.done;
 };
 
-// Carousel Cache functions (Daily)
 export const saveCarouselCache = async (dateKey: string, data: any[]) => {
     const db = await initDB();
     await db.put('carousel_cache', { date: dateKey, data, timestamp: Date.now() });
@@ -197,26 +199,4 @@ export const clearExpiredCarouselCache = async (currentDateKey: string) => {
         }
     }
     await tx.done;
-};
-// --- User Subtitles ---
-export interface SavedSubtitle {
-    streamId: string;
-    vtt: string;
-    language: string;
-    timestamp: number;
-}
-
-export const saveUserSubtitle = async (subtitle: SavedSubtitle) => {
-    const db = await initDB();
-    await db.put('user_subtitles', subtitle);
-};
-
-export const getUserSubtitle = async (streamId: string): Promise<SavedSubtitle | undefined> => {
-    const db = await initDB();
-    return db.get('user_subtitles', String(streamId));
-};
-
-export const clearUserSubtitle = async (streamId: string) => {
-    const db = await initDB();
-    await db.delete('user_subtitles', String(streamId));
 };
