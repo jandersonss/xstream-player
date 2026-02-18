@@ -6,8 +6,9 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import VideoPlayer from '@/components/VideoPlayer';
-import { ArrowLeft, Play, Calendar, Star, Clock, Heart } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, Heart, Subtitles } from 'lucide-react';
 import Loader from '@/components/Loader';
+import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 
 // Types for Movie Info
 interface MovieInfo {
@@ -29,12 +30,16 @@ interface MovieInfo {
 }
 
 import { useData } from '@/app/context/DataContext';
+import { useTMDb } from '@/app/context/TMDbContext';
+import { useSubtitle } from '@/app/context/SubtitleContext';
 
 export default function WatchMoviePage() {
     const { credentials } = useAuth();
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
     const { updateProgress, getProgress, isLoaded: progressLoaded, loadingDetails } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
+    const { searchMovie, isConfigured: tmdbConfigured } = useTMDb();
+    const { getSavedSubtitle } = useSubtitle();
     const params = useParams();
     const router = useRouter();
     const streamId = params.streamId as string;
@@ -44,6 +49,9 @@ export default function WatchMoviePage() {
     const [loading, setLoading] = useState(true);
     const [isPlaying, setIsPlaying] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
+    const [showSubtitlePanel, setShowSubtitlePanel] = useState(false);
+    const [tmdbId, setTmdbId] = useState<number | undefined>(undefined);
 
     // Calculate resumeTime synchronously based on progressLoaded
     const resumeTime = useMemo(() => {
@@ -101,6 +109,39 @@ export default function WatchMoviePage() {
 
         loadMovieInfo();
     }, [credentials, streamId, getCachedDetail, saveCachedDetail]);
+
+    // Resolve TMDB ID for better subtitle matching
+    useEffect(() => {
+        if (!movie || !tmdbConfigured || tmdbId) return;
+
+        const resolveTmdbId = async () => {
+            try {
+                const result = await searchMovie(movie.info.name);
+                if (result) {
+                    setTmdbId(result.id);
+                }
+            } catch (err) {
+                console.error('[WatchMoviePage] Failed to resolve TMDB ID:', err);
+            }
+        };
+
+        resolveTmdbId();
+    }, [movie, tmdbConfigured, tmdbId, searchMovie]);
+
+    // Load saved subtitle on mount
+    useEffect(() => {
+        if (!streamId) return;
+
+        const loadSavedSub = async () => {
+            const saved = await getSavedSubtitle(streamId);
+            if (saved && saved.vtt) {
+                console.log('[WatchMoviePage] loading saved subtitle');
+                const blob = new Blob([saved.vtt], { type: 'text/vtt' });
+                setSubtitleUrl(URL.createObjectURL(blob));
+            }
+        };
+        loadSavedSub();
+    }, [streamId, getSavedSubtitle]);
 
     // Auto-play from continue watching
     const searchParams = useSearchParams();
@@ -174,6 +215,7 @@ export default function WatchMoviePage() {
                         onProgress={handleProgress}
                         enterFullscreen={true}
                         onBack={() => setIsPlaying(false)}
+                        subtitleUrl={subtitleUrl || undefined}
                     />
                 </div>
             </div>
@@ -255,6 +297,19 @@ export default function WatchMoviePage() {
                         </button>
 
                         <button
+                            onClick={() => setShowSubtitlePanel(true)}
+                            data-focusable="true"
+                            tabIndex={0}
+                            className={`mt-8 font-bold py-4 px-8 rounded-full flex items-center gap-3 transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-white focus:scale-110 ${subtitleUrl
+                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/40'
+                                : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                                }`}
+                        >
+                            <Subtitles size={24} />
+                            <span>{subtitleUrl ? 'Legendas ✓' : 'Legendas'}</span>
+                        </button>
+
+                        <button
                             onClick={toggleFavorite}
                             data-focusable="true"
                             tabIndex={0}
@@ -268,6 +323,17 @@ export default function WatchMoviePage() {
                     </div>
                 </div>
             </div>
+
+            {showSubtitlePanel && (
+                <SubtitleSearchPanel
+                    title={movie.info.name}
+                    year={movie.info.releasedate}
+                    tmdbId={tmdbId}
+                    streamId={streamId}
+                    onSubtitleSelected={(url) => setSubtitleUrl(url)}
+                    onClose={() => setShowSubtitlePanel(false)}
+                />
+            )}
         </div>
     );
 }

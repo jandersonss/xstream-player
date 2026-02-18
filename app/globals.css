@@ -57,3 +57,19 @@ body {
   background: #262626;
   border-radius: 4px;
 }
+
+/* Subtitle Styling */
+video::cue {
+  background-color: rgba(0, 0, 0, 0.7) !important;
+  color: #ffffff !important;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 1) !important;
+  font-family: var(--font-main) !important;
+  font-size: var(--subtitle-font-size, 1.2rem) !important;
+  line-height: 0 !important;
+  /* Raises the subtitle by increasing the line box height */
+}
+
+/* Chrome/Webkit specific position adjustment if supported */
+video::-webkit-media-text-track-display {
+  padding-bottom: 5% !important;
+}

@@ -1,10 +1,12 @@
 'use client';
 
+import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw } from 'lucide-react';
+import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw, Subtitles } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useData } from '../app/context/DataContext';
+import SubtitleSettingsModal from './SubtitleSettingsModal';
 
 const menuItems = [
     { name: 'Início', icon: Home, path: '/dashboard' },
@@ -19,6 +21,7 @@ export default function Sidebar() {
     const pathname = usePathname();
     const { logout } = useAuth();
     const { syncData, isSyncing, syncProgress, lastSync } = useData();
+    const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
 
     return (
         <aside className="hidden md:flex w-20 lg:w-72 h-full bg-black/60 backdrop-blur-xl border-r border-white/10 flex flex-col transition-all duration-300 relative z-50">
@@ -69,6 +72,16 @@ export default function Sidebar() {
 
             <div className="p-2 lg:p-6 space-y-4 border-t border-white/5">
                 <button
+                    onClick={() => setShowSubtitleSettings(true)}
+                    data-focusable="true"
+                    tabIndex={0}
+                    className="w-full flex items-center gap-0 lg:gap-4 px-2 lg:px-4 py-4 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-emerald-600 justify-center lg:justify-start"
+                >
+                    <Subtitles size={24} className="group-hover:scale-110 transition-transform duration-300" />
+                    <span className="hidden lg:block font-medium">Legendas</span>
+                </button>
+
+                <button
                     onClick={syncData}
                     disabled={isSyncing}
                     data-focusable="true"
@@ -94,6 +107,11 @@ export default function Sidebar() {
                     <span className="hidden lg:block font-medium">Sair</span>
                 </button>
             </div>
+
+            <SubtitleSettingsModal
+                isOpen={showSubtitleSettings}
+                onClose={() => setShowSubtitleSettings(false)}
+            />
         </aside>
     );
 }

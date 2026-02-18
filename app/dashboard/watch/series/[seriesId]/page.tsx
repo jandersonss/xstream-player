@@ -6,8 +6,9 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
-import { ArrowLeft, Play, Calendar, Star, Clock, List, Heart } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, List, Heart, Subtitles } from 'lucide-react';
 import Loader from '@/components/Loader';
+import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 
 // Types
 interface Episode {
@@ -40,12 +41,16 @@ interface SeriesInfo {
 }
 
 import { useData } from '@/app/context/DataContext';
+import { useTMDb } from '@/app/context/TMDbContext';
+import { useSubtitle } from '@/app/context/SubtitleContext';
 
 export default function WatchSeriesPage() {
     const { credentials } = useAuth();
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
     const { updateProgress, getProgress, loadDetail, isLoaded: progressLoaded, loadingDetails } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
+    const { searchTV, isConfigured: tmdbConfigured } = useTMDb();
+    const { getSavedSubtitle } = useSubtitle();
     const params = useParams();
     const router = useRouter();
     const seriesId = params.seriesId as string;
@@ -56,6 +61,9 @@ export default function WatchSeriesPage() {
     const [selectedEpisode, setSelectedEpisode] = useState<Episode | null>(null);
     const [error, setError] = useState<string | null>(null);
     const [activeSeason, setActiveSeason] = useState<string>("1");
+    const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
+    const [showSubtitlePanel, setShowSubtitlePanel] = useState(false);
+    const [parentTmdbId, setParentTmdbId] = useState<number | undefined>(undefined);
 
     // Calculate resumeTime synchronously based on selected episode
     const resumeTime = useMemo(() => {
@@ -125,6 +133,39 @@ export default function WatchSeriesPage() {
 
         loadSeriesInfo();
     }, [credentials, seriesId, getCachedDetail, saveCachedDetail]);
+
+    // Resolve TMDB ID for better subtitle matching
+    useEffect(() => {
+        if (!series || !tmdbConfigured || parentTmdbId) return;
+
+        const resolveTmdbId = async () => {
+            try {
+                const result = await searchTV(series.info.name);
+                if (result) {
+                    setParentTmdbId(result.id);
+                }
+            } catch (err) {
+                console.error('[WatchSeriesPage] Failed to resolve TMDB ID:', err);
+            }
+        };
+
+        resolveTmdbId();
+    }, [series, tmdbConfigured, parentTmdbId, searchTV]);
+
+    // Load saved subtitle for selected episode
+    useEffect(() => {
+        if (!selectedEpisode) return;
+
+        const loadSavedSub = async () => {
+            const saved = await getSavedSubtitle(selectedEpisode.id);
+            if (saved && saved.vtt) {
+                console.log('[WatchSeriesPage] loading saved subtitle for episode:', selectedEpisode.id);
+                const blob = new Blob([saved.vtt], { type: 'text/vtt' });
+                setSubtitleUrl(URL.createObjectURL(blob));
+            }
+        };
+        loadSavedSub();
+    }, [selectedEpisode?.id, getSavedSubtitle]);
 
     // Load detailed progress for this series
     useEffect(() => {
@@ -233,12 +274,14 @@ export default function WatchSeriesPage() {
 
         const playNext = () => {
             if (hasNext) {
+                setSubtitleUrl(null);
                 setSelectedEpisode(allEpisodes[currentIndex + 1]);
             }
         };
 
         const playPrevious = () => {
             if (hasPrevious) {
+                setSubtitleUrl(null);
                 setSelectedEpisode(allEpisodes[currentIndex - 1]);
             }
         };
@@ -262,6 +305,7 @@ export default function WatchSeriesPage() {
                         hasPrevious={hasPrevious}
                         enterFullscreen={true}
                         onBack={handleBackFromPlayer}
+                        subtitleUrl={subtitleUrl || undefined}
                     />
                 </div>
             </div>
@@ -407,6 +451,27 @@ export default function WatchSeriesPage() {
                                         {ep.container_extension}
                                     </div>
 
+                                    {/* Subtitle Button */}
+                                    <div
+                                        className="ml-2 flex-shrink-0"
+                                        onClick={(e) => {
+                                            e.stopPropagation();
+                                            setSelectedEpisode(null);
+                                            setShowSubtitlePanel(true);
+                                            // Store the episode info temporarily for the search
+                                            (window as any).__subtitleEpisode = {
+                                                seasonNumber: Number(ep.season || activeSeason),
+                                                episodeNumber: Number(ep.episode_num),
+                                                episodeRef: ep,
+                                            };
+                                        }}
+                                    >
+                                        <Subtitles
+                                            size={18}
+                                            className="text-gray-600 hover:text-emerald-400 transition-colors cursor-pointer"
+                                        />
+                                    </div>
+
                                     {/* Progress Bar */}
                                     {progress && duration > 0 && currentTime > 0 && (
                                         <div className="absolute bottom-0 left-0 w-full h-1.5 bg-gray-600/80">
@@ -425,6 +490,29 @@ export default function WatchSeriesPage() {
                     </div>
                 </div>
             </div>
+
+            {showSubtitlePanel && (
+                <SubtitleSearchPanel
+                    title={series.info.name}
+                    year={series.info.releaseDate}
+                    seasonNumber={(window as any).__subtitleEpisode?.seasonNumber || Number(activeSeason)}
+                    episodeNumber={(window as any).__subtitleEpisode?.episodeNumber || 1}
+                    parentTmdbId={parentTmdbId}
+                    streamId={(window as any).__subtitleEpisode?.episodeRef?.id || String(seriesId)}
+                    onSubtitleSelected={(url) => {
+                        setSubtitleUrl(url);
+                        // Auto-select the episode that was clicked for subtitle search
+                        const epRef = (window as any).__subtitleEpisode?.episodeRef;
+                        if (epRef) {
+                            setSelectedEpisode(epRef);
+                        }
+                    }}
+                    onClose={() => {
+                        setShowSubtitlePanel(false);
+                        (window as any).__subtitleEpisode = null;
+                    }}
+                />
+            )}
         </div>
     );
 }
