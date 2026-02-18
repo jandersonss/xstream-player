@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
-import * as db from '../lib/db';
+import { SavedSubtitle } from '../lib/db';
 
 interface SubtitleConfig {
     apiKey: string;
@@ -47,7 +47,7 @@ interface SubtitleContextType {
         parent_tmdb_id?: number | string;
     }) => Promise<SubtitleResult[]>;
     downloadSubtitle: (fileId: number, streamId: string) => Promise<string | null>;
-    getSavedSubtitle: (streamId: string) => Promise<db.SavedSubtitle | undefined>;
+    getSavedSubtitle: (streamId: string) => Promise<SavedSubtitle | undefined>;
     clearSavedSubtitle: (streamId: string) => Promise<void>;
 }
 
@@ -203,13 +203,20 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
                 return null;
             }
 
-            // Save for persistence
-            await db.saveUserSubtitle({
-                streamId: String(streamId),
-                vtt,
-                language: 'pt-BR', // Default or could be passed from search result
-                timestamp: Date.now()
-            });
+            // Save for persistence to server
+            try {
+                await fetch('/api/subtitles/user', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        streamId: String(streamId),
+                        vtt,
+                        language: 'pt-BR'
+                    })
+                });
+            } catch (err) {
+                console.warn('[SubtitleContext] Failed to sync subtitle to server:', err);
+            }
 
             const blob = new Blob([vtt], { type: 'text/vtt' });
             return URL.createObjectURL(blob);
@@ -220,11 +227,25 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
     }, [config]);
 
     const getSavedSubtitle = useCallback(async (streamId: string) => {
-        return db.getUserSubtitle(streamId);
+        try {
+            const response = await fetch(`/api/subtitles/user?streamId=${streamId}`);
+            if (response.ok) {
+                return await response.json();
+            }
+        } catch (err) {
+            console.warn('[SubtitleContext] Failed to fetch saved subtitle:', err);
+        }
+        return null;
     }, []);
 
     const clearSavedSubtitle = useCallback(async (streamId: string) => {
-        await db.clearUserSubtitle(streamId);
+        try {
+            await fetch(`/api/subtitles/user?streamId=${streamId}`, {
+                method: 'DELETE'
+            });
+        } catch (err) {
+            console.warn('[SubtitleContext] Failed to clear saved subtitle:', err);
+        }
     }, []);
 
     return (
