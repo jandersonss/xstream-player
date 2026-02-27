@@ -130,7 +130,7 @@ export default function SearchPage() {
     const { visibleItems, hasMore, sentinelRef } = useInfiniteScroll(results, { initialBatchSize: 30 });
 
     return (
-        <div className="min-h-full flex flex-col space-y-8">
+        <div className="min-h-full flex flex-col space-y-8 p-4 md:p-6 lg:p-10">
             {/* Header & Search Input */}
             <div className="flex flex-col gap-6">
                 <div>

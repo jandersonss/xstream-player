@@ -1,8 +1,8 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Info, Volume2, VolumeX } from 'lucide-react';
+import { Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useData } from '../app/context/DataContext';
 import { useTMDb } from '../app/context/TMDbContext';
@@ -49,13 +49,42 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
-    const [isMuted, setIsMuted] = useState(true);
     const [showLogo, setShowLogo] = useState(false);
 
     // Video State
     const [videoKey, setVideoKey] = useState<string | null>(null);
-    const [showVideo, setShowVideo] = useState(false);
+    const [showVideo, setShowVideo] = useState(true);
     const iframeRef = useRef<HTMLIFrameElement>(null);
+    const heroRef = useRef<HTMLDivElement>(null);
+
+    const handleNavigate = useCallback(() => {
+        if (!heroItems.length) return;
+        const item = heroItems[currentIndex];
+        router.push(
+            item.type === 'movie'
+                ? `/dashboard/watch/movie/${item.id}`
+                : `/dashboard/watch/series/${item.id}`
+        );
+    }, [heroItems, currentIndex, router]);
+
+    const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
+        if (e.key === 'ArrowRight') {
+            // At last item: let focus move to the next element naturally
+            if (currentIndex < heroItems.length - 1) {
+                e.preventDefault();
+                setCurrentIndex((prev) => prev + 1);
+            }
+        } else if (e.key === 'ArrowLeft') {
+            // At first item: let focus move to the previous element naturally
+            if (currentIndex > 0) {
+                e.preventDefault();
+                setCurrentIndex((prev) => prev - 1);
+            }
+        } else if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault();
+            handleNavigate();
+        }
+    }, [currentIndex, heroItems.length, handleNavigate]);
 
     useEffect(() => {
         if (heroItems.length <= 1) return;
@@ -104,18 +133,6 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
         const timer = setTimeout(() => setShowLogo(true), 500);
         return () => clearTimeout(timer);
     }, [currentIndex, heroItems, isConfigured, fetchVideos]);
-
-    // Handle Mute Toggle via PostMessage
-    useEffect(() => {
-        if (iframeRef.current && iframeRef.current.contentWindow) {
-            const command = isMuted ? 'mute' : 'unMute';
-            iframeRef.current.contentWindow.postMessage(JSON.stringify({
-                event: 'command',
-                func: command,
-                args: []
-            }), '*');
-        }
-    }, [isMuted, videoKey]);
 
     const fetchHeroContent = useCallback(async () => {
         const today = new Date();
@@ -268,41 +285,48 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const backdropUrl = currentItem.backdrop.replace('w500', 'original');
 
     return (
-        <div className="relative w-full h-[70vh] md:h-[85vh] overflow-hidden group">
-            {/* Background Image / Video Placeholder */}
-            <div className="absolute inset-0 z-0">
-                {/* Fallback Image */}
-                <div
-                    className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-in-out transform scale-105 group-hover:scale-110 ${showVideo ? 'opacity-0' : 'opacity-100'}`}
-                    style={{ backgroundImage: `url(${backdropUrl})` }}
-                />
+        <div
+            ref={heroRef}
+            className="relative w-full h-[45vh] md:h-[60vh] lg:h-[85vh] overflow-hidden group outline-none cursor-pointer"
+            tabIndex={0}
+            data-focusable="true"
+            data-carousel="true"
+            onClick={handleNavigate}
+            onKeyDown={handleKeyDown}
+            aria-label="Hero carousel"
+            aria-roledescription="carousel">
+            <div
+                className="relative w-full h-full overflow-hidden"
+            >
+                {/* Background Image / Video Placeholder */}
+                <div className="absolute inset-0 z-0 w-full ">
+                    {/* Fallback Image */}
+                    <div
+                        className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-in-out transform scale-105 group-hover:scale-110 ${showVideo ? 'opacity-0' : 'opacity-100'}`}
+                        style={{ backgroundImage: `url(${backdropUrl})` }}
+                    />
 
-                {/* Video Player */}
-                {videoKey && (
-                    <div className={`absolute inset-0 transition-opacity duration-1000 ${showVideo ? 'opacity-100' : 'opacity-0'}`}>
-                        <iframe
-                            ref={iframeRef}
-                            className="w-full h-full scale-150 pointer-events-none"
-                            src={`https://www.youtube.com/embed/${videoKey}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&enablejsapi=1&loop=1&playlist=${videoKey}&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
-                            title="Trailer"
-                            allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
-                        />
-                    </div>
-                )}
-
-                {/* Gradient Overlays for Readability (OLED Dark Mode) */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0a0a0a] via-[#0a0a0a]/50 to-transparent pointer-events-none" />
-                <div className="absolute inset-0 bg-gradient-to-r from-[#0a0a0a] from-10% via-[#0a0a0a]/40 to-transparent pointer-events-none" />
-                <div className="absolute inset-0 bg-gradient-to-l from-[#0a0a0a] from-0% via-transparent to-transparent opacity-80 pointer-events-none" />
+                    {/* Video Player */}
+                    {videoKey && (
+                        <div className={`absolute w-full h-full inset-0 transition-opacity duration-1000 ${showVideo ? 'opacity-100' : 'opacity-0'}`}>
+                            <iframe
+                                ref={iframeRef}
+                                className="aspect-video scale-150 pointer-events-none"
+                                src={`https://www.youtube.com/embed/${videoKey}?autoplay=1&mute=0&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&enablejsapi=1&loop=1&playlist=${videoKey}&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+                                title="Trailer"
+                                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                            />
+                        </div>
+                    )}
+                </div>
             </div>
-
             {/* Content Container */}
-            <div className="absolute inset-0 z-10 flex flex-col justify-end pb-20 md:pb-24 px-6 md:px-16 max-w-7xl mx-auto w-full pointer-events-none">
+            <div className="absolute inset-0 z-20 flex flex-col justify-end pb-16 md:pb-15 px-6 md:px-16 w-full pointer-events-none bg-gradient-to-t from-black via-black/10 from-20% to-transparent">
                 <div
-                    className={`transition-all duration-700 transform ${showLogo ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'} pointer-events-auto`}
+                    className={`transition-all duration-700 transform ${showLogo ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
                 >
                     {/* Metadata Tags */}
-                    <div className="flex items-center gap-3 mb-4">
+                    <div className="flex items-center gap-2 mb-2">
                         <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded uppercase tracking-wider">
                             {currentItem.type === 'movie' ? 'Filme' : 'Série'}
                         </span>
@@ -315,71 +339,33 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     </div>
 
                     {/* Title */}
-                    <h1 className="text-4xl md:text-6xl lg:text-7xl font-bold text-white mb-4 leading-tight max-w-4xl tracking-tight drop-shadow-2xl">
+                    <h1 className="text-2xl md:text-4xl font-bold text-white mb-1 leading-tight max-w-4xl tracking-tight drop-shadow-2xl">
                         {currentItem.title}
                     </h1>
 
                     {/* Description */}
-                    <p className="text-gray-300 text-base md:text-lg max-w-2xl mb-8 line-clamp-3 md:line-clamp-2 drop-shadow-md">
+                    <p className="text-gray-300 text-base md:text-lg max-w-2xl line-clamp-3 md:line-clamp-2 drop-shadow-md">
                         {currentItem.description}
                     </p>
-
-                    {/* Actions */}
-                    <div className="flex items-center gap-4">
-                        <button
-                            onClick={() => router.push(currentItem.type === 'movie'
-                                ? `/dashboard/watch/movie/${currentItem.id}?autoplay=true`
-                                : `/dashboard/watch/series/${currentItem.id}?autoplay=true`
-                            )}
-                            className="flex items-center gap-3 px-8 py-4 bg-white hover:bg-gray-200 text-black rounded-xl font-bold text-lg transition-all duration-300 transform hover:scale-105 shadow-[0_0_20px_rgba(255,255,255,0.3)] focus:outline-none focus:ring-4 focus:ring-white/50"
-                            data-focusable="true"
-                            tabIndex={0}
-                        >
-                            <Play className="w-6 h-6 fill-black" />
-                            Assistir
-                        </button>
-
-                        <button
-                            onClick={() => router.push(currentItem.type === 'movie'
-                                ? `/dashboard/watch/movie/${currentItem.id}` // Assuming detail route exists or structure matches
-                                : `/dashboard/watch/series/${currentItem.id}`
-                            )}
-                            className="flex items-center gap-3 px-8 py-4 bg-white/10 hover:bg-white/20 backdrop-blur-md border border-white/20 text-white rounded-xl font-bold text-lg transition-all duration-300 focus:outline-none focus:ring-4 focus:ring-white/50"
-                            data-focusable="true"
-                            tabIndex={0}
-                        >
-                            <Info className="w-6 h-6" />
-                            Mais Info
-                        </button>
-
-                        {videoKey && (
-                            <button
-                                onClick={() => setIsMuted(!isMuted)}
-                                className="ml-auto w-12 h-12 flex items-center justify-center rounded-full border border-white/30 bg-black/30 backdrop-blur-sm text-white hover:bg-white/10 transition-colors focus:outline-none focus:ring-2 focus:ring-white"
-                                data-focusable="true"
-                                tabIndex={0}
-                            >
-                                {isMuted ? <VolumeX size={20} /> : <Volume2 size={20} />}
-                            </button>
-                        )}
-                    </div>
                 </div>
             </div>
 
             {/* Pagination / Indicators */}
-            <div className="absolute right-6 md:right-16 bottom-1/2 transform translate-y-1/2 z-20 flex flex-col gap-4">
+            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-row items-center gap-2">
                 {heroItems.map((_, idx) => (
                     <button
                         key={idx}
-                        onClick={() => setCurrentIndex(idx)}
-                        className={`w-1 h-12 rounded-full transition-all duration-300 ${idx === currentIndex
-                            ? 'bg-white h-16 shadow-[0_0_10px_rgba(255,255,255,0.8)]'
-                            : 'bg-white/20 hover:bg-white/40'
+                        onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
+                        className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex
+                            ? 'w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] shadow-lg'
+                            : 'w-4 bg-white/30 hover:bg-white/50'
                             }`}
-                        aria-label={`Go to slide ${idx + 1}`}
+                        aria-label={`Ir para slide ${idx + 1}`}
+                        aria-current={idx === currentIndex ? 'true' : undefined}
                     />
                 ))}
             </div>
+
         </div>
     );
 }

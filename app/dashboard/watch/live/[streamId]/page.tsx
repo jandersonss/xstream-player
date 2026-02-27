@@ -4,7 +4,6 @@ import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import VideoPlayer from '@/components/VideoPlayer';
-import { ArrowLeft } from 'lucide-react';
 
 export default function WatchLivePage() {
     const { credentials } = useAuth();

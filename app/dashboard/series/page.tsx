@@ -77,7 +77,7 @@ export default function SeriesCategories() {
             {/* Hero Section specific for Series */}
             <HeroSection type='series' />
 
-            <div className="pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 p-4 md:p-6 lg:p-10">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 mt-4">
                     <div className="flex items-center gap-3">
                         <div className="p-2 md:p-3 bg-purple-600 rounded-lg shadow-lg shadow-purple-900/40">

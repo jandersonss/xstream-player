@@ -325,7 +325,7 @@ export default function Dashboard() {
     return (
         <>
             {/* Hero & Header Container */}
-            < div className="relative w-full -mt-8" > {/* Negative margin to pull up if needed, or remove padding from parent if possible. Assuming parent has padding. */}
+            < div className="relative w-full" > {/* Negative margin to pull up if needed, or remove padding from parent if possible. Assuming parent has padding. */}
 
                 {/* Header Section - Overlay */}
                 <div className="absolute top-0 left-0 right-0 z-50 flex flex-row justify-between items-center px-4 py-6 md:px-12 md:py-10 bg-gradient-to-b from-black/90 via-black/40 to-transparent">
@@ -361,162 +361,164 @@ export default function Dashboard() {
                 {/* Hero Section */}
                 <HeroSection />
             </div >
+            <div className="p-4 md:p-6 lg:p-10">
 
-            {/* Continue Watching Section */}
-            {
-                continueWatching.length > 0 && (
-                    <ContentCarousel
-                        title="Continuar Assistindo"
-                        items={continueWatching}
-                        icon={Clock}
-                        showProgress={true}
-                    />
-                )
-            }
-
-            {/* Dynamic Carousels */}
-            {
-                carouselData.map((carousel) => {
-                    const items = carousel.data.map(stream =>
-                        transformStreamToCarouselItem(stream, carousel.type)
-                    );
-
-                    return (
+                {/* Continue Watching Section */}
+                {
+                    continueWatching.length > 0 && (
                         <ContentCarousel
-                            key={carousel.id}
-                            title={carousel.title}
-                            items={items}
-                            icon={getCarouselIcon(carousel.id)}
-                            onViewAll={carousel.categoryId ? () => {
-                                router.push(`/dashboard/${carousel.type === 'movie' ? 'movies' : 'series'}/${carousel.categoryId}`);
-                            } : undefined}
+                            title="Continuar Assistindo"
+                            items={continueWatching}
+                            icon={Clock}
+                            showProgress={true}
                         />
-                    );
-                })
-            }
+                    )
+                }
 
-            {/* Main Categories Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <Link
-                    href="/dashboard/live"
-                    data-focusable="true"
-                    tabIndex={0}
-                    className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
-                >
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                {/* Dynamic Carousels */}
+                {
+                    carouselData.map((carousel) => {
+                        const items = carousel.data.map(stream =>
+                            transformStreamToCarouselItem(stream, carousel.type)
+                        );
 
-                    <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="p-3 bg-red-600 rounded-full group-hover:scale-110 transition-transform">
-                                <Tv size={24} className="text-white" />
+                        return (
+                            <ContentCarousel
+                                key={carousel.id}
+                                title={carousel.title}
+                                items={items}
+                                icon={getCarouselIcon(carousel.id)}
+                                onViewAll={carousel.categoryId ? () => {
+                                    router.push(`/dashboard/${carousel.type === 'movie' ? 'movies' : 'series'}/${carousel.categoryId}`);
+                                } : undefined}
+                            />
+                        );
+                    })
+                }
+
+                {/* Main Categories Cards */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 mb-6">
+                    <Link
+                        href="/dashboard/live"
+                        data-focusable="true"
+                        tabIndex={0}
+                        className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+
+                        <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-3 bg-red-600 rounded-full group-hover:scale-110 transition-transform">
+                                    <Tv size={24} className="text-white" />
+                                </div>
+                                <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">Transmissão ao Vivo</span>
                             </div>
-                            <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">Transmissão ao Vivo</span>
+                            <h3 className="text-2xl font-bold text-white mb-1">TV ao Vivo</h3>
+                            <p className="text-gray-300 text-sm line-clamp-1">Assista seus canais favoritos ao vivo.</p>
                         </div>
-                        <h3 className="text-2xl font-bold text-white mb-1">TV ao Vivo</h3>
-                        <p className="text-gray-300 text-sm line-clamp-1">Assista seus canais favoritos ao vivo.</p>
-                    </div>
-                </Link>
+                    </Link>
 
-                <Link
-                    href="/dashboard/movies"
-                    data-focusable="true"
-                    tabIndex={0}
-                    className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
-                >
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=2525&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                    <Link
+                        href="/dashboard/movies"
+                        data-focusable="true"
+                        tabIndex={0}
+                        className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=2525&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
 
-                    <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="p-3 bg-blue-600 rounded-full group-hover:scale-110 transition-transform">
-                                <Film size={24} className="text-white" />
+                        <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-3 bg-blue-600 rounded-full group-hover:scale-110 transition-transform">
+                                    <Film size={24} className="text-white" />
+                                </div>
+                                <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">On Demand</span>
                             </div>
-                            <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">On Demand</span>
+                            <h3 className="text-2xl font-bold text-white mb-1">Filmes</h3>
+                            <p className="text-gray-300 text-sm line-clamp-1">Últimos lançamentos e clássicos.</p>
                         </div>
-                        <h3 className="text-2xl font-bold text-white mb-1">Filmes</h3>
-                        <p className="text-gray-300 text-sm line-clamp-1">Últimos lançamentos e clássicos.</p>
-                    </div>
-                </Link>
+                    </Link>
 
-                <Link
-                    href="/dashboard/series"
-                    data-focusable="true"
-                    tabIndex={0}
-                    className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
-                >
-                    <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                    <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=2669&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                    <Link
+                        href="/dashboard/series"
+                        data-focusable="true"
+                        tabIndex={0}
+                        className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
+                    >
+                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=2669&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
 
-                    <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
-                        <div className="flex items-center justify-between mb-2">
-                            <div className="p-3 bg-purple-600 rounded-full group-hover:scale-110 transition-transform">
-                                <Layers size={24} className="text-white" />
+                        <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
+                            <div className="flex items-center justify-between mb-2">
+                                <div className="p-3 bg-purple-600 rounded-full group-hover:scale-110 transition-transform">
+                                    <Layers size={24} className="text-white" />
+                                </div>
+                                <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">Maratonar</span>
                             </div>
-                            <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">Maratonar</span>
+                            <h3 className="text-2xl font-bold text-white mb-1">Séries</h3>
+                            <p className="text-gray-300 text-sm line-clamp-1">Programas de TV e episódios.</p>
                         </div>
-                        <h3 className="text-2xl font-bold text-white mb-1">Séries</h3>
-                        <p className="text-gray-300 text-sm line-clamp-1">Programas de TV e episódios.</p>
-                    </div>
-                </Link>
-            </div>
-
-            {/* Account Details */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-                <div className="bg-[#1a1a1a] rounded-xl p-6 border border-[#333]">
-                    <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-                        <Clock size={18} className="text-gray-400" />
-                        Detalhes da Conta
-                    </h3>
-                    <div className="space-y-4">
-                        <div className="flex justify-between border-b border-[#333] pb-2">
-                            <span className="text-gray-400">Conexões Máximas</span>
-                            <span className="text-white font-medium">{user?.max_connections}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#333] pb-2">
-                            <span className="text-gray-400">Conexões Ativas</span>
-                            <span className="text-white font-medium">{user?.active_cons}</span>
-                        </div>
-                        <div className="flex justify-between border-b border-[#333] pb-2">
-                            <span className="text-gray-400">URL</span>
-                            <span className="text-white font-medium truncate max-w-[200px]">{server?.url}</span>
-                        </div>
-                        <div className="flex justify-between">
-                            <span className="text-gray-400">Fuso Horário</span>
-                            <span className="text-white font-medium">{server?.timezone}</span>
-                        </div>
-                    </div>
+                    </Link>
                 </div>
 
-                <div className="bg-gradient-to-br from-[#1a1a1a] to-[#222] rounded-xl p-6 border border-[#333] flex flex-col items-center justify-center text-center">
-                    <div className="w-16 h-16 bg-[#333] rounded-full flex items-center justify-center mb-4">
-                        {isConfigured ? (
-                            <Star size={32} className="text-yellow-500" />
-                        ) : (
-                            <Tv size={32} className="text-gray-500" />
+                {/* Account Details */}
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div className="bg-[#1a1a1a] rounded-xl p-6 border border-[#333]">
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                            <Clock size={18} className="text-gray-400" />
+                            Detalhes da Conta
+                        </h3>
+                        <div className="space-y-4">
+                            <div className="flex justify-between border-b border-[#333] pb-2">
+                                <span className="text-gray-400">Conexões Máximas</span>
+                                <span className="text-white font-medium">{user?.max_connections}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-[#333] pb-2">
+                                <span className="text-gray-400">Conexões Ativas</span>
+                                <span className="text-white font-medium">{user?.active_cons}</span>
+                            </div>
+                            <div className="flex justify-between border-b border-[#333] pb-2">
+                                <span className="text-gray-400">URL</span>
+                                <span className="text-white font-medium truncate max-w-[200px]">{server?.url}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-400">Fuso Horário</span>
+                                <span className="text-white font-medium">{server?.timezone}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div className="bg-gradient-to-br from-[#1a1a1a] to-[#222] rounded-xl p-6 border border-[#333] flex flex-col items-center justify-center text-center">
+                        <div className="w-16 h-16 bg-[#333] rounded-full flex items-center justify-center mb-4">
+                            {isConfigured ? (
+                                <Star size={32} className="text-yellow-500" />
+                            ) : (
+                                <Tv size={32} className="text-gray-500" />
+                            )}
+                        </div>
+                        <h3 className="text-white font-bold mb-2">
+                            {isConfigured ? 'Experiência TMDb Ativa' : 'Configure o TMDb'}
+                        </h3>
+                        <p className="text-gray-400 text-sm">
+                            {isConfigured
+                                ? 'Carrosséis personalizados com conteúdos do TMDb disponíveis no seu IPTV.'
+                                : 'Configure sua chave de API para ver sugestões do TMDb filtradas pelo seu catálogo.'}
+                        </p>
+                        {!isConfigured && (
+                            <button
+                                onClick={() => setShowSettings(true)}
+                                className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white text-sm font-medium transition-colors"
+                            >
+                                Configurar Agora
+                            </button>
                         )}
                     </div>
-                    <h3 className="text-white font-bold mb-2">
-                        {isConfigured ? 'Experiência TMDb Ativa' : 'Configure o TMDb'}
-                    </h3>
-                    <p className="text-gray-400 text-sm">
-                        {isConfigured
-                            ? 'Carrosséis personalizados com conteúdos do TMDb disponíveis no seu IPTV.'
-                            : 'Configure sua chave de API para ver sugestões do TMDb filtradas pelo seu catálogo.'}
-                    </p>
-                    {!isConfigured && (
-                        <button
-                            onClick={() => setShowSettings(true)}
-                            className="mt-4 px-4 py-2 bg-red-600 hover:bg-red-700 rounded-lg text-white text-sm font-medium transition-colors"
-                        >
-                            Configurar Agora
-                        </button>
-                    )}
                 </div>
-            </div>
 
-            {/* TMDb Settings Modal */}
-            <TMDbSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+                {/* TMDb Settings Modal */}
+                <TMDbSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+            </div>
         </>
     );
 }

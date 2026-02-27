@@ -41,6 +41,12 @@ export const useTvNavigation = () => {
 
             // Directional Navigation
             if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) {
+                // If the focused element is a carousel, let ArrowLeft/ArrowRight be
+                // handled by the component itself (it will preventDefault internally)
+                const isCarousel = activeElement?.getAttribute('data-carousel') === 'true';
+                if (isCarousel && (e.key === 'ArrowLeft' || e.key === 'ArrowRight')) {
+                    return;
+                }
                 e.preventDefault();
                 handleDirectionalNav(e.key);
             }

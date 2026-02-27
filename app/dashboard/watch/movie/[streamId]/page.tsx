@@ -224,7 +224,7 @@ export default function WatchMoviePage() {
 
     // Details View
     return (
-        <div className="min-h-screen bg-[#141414] text-white">
+        <div className="min-h-screen bg-[#141414] text-white ">
             {/* Background Backdrop (using poster logic if backdrop not available, blurred) */}
             <div className="absolute inset-0 overflow-hidden">
                 <div
@@ -234,7 +234,7 @@ export default function WatchMoviePage() {
                 <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/80 to-transparent"></div>
             </div>
 
-            <div className="relative z-10 container mx-auto px-6 py-12 lg:py-20">
+            <div className="relative z-10 container mx-auto p-4 md:p-6 lg:p-10">
                 <button
                     onClick={() => router.back()}
                     data-focusable="true"
@@ -257,7 +257,7 @@ export default function WatchMoviePage() {
 
                     {/* Metadata */}
                     <div className="flex-1 space-y-6">
-                        <h1 className="text-4xl lg:text-6xl font-bold leading-tight">{movie.info.name}</h1>
+                        <h1 className="text-3xl lg:text-5xl font-bold leading-tight">{movie.info.name}</h1>
 
                         <div className="flex flex-wrap items-center gap-4 text-sm lg:text-base text-gray-300">
                             {movie.info.releasedate && (
@@ -285,41 +285,40 @@ export default function WatchMoviePage() {
                             <p><strong className="text-white">Gênero:</strong> {movie.info.genre}</p>
                             <p><strong className="text-white">Diretor:</strong> {movie.info.director}</p>
                         </div>
-
-                        <button
-                            onClick={handlePlay}
-                            data-focusable="true"
-                            tabIndex={0}
-                            className="mt-8 bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-full flex items-center gap-3 transition-all transform hover:scale-105 shadow-lg shadow-red-900/40 focus:outline-none focus:ring-4 focus:ring-white focus:scale-110"
-                        >
-                            <Play size={28} fill="currentColor" />
-                            <span>Reproduzir Filme</span>
-                        </button>
-
-                        <button
-                            onClick={() => setShowSubtitlePanel(true)}
-                            data-focusable="true"
-                            tabIndex={0}
-                            className={`mt-8 font-bold py-4 px-8 rounded-full flex items-center gap-3 transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-white focus:scale-110 ${subtitleUrl
-                                ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/40'
-                                : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                                }`}
-                        >
-                            <Subtitles size={24} />
-                            <span>{subtitleUrl ? 'Legendas ✓' : 'Legendas'}</span>
-                        </button>
-
-                        <button
-                            onClick={toggleFavorite}
-                            data-focusable="true"
-                            tabIndex={0}
-                            className={`mt-4 ml-4 p-4 rounded-full border transition-all focus:outline-none focus:ring-4 focus:ring-white ${movie && isFavorite(movie.movie_data.stream_id, 'movie')
-                                ? 'bg-white text-red-600 border-white'
-                                : 'bg-transparent text-white border-white/30 hover:bg-white/10'
-                                }`}
-                        >
-                            <Heart size={28} fill={movie && isFavorite(movie.movie_data.stream_id, 'movie') ? "currentColor" : "none"} />
-                        </button>
+                        <div className='flex items-center gap-4'>
+                            <button
+                                onClick={handlePlay}
+                                data-focusable="true"
+                                tabIndex={0}
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-full flex items-center gap-3 transition-all transform hover:scale-105 shadow-lg shadow-red-900/40 focus:outline-none focus:ring-4 focus:ring-white focus:scale-110"
+                            >
+                                <Play size={28} fill="currentColor" />
+                                <span>Reproduzir Filme</span>
+                            </button>
+                            <button
+                                onClick={() => setShowSubtitlePanel(true)}
+                                data-focusable="true"
+                                tabIndex={0}
+                                className={`font-bold py-4 px-8 rounded-full flex items-center gap-3 transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-white focus:scale-110 ${subtitleUrl
+                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/40'
+                                    : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
+                                    }`}
+                            >
+                                <Subtitles size={24} />
+                                <span>{subtitleUrl ? 'Legendas ✓' : 'Legendas'}</span>
+                            </button>
+                            <button
+                                onClick={toggleFavorite}
+                                data-focusable="true"
+                                tabIndex={0}
+                                className={`p-4 rounded-full border transition-all focus:outline-none focus:ring-4 focus:ring-white ${movie && isFavorite(movie.movie_data.stream_id, 'movie')
+                                    ? 'bg-white text-red-600 border-white'
+                                    : 'bg-transparent text-white border-white/30 hover:bg-white/10'
+                                    }`}
+                            >
+                                <Heart size={28} fill={movie && isFavorite(movie.movie_data.stream_id, 'movie') ? "currentColor" : "none"} />
+                            </button>
+                        </div>
                     </div>
                 </div>
             </div>
