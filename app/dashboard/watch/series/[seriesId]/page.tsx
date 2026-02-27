@@ -326,7 +326,7 @@ export default function WatchSeriesPage() {
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#141414]/90 to-[#141414]"></div>
             </div>
 
-            <div className="relative z-10 container mx-auto px-6 pt-20 pb-12">
+            <div className="relative z-10 container mx-auto p-4 md:p-6 lg:p-10">
                 <button
                     onClick={() => router.back()}
                     data-focusable="true"
@@ -349,7 +349,7 @@ export default function WatchSeriesPage() {
 
                     {/* Metadata */}
                     <div className="flex-1 space-y-6">
-                        <h1 className="text-4xl lg:text-6xl font-bold leading-tight">{series.info.name}</h1>
+                        <h1 className="text-3xl lg:text-5xl font-bold leading-tight">{series.info.name}</h1>
 
                         <div className="flex flex-wrap items-center gap-4 text-sm lg:text-base text-gray-300">
                             {series.info.releaseDate && (

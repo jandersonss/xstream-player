@@ -61,7 +61,7 @@ export default function FavoritesPage() {
     );
 
     return (
-        <div className="space-y-12">
+        <div className="space-y-12 p-4 md:p-6 lg:p-10">
             <div className="flex flex-col gap-2">
                 <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Meus Favoritos</h1>
                 <p className="text-gray-400 text-sm md:text-base">Sua coleção personalizada de conteúdo.</p>

@@ -71,7 +71,7 @@ export default function LiveCategories() {
     if (error) return <div className="text-red-500">{error}</div>;
 
     return (
-        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
+        <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 p-4 md:p-6 lg:p-10">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
                 <div className="flex items-center gap-3">
                     <div className="p-2 md:p-3 bg-red-600 rounded-lg shadow-lg shadow-red-900/40">

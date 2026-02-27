@@ -74,12 +74,12 @@ export default function MovieCategories() {
     if (error) return <div className="text-red-500">{error}</div>;
 
     return (
-        <div className="relative w-full -mt-20"> {/* Negative margin to pull beneath fixed header if needed, similar to Dashboard */}
+        <div className="relative w-full"> {/* Negative margin to pull beneath fixed header if needed, similar to Dashboard */}
 
             {/* Hero Section specific for Movies */}
             <HeroSection type='movie' />
 
-            <div className="pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500">
+            <div className="pb-12 animate-in fade-in slide-in-from-bottom-4 duration-500 p-4 md:p-6 lg:p-10">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8 mt-4">
                     <div className="flex items-center gap-3">
                         <div className="p-2 md:p-3 bg-blue-600 rounded-lg shadow-lg shadow-blue-900/40">

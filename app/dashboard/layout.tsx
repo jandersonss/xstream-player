@@ -35,7 +35,7 @@ export default function DashboardLayout({
             <Sidebar />
 
             <main className="flex-1 overflow-y-auto h-full transition-all duration-300 pb-16 md:pb-0">
-                <div className="p-4 md:p-6 lg:p-10 max-w-[1600px] mx-auto min-h-full">
+                <div className="max-w-[1600px] mx-auto min-h-full">
                     {children}
                 </div>
             </main>
