@@ -311,7 +311,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         <div className={`absolute w-full h-full inset-0 transition-opacity duration-1000 ${showVideo ? 'opacity-100' : 'opacity-0'}`}>
                             <iframe
                                 ref={iframeRef}
-                                className="aspect-video scale-150 pointer-events-none"
+                                className="w-full h-full aspect-video scale-150 pointer-events-none"
                                 src={`https://www.youtube.com/embed/${videoKey}?autoplay=1&mute=0&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&enablejsapi=1&loop=1&playlist=${videoKey}&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                                 title="Trailer"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
