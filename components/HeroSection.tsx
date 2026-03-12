@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, KeyboardEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, KeyboardEvent, TouchEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
@@ -56,6 +56,8 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const [showVideo, setShowVideo] = useState(true);
     const iframeRef = useRef<HTMLIFrameElement>(null);
     const heroRef = useRef<HTMLDivElement>(null);
+    const touchStartX = useRef<number | null>(null);
+    const touchStartY = useRef<number | null>(null);
 
     const handleNavigate = useCallback(() => {
         if (!heroItems.length) return;
@@ -85,6 +87,28 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
             handleNavigate();
         }
     }, [currentIndex, heroItems.length, handleNavigate]);
+
+    const handleTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
+        touchStartX.current = e.touches[0].clientX;
+        touchStartY.current = e.touches[0].clientY;
+    }, []);
+
+    const handleTouchEnd = useCallback((e: TouchEvent<HTMLDivElement>) => {
+        if (touchStartX.current === null || touchStartY.current === null) return;
+        const dx = e.changedTouches[0].clientX - touchStartX.current;
+        const dy = e.changedTouches[0].clientY - touchStartY.current;
+        touchStartX.current = null;
+        touchStartY.current = null;
+        // Only handle horizontal swipes (horizontal movement > vertical)
+        if (Math.abs(dx) < 50 || Math.abs(dx) < Math.abs(dy)) return;
+        if (dx < 0) {
+            // Swipe left → next
+            setCurrentIndex((prev) => (prev + 1) % heroItems.length);
+        } else {
+            // Swipe right → previous
+            setCurrentIndex((prev) => (prev - 1 + heroItems.length) % heroItems.length);
+        }
+    }, [heroItems.length]);
 
     useEffect(() => {
         if (heroItems.length <= 1) return;
@@ -293,6 +317,8 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
             data-carousel="true"
             onClick={handleNavigate}
             onKeyDown={handleKeyDown}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
             aria-label="Hero carousel"
             aria-roledescription="carousel">
             <div
@@ -351,18 +377,22 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
             </div>
 
             {/* Pagination / Indicators */}
-            <div className="absolute bottom-6 left-1/2 -translate-x-1/2 z-40 flex flex-row items-center gap-2">
+            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex flex-row items-center">
                 {heroItems.map((_, idx) => (
                     <button
                         key={idx}
                         onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
-                        className={`h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex
-                            ? 'w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)] shadow-lg'
-                            : 'w-4 bg-white/30 hover:bg-white/50'
-                            }`}
+                        className="px-2 py-3 flex items-center justify-center"
                         aria-label={`Ir para slide ${idx + 1}`}
                         aria-current={idx === currentIndex ? 'true' : undefined}
-                    />
+                    >
+                        <span
+                            className={`block h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex
+                                ? 'w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]'
+                                : 'w-4 bg-white/30 hover:bg-white/50'
+                                }`}
+                        />
+                    </button>
                 ))}
             </div>
 
