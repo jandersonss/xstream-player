@@ -54,6 +54,7 @@ export default function VideoPlayer({
     const [centerPlayPause, setCenterPlayPause] = useState<{ show: boolean; playing: boolean }>({ show: false, playing: false });
     const [subtitleFontSize, setSubtitleFontSize] = useState(1.5);
     const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+    const [isMetadataLoaded, setIsMetadataLoaded] = useState(false);
 
     // Auto-enable subtitles when a new URL is provided
     useEffect(() => {
@@ -91,26 +92,116 @@ export default function VideoPlayer({
         onBack();
     } : null);
 
-    useEffect(() => {
-        const handleFullscreenChange = () => {
-            setIsFullscreen(!!document.fullscreenElement);
-
-            if (!document.fullscreenElement) {
-                onBack?.();
-            }
-        };
-
-        document.addEventListener('fullscreenchange', handleFullscreenChange);
-        return () => document.removeEventListener('fullscreenchange', handleFullscreenChange);
+    // Cross-platform fullscreen helpers
+    // Unified Fullscreen Helpers
+    const getFullscreenElement = useCallback((): Element | null => {
+        return document.fullscreenElement
+            || (document as any).webkitFullscreenElement
+            || null;
     }, []);
 
-    useEffect(() => {
-        if (enterFullscreen && containerRef.current && !document.fullscreenElement) {
-            containerRef.current.requestFullscreen().catch(err => {
-                console.warn('[VideoPlayer] Auto-fullscreen failed:', err);
-            });
+    const isCurrentlyFullscreen = useCallback(() => {
+        const video = videoRef.current;
+        return !!getFullscreenElement() || (video as any)?.webkitDisplayingFullscreen === true;
+    }, [getFullscreenElement]);
+
+    const enterFullscreenMode = useCallback((isProgrammatic = false) => {
+        const container = containerRef.current;
+        const video = videoRef.current;
+        if (!container || !video) return;
+
+        // On iOS, readyState must be >= 1 for webkitEnterFullscreen to work.
+        // If readyState is 0, we must NOT attempt it or it will crash.
+        if (video.readyState < 1 && !isMetadataLoaded) {
+            console.warn('[VideoPlayer] Cannot enter fullscreen: Metadata not loaded (readyState 0)');
+            if (video.readyState === 0) video.load();
+            return;
         }
-    }, [enterFullscreen]);
+
+        try {
+            // Priority 1: iOS Safari / Mobile Webkit on Video Element
+            // Direct call is required synchronously during user gesture.
+            if ((video as any).webkitEnterFullscreen) {
+                (video as any).webkitEnterFullscreen();
+                return;
+            }
+
+            // Priority 2: Standard API on container (Desktop, Android)
+            if (container.requestFullscreen) {
+                container.requestFullscreen().catch((err) => {
+                    // Fail silently for programmatic calls, log for interactive
+                    if (!isProgrammatic) console.warn('[VideoPlayer] requestFullscreen failed:', err);
+                });
+            }
+            // Priority 3: Older Webkit container request
+            else if ((container as any).webkitRequestFullscreen) {
+                (container as any).webkitRequestFullscreen();
+            }
+        } catch (e) {
+            if (!isProgrammatic) console.error('[VideoPlayer] Fullscreen attempt failed:', e);
+        }
+    }, [isMetadataLoaded]);
+
+    const exitFullscreenMode = useCallback(() => {
+        try {
+            if (document.exitFullscreen) {
+                document.exitFullscreen();
+            } else if ((document as any).webkitExitFullscreen) {
+                (document as any).webkitExitFullscreen();
+            } else if (videoRef.current && (videoRef.current as any).webkitExitFullscreen) {
+                (videoRef.current as any).webkitExitFullscreen();
+            }
+        } catch (e) {
+            console.error('[VideoPlayer] Exit fullscreen error:', e);
+        }
+    }, []);
+
+    const toggleFullscreen = useCallback(() => {
+        if (!isCurrentlyFullscreen()) {
+            enterFullscreenMode(false); // Interactive
+        } else {
+            exitFullscreenMode();
+        }
+    }, [isCurrentlyFullscreen, enterFullscreenMode, exitFullscreenMode]);
+
+    // Fullscreen State Synchronization
+    useEffect(() => {
+        const video = videoRef.current;
+
+        const updateFullscreenState = () => {
+            const isFs = isCurrentlyFullscreen();
+            setIsFullscreen(isFs);
+            console.log('[VideoPlayer] Fullscreen state updated:', isFs);
+        };
+
+        // Standard and Webkit prefixed events for document/container level changes
+        document.addEventListener('fullscreenchange', updateFullscreenState);
+        document.addEventListener('webkitfullscreenchange', updateFullscreenState);
+
+        // iOS specific events for native video player fullscreen
+        if (video) {
+            video.addEventListener('webkitbeginfullscreen', updateFullscreenState);
+            video.addEventListener('webkitendfullscreen', updateFullscreenState);
+        }
+
+        return () => {
+            document.removeEventListener('fullscreenchange', updateFullscreenState);
+            document.removeEventListener('webkitfullscreenchange', updateFullscreenState);
+            if (video) {
+                video.removeEventListener('webkitbeginfullscreen', updateFullscreenState);
+                video.removeEventListener('webkitendfullscreen', updateFullscreenState);
+            }
+        };
+    }, [isCurrentlyFullscreen]);
+
+    // Automatic Fullscreen Trigger
+    useEffect(() => {
+        if (enterFullscreen && containerRef.current && isMetadataLoaded && !isCurrentlyFullscreen()) {
+            console.log('[VideoPlayer] Handling enterFullscreen prop - Programmatic attempt');
+            // Programmatic calls often fail on iOS, so we pass true to fail silently
+            enterFullscreenMode(true);
+        }
+    }, [enterFullscreen, isMetadataLoaded, isCurrentlyFullscreen, enterFullscreenMode]);
 
     const formatTime = (time: number) => {
         if (isNaN(time)) return '00:00';
@@ -171,15 +262,7 @@ export default function VideoPlayer({
         }
     }, []);
 
-    const toggleFullscreen = useCallback(() => {
-        if (!document.fullscreenElement) {
-            containerRef.current?.requestFullscreen();
-            setIsFullscreen(true);
-        } else {
-            document.exitFullscreen();
-            setIsFullscreen(false);
-        }
-    }, []);
+
 
     const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const time = parseFloat(e.target.value);
@@ -397,16 +480,26 @@ export default function VideoPlayer({
             }
         };
         const handleLoadedMetadata = () => {
+            console.log('[VideoPlayer] Metadata loaded. readyState:', video.readyState);
             setDuration(video.duration);
             if (onMetadata) onMetadata(video.duration);
+            setIsMetadataLoaded(true);
+            setupVideo();
         };
+
         const handleEnded = () => {
-            if (onNext) {
-                onNext();
-            }
+            if (onNext) onNext();
         };
+
         const handleWaiting = () => setIsBuffering(true);
-        const handleCanPlay = () => setIsBuffering(false);
+        const handleCanPlay = () => {
+            console.log('[VideoPlayer] Can play. readyState:', video.readyState);
+            setIsBuffering(false);
+            setIsMetadataLoaded(true);
+        };
+
+        const handlePlaying = () => setIsBuffering(false);
+
         const handleProgress = () => {
             if (video.buffered.length > 0) {
                 const bufferedEnd = video.buffered.end(video.buffered.length - 1);
@@ -414,38 +507,49 @@ export default function VideoPlayer({
                 setBufferedPercent(percent);
             }
         };
+
         const handleVolumeChange = () => {
             setVolume(video.volume);
             setIsMuted(video.muted);
         };
 
+        const handleVideoError = () => {
+            const error = video.error;
+            setError(`Playback Error: ${error?.message || 'The video could not be loaded.'}`);
+            setIsBuffering(false);
+        };
+
         video.addEventListener('play', updatePlayState);
         video.addEventListener('pause', updatePlayState);
-        video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
-        video.addEventListener('ended', handleEnded);
-        video.addEventListener('waiting', handleWaiting);
         video.addEventListener('canplay', handleCanPlay);
+        video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('progress', handleProgress);
+        video.addEventListener('waiting', handleWaiting);
+        video.addEventListener('playing', handlePlaying);
+        video.addEventListener('ended', handleEnded);
+        video.addEventListener('error', handleVideoError);
         video.addEventListener('volumechange', handleVolumeChange);
 
         return () => {
             if (hls) hls.destroy();
             video.removeEventListener('play', updatePlayState);
             video.removeEventListener('pause', updatePlayState);
-            video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
-            video.removeEventListener('ended', handleEnded);
-            video.removeEventListener('waiting', handleWaiting);
             video.removeEventListener('canplay', handleCanPlay);
+            video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('progress', handleProgress);
+            video.removeEventListener('waiting', handleWaiting);
+            video.removeEventListener('playing', handlePlaying);
+            video.removeEventListener('ended', handleEnded);
+            video.removeEventListener('error', handleVideoError);
             video.removeEventListener('volumechange', handleVolumeChange);
         };
-    }, [src, autoPlay]);
+    }, [src, initialTime, autoPlay, onMetadata, onNext, onProgress]);
 
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || !initialTime || hasAppliedInitialTime.current) return;
+        if (!video || !initialTime || hasAppliedInitialTime.current || !isMetadataLoaded) return;
 
         const applySeek = () => {
             if (initialTime > 0 && !hasAppliedInitialTime.current && video.currentTime < 5) {
@@ -473,7 +577,7 @@ export default function VideoPlayer({
     return (
         <div
             ref={containerRef}
-            className="relative w-full aspect-video bg-black group overflow-hidden rounded-xl shadow-2xl border border-white/10"
+            className="relative w-full max-h-[100vh] aspect-video bg-black group overflow-hidden rounded-xl shadow-2xl border border-white/10"
             style={{ '--subtitle-font-size': `${subtitleFontSize}rem` } as any}
             onMouseMove={handleInteraction}
             onMouseLeave={() => isPlaying && setShowControls(false)}
