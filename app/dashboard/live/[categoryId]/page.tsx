@@ -50,7 +50,15 @@ export default function LiveStreams() {
                 // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'live');
                 if (cached && cached.length > 0) {
-                    setStreams(cached.map(s => ({ ...s.data, stream_id: s.id })));
+                    setStreams(cached.map(s => ({
+                        stream_id: s.id,
+                        name: s.name,
+                        stream_icon: s.icon || '',
+                        epg_channel_id: s.epg_channel_id || '',
+                        added: s.added || '',
+                        category_id: s.category_id,
+                        stream_type: s.stream_type || '',
+                    })));
                     setLoading(false);
                     return;
                 }

@@ -51,9 +51,24 @@ export default function SearchPage() {
 
                 if (cachedLive.length > 0 || cachedMovies.length > 0 || cachedSeries.length > 0) {
                     setData({
-                        live: cachedLive.map(s => s.data),
-                        movies: cachedMovies.map(s => s.data),
-                        series: cachedSeries.map(s => s.data)
+                        live: cachedLive.map(s => ({
+                            stream_id: s.id,
+                            name: s.name,
+                            stream_icon: s.icon,
+                            rating: s.rating,
+                        })),
+                        movies: cachedMovies.map(s => ({
+                            stream_id: s.id,
+                            name: s.name,
+                            stream_icon: s.icon,
+                            rating: s.rating,
+                        })),
+                        series: cachedSeries.map(s => ({
+                            series_id: s.id,
+                            name: s.name,
+                            cover: s.cover || s.icon,
+                            rating: s.rating,
+                        }))
                     });
                     setInitialLoading(false);
                     return;
