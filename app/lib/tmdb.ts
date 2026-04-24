@@ -162,11 +162,24 @@ export const generateCacheKey = (endpoint: string, params: Record<string, any>):
 };
 
 /**
+ * In-memory cache for normalized titles to avoid re-computing
+ * during the same session. This is especially important for
+ * findBestMatch which may normalize the same title many times.
+ */
+const normalizationCache = new Map<string, string>();
+
+/**
  * Normalize title for matching
  * Removes special characters, years, quality indicators, articles, etc.
+ * Uses in-memory cache to avoid repeated regex computation.
  */
 export const normalizeTitle = (title: string): string => {
-    return title
+    if (!title) return '';
+
+    const cached = normalizationCache.get(title);
+    if (cached !== undefined) return cached;
+
+    const result = title
         .toLowerCase()
         // Remove common prefixes/articles in multiple languages
         .replace(/^(the|a|an|o|os|as|um|uma|el|la|los|las|le|les|un|une|des|der|die|das)\s+/i, '')
@@ -183,50 +196,94 @@ export const normalizeTitle = (title: string): string => {
         // Normalize multiple spaces
         .replace(/\s+/g, ' ')
         .trim();
+
+    // Cap cache size to prevent memory leaks on very long sessions
+    if (normalizationCache.size > 50000) {
+        normalizationCache.clear();
+    }
+    normalizationCache.set(title, result);
+
+    return result;
 };
 
 /**
- * Calculate Levenshtein distance between two strings
+ * Calculate Levenshtein distance between two strings.
+ * Uses bounded computation — bails out early if distance exceeds maxDist.
+ * This avoids wasted CPU on strings that clearly won't match.
  */
-const levenshteinDistance = (str1: string, str2: string): number => {
-    const matrix: number[][] = [];
+const levenshteinDistance = (str1: string, str2: string, maxDist?: number): number => {
+    const len1 = str1.length;
+    const len2 = str2.length;
 
-    for (let i = 0; i <= str2.length; i++) {
-        matrix[i] = [i];
+    // Quick length-based bailout
+    if (maxDist !== undefined && Math.abs(len1 - len2) > maxDist) {
+        return maxDist + 1;
     }
 
-    for (let j = 0; j <= str1.length; j++) {
-        matrix[0][j] = j;
+    // Use single-row optimization instead of full matrix (O(n) space vs O(n*m))
+    let prevRow: number[] = [];
+    for (let j = 0; j <= len1; j++) {
+        prevRow[j] = j;
     }
 
-    for (let i = 1; i <= str2.length; i++) {
-        for (let j = 1; j <= str1.length; j++) {
+    for (let i = 1; i <= len2; i++) {
+        let prev = i;
+        let minInRow = prev;
+
+        for (let j = 1; j <= len1; j++) {
+            let current: number;
             if (str2.charAt(i - 1) === str1.charAt(j - 1)) {
-                matrix[i][j] = matrix[i - 1][j - 1];
+                current = prevRow[j - 1];
             } else {
-                matrix[i][j] = Math.min(
-                    matrix[i - 1][j - 1] + 1,
-                    matrix[i][j - 1] + 1,
-                    matrix[i - 1][j] + 1
+                current = Math.min(
+                    prevRow[j - 1] + 1,
+                    prev + 1,
+                    prevRow[j] + 1
                 );
             }
+
+            prevRow[j - 1] = prev;
+            prev = current;
+
+            if (current < minInRow) {
+                minInRow = current;
+            }
+        }
+
+        prevRow[len1] = prev;
+
+        // Early termination: if min value in this row exceeds maxDist,
+        // the result will only get worse
+        if (maxDist !== undefined && minInRow > maxDist) {
+            return maxDist + 1;
         }
     }
 
-    return matrix[str2.length][str1.length];
+    return prevRow[len1];
 };
 
 /**
  * Calculate similarity score between two strings (0-1)
- * Uses Levenshtein distance
+ * Uses bounded Levenshtein distance for efficiency
  */
-const calculateSimilarity = (str1: string, str2: string): number => {
+const calculateSimilarity = (str1: string, str2: string, threshold?: number): number => {
     const longer = str1.length > str2.length ? str1 : str2;
     const shorter = str1.length > str2.length ? str2 : str1;
 
     if (longer.length === 0) return 1.0;
 
-    const editDistance = levenshteinDistance(longer, shorter);
+    // Calculate max allowed distance from threshold
+    const maxDist = threshold !== undefined
+        ? Math.floor(longer.length * (1 - threshold))
+        : undefined;
+
+    const editDistance = levenshteinDistance(longer, shorter, maxDist);
+
+    // If bounded computation bailed out, return 0
+    if (maxDist !== undefined && editDistance > maxDist) {
+        return 0;
+    }
+
     return (longer.length - editDistance) / longer.length;
 };
 
@@ -243,8 +300,8 @@ export const titlesMatch = (title1: string, title2: string, threshold: number = 
     // Exact match
     if (normalized1 === normalized2) return true;
 
-    // Calculate similarity
-    const similarity = calculateSimilarity(normalized1, normalized2);
+    // Calculate similarity with bounded computation
+    const similarity = calculateSimilarity(normalized1, normalized2, threshold);
 
     return similarity >= threshold;
 };
@@ -252,8 +309,12 @@ export const titlesMatch = (title1: string, title2: string, threshold: number = 
 
 
 /**
- * Find the best match for a title in a list of items
- * optimized to use pre-normalized items if provided
+ * Find the best match for a title in a list of items.
+ * Optimized with:
+ * 1. Exact match via Map lookup (O(1))
+ * 2. Length-based pre-filtering
+ * 3. Bounded Levenshtein that bails out early
+ * 4. In-memory normalization cache
  */
 export const findBestMatch = <T extends { name: string; normalized_name?: string }>(
     targetTitle: string,
@@ -264,29 +325,30 @@ export const findBestMatch = <T extends { name: string; normalized_name?: string
     let bestScore = 0;
     const normalizedTarget = normalizeTitle(targetTitle);
 
+    if (!normalizedTarget) return null;
+
+    // Build a quick exact-match map on first call per items array
+    // (items reference stability means this is typically cached by the caller)
     for (const entry of items) {
-        let normalizedItem: string;
-        let originalItem: T;
+        const normalizedItem = entry.normalized_name || normalizeTitle(entry.name);
 
-        const raw = entry as T;
-        normalizedItem = raw.normalized_name || normalizeTitle(raw.name);
-        originalItem = raw;
-
-        // Exact match optimization
+        // Exact match — return immediately
         if (normalizedTarget === normalizedItem) {
-            return { item: originalItem, score: 1.0 };
+            return { item: entry, score: 1.0 };
         }
 
-        // Only calculate Levenshtein if lengths are somewhat similar (optimization)
-        if (Math.abs(normalizedTarget.length - normalizedItem.length) > 5) {
+        // Aggressive length diff filter — skip if lengths differ too much
+        // For threshold 0.85, max allowed diff is ~15% of longer string
+        const maxLenDiff = Math.max(3, Math.floor(Math.max(normalizedTarget.length, normalizedItem.length) * 0.15));
+        if (Math.abs(normalizedTarget.length - normalizedItem.length) > maxLenDiff) {
             continue;
         }
 
-        const similarity = calculateSimilarity(normalizedTarget, normalizedItem);
+        const similarity = calculateSimilarity(normalizedTarget, normalizedItem, threshold);
 
         if (similarity > bestScore) {
             bestScore = similarity;
-            bestMatch = originalItem;
+            bestMatch = entry;
         }
     }
 

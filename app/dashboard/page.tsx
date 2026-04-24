@@ -28,7 +28,7 @@ import {
     getCarouselCache,
     clearExpiredCarouselCache
 } from '../lib/db';
-import { div } from 'framer-motion/client';
+
 
 interface EnrichedStream extends CachedStream {
     tmdbData?: {
@@ -42,7 +42,7 @@ interface EnrichedStream extends CachedStream {
 
 export default function Dashboard() {
     const { user, server } = useAuth();
-    const { lastSync, getCachedCategories, getAllCachedStreams } = useData();
+    const { lastSync, getCachedCategories, getAllCachedStreams, getCachedStreams } = useData();
     const { progressMap } = useWatchProgress();
     const {
         isConfigured,
@@ -266,18 +266,15 @@ export default function Dashboard() {
         const shuffled = shuffleWithSeed(allCategories, seed);
         const selected = shuffled.slice(0, 4);
 
-        // Load content for each category
+        // Load content for each category using indexed query (no full table scan)
         const dataPromises = selected.map(async ({ type, category }) => {
-            const streams = await getAllCachedStreams(type);
-            const categoryStreams = streams
-                .filter(s => s.category_id === category.category_id)
-                .slice(0, 20);
+            const categoryStreams = await getCachedStreams(category.category_id, type);
 
             return {
                 id: `${type}-${category.category_id}`,
                 title: category.category_name,
                 type,
-                data: categoryStreams,
+                data: categoryStreams.slice(0, 20),
                 categoryId: category.category_id
             };
         });

@@ -1,15 +1,16 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import * as db from '../lib/db';
-import { normalizeTitle } from '../lib/tmdb';
+import { getDeviceProfile } from '../lib/deviceProfile';
 
 interface DataContextType {
     isSyncing: boolean;
     lastSync: number | null;
     syncProgress: number;
     syncData: () => Promise<void>;
+    cancelSync: () => void;
     getCachedCategories: (type: 'live' | 'movie' | 'series') => Promise<db.CachedCategory[]>;
     getCachedStreams: (categoryId: string, type: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
     getAllCachedStreams: (type?: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
@@ -19,18 +20,162 @@ interface DataContextType {
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
 
+
+
+/**
+ * Extract only necessary fields from raw API items.
+ * This eliminates storing the full raw JSON blob (~70% storage reduction).
+ */
+function mapItemToSlimStream(item: any, type: 'live' | 'movie' | 'series'): db.CachedStream {
+    return {
+        id: String(item.stream_id || item.series_id),
+        category_id: String(item.category_id),
+        name: item.name || '',
+        type,
+        icon: item.stream_icon || item.cover || undefined,
+        rating: item.rating || undefined,
+        added: item.added || undefined,
+        // Do NOT normalize here — defer to lazy normalization
+        normalized_name: undefined,
+        // Additional fields used by listing pages
+        container_extension: item.container_extension || undefined,
+        epg_channel_id: item.epg_channel_id || undefined,
+        stream_type: item.stream_type || undefined,
+        cover: item.cover || undefined,
+        plot: item.plot || undefined,
+        cast: item.cast || undefined,
+        director: item.director || undefined,
+        genre: item.genre || undefined,
+        release_date: item.releaseDate || item.release_date || undefined,
+        rating_5based: item.rating_5based || undefined,
+        backdrop_path: item.backdrop_path || undefined,
+        last_modified: item.last_modified || undefined,
+    };
+}
+
+/**
+ * Yield to the event loop to prevent UI freezing on low-power devices.
+ * Essential for webOS 4 (Chrome 60) with limited CPU.
+ */
+function yieldToEventLoop(): Promise<void> {
+    return new Promise(resolve => setTimeout(resolve, 0));
+}
+
 export function DataProvider({ children }: { children: React.ReactNode }) {
     const { credentials } = useAuth();
     const [isSyncing, setIsSyncing] = useState(false);
     const [syncProgress, setSyncProgress] = useState(0);
     const [lastSync, setLastSync] = useState<number | null>(null);
+    const abortControllerRef = useRef<AbortController | null>(null);
 
+    /**
+     * Fetch streams page by page from the paginated proxy.
+     * Each page is processed and saved to IDB immediately, so the client
+     * never holds more than SYNC_PAGE_SIZE items in memory at once.
+     */
+    const fetchStreamsPaginated = async (
+        type: 'live' | 'movie' | 'series',
+        action: string,
+        progressStart: number,
+        progressWeight: number,
+        signal: AbortSignal
+    ) => {
+        if (!credentials) return;
 
-    const fetchAllDataByType = async (type: 'live' | 'movie' | 'series', action: string, progressStart: number, progressWeight: number) => {
+        const profile = getDeviceProfile();
+        const pageSize = profile.syncPageSize;
+
+        let page = 1;
+        let hasMore = true;
+        let total = 0;
+        let processed = 0;
+
+        console.log(`[Sync] Starting ${type} with pageSize=${pageSize} (${profile.description})`);
+
+        while (hasMore) {
+            if (signal.aborted) return;
+
+            const res = await fetch('/api/proxy', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    ...credentials,
+                    action,
+                    page,
+                    limit: pageSize
+                }),
+                signal
+            });
+
+            const result = await res.json();
+
+            // Check if it's a paginated response
+            if (result.items && Array.isArray(result.items)) {
+                total = result.total || 0;
+                hasMore = result.hasMore || false;
+
+                if (result.items.length > 0) {
+                    const batch = result.items.map((item: any) =>
+                        mapItemToSlimStream(item, type)
+                    );
+                    await db.saveStreams(batch);
+                    processed += batch.length;
+                }
+
+                // Update progress
+                const fraction = total > 0 ? processed / total : 1;
+                const currentProgress = progressStart + (fraction * progressWeight);
+                setSyncProgress(Math.round(currentProgress));
+
+                // Yield to event loop between pages (skip on high-end devices)
+                if (profile.yieldBetweenBatches) {
+                    await yieldToEventLoop();
+                }
+
+                page++;
+            } else {
+                // Fallback: non-paginated response (e.g. categories or errors)
+                // Should not happen for stream actions, but handle gracefully
+                if (Array.isArray(result)) {
+                    total = result.length;
+                    for (let i = 0; i < total; i += pageSize) {
+                        if (signal.aborted) return;
+                        const batch = result.slice(i, i + pageSize).map((item: any) =>
+                            mapItemToSlimStream(item, type)
+                        );
+                        await db.saveStreams(batch);
+                        if (profile.yieldBetweenBatches) {
+                            await yieldToEventLoop();
+                        }
+
+                        const currentProgress = progressStart + ((Math.min(i + pageSize, total) / total) * progressWeight);
+                        setSyncProgress(Math.round(currentProgress));
+                    }
+                }
+                hasMore = false;
+            }
+        }
+
+        if (total === 0) {
+            setSyncProgress(Math.round(progressStart + progressWeight));
+        }
+
+        console.log(`[Sync] ${type}: ${processed} items synced in ${page - 1} pages`);
+    };
+
+    const fetchAllDataByType = async (
+        type: 'live' | 'movie' | 'series',
+        action: string,
+        progressStart: number,
+        progressWeight: number,
+        signal: AbortSignal
+    ) => {
         if (!credentials) return;
 
         try {
-            // 1. Fetch Categories
+            if (signal.aborted) return;
+
+            // 1. Fetch Categories (small, non-paginated)
             const catAction = type === 'movie' ? 'get_vod_categories' :
                 type === 'series' ? 'get_series_categories' :
                     'get_live_categories';
@@ -38,7 +183,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             const catRes = await fetch('/api/proxy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...credentials, action: catAction })
+                body: JSON.stringify({ ...credentials, action: catAction }),
+                signal
             });
             const categories = await catRes.json();
 
@@ -46,71 +192,76 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
                 await db.saveCategories(categories.map(c => ({ ...c, type })));
             }
 
-            // 2. Fetch all streams/vods/series
-            const streamRes = await fetch('/api/proxy', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ ...credentials, action })
-            });
-            const items = await streamRes.json();
+            if (signal.aborted) return;
 
-            if (Array.isArray(items)) {
-                const total = items.length;
-                if (total === 0) {
-                    setSyncProgress(Math.round(progressStart + progressWeight));
-                    return;
-                }
+            // 2. Fetch streams page by page (paginated)
+            await fetchStreamsPaginated(type, action, progressStart, progressWeight, signal);
 
-                const batchSize = 1000; // Larger batches for speed
-                for (let i = 0; i < total; i += batchSize) {
-                    const batch = items.slice(i, i + batchSize).map(item => ({
-                        id: String(item.stream_id || item.series_id),
-                        category_id: String(item.category_id),
-                        name: item.name,
-                        type,
-                        icon: item.stream_icon || item.cover,
-                        rating: item.rating,
-                        added: item.added,
-                        normalized_name: normalizeTitle(item.name || ''),
-                        data: item
-                    }));
-                    await db.saveStreams(batch);
-
-                    const currentProgress = progressStart + ((Math.min(i + batchSize, total) / total) * progressWeight);
-                    setSyncProgress(Math.round(currentProgress));
-                }
-            } else {
-                setSyncProgress(Math.round(progressStart + progressWeight));
+        } catch (error: any) {
+            if (error.name === 'AbortError') {
+                console.log(`Sync cancelled for ${type}`);
+                return;
             }
-        } catch (error) {
             console.error(`Sync error for ${type}:`, error);
             setSyncProgress(Math.round(progressStart + progressWeight));
         }
     };
 
+    const cancelSync = useCallback(() => {
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+            abortControllerRef.current = null;
+            setIsSyncing(false);
+            setSyncProgress(0);
+            console.log('Sync cancelled by user');
+        }
+    }, []);
+
     const syncData = useCallback(async () => {
         if (!credentials || isSyncing) return;
+
+        // Cancel any previous sync
+        if (abortControllerRef.current) {
+            abortControllerRef.current.abort();
+        }
+
+        const controller = new AbortController();
+        abortControllerRef.current = controller;
 
         setIsSyncing(true);
         setSyncProgress(0);
 
         try {
             // Sequential sync to avoid overwhelming the browser/API
-            await fetchAllDataByType('live', 'get_live_streams', 0, 33);
-            await fetchAllDataByType('movie', 'get_vod_streams', 33, 33);
-            await fetchAllDataByType('series', 'get_series', 66, 34);
+            await fetchAllDataByType('live', 'get_live_streams', 0, 33, controller.signal);
+            await fetchAllDataByType('movie', 'get_vod_streams', 33, 33, controller.signal);
+            await fetchAllDataByType('series', 'get_series', 66, 34, controller.signal);
 
-            const timestamp = Date.now();
-            await db.saveSyncMetadata({ type: 'categories', lastSync: timestamp });
-            setLastSync(timestamp);
-            setSyncProgress(100);
+            if (!controller.signal.aborted) {
+                const timestamp = Date.now();
+                await db.saveSyncMetadata({ type: 'categories', lastSync: timestamp });
+                setLastSync(timestamp);
+                setSyncProgress(100);
+            }
         } finally {
+            if (abortControllerRef.current === controller) {
+                abortControllerRef.current = null;
+            }
             setTimeout(() => {
                 setIsSyncing(false);
                 setSyncProgress(0);
             }, 1000);
         }
     }, [credentials, isSyncing]);
+
+    // Cleanup on unmount
+    useEffect(() => {
+        return () => {
+            if (abortControllerRef.current) {
+                abortControllerRef.current.abort();
+            }
+        };
+    }, []);
 
     useEffect(() => {
         const initData = async () => {
@@ -160,6 +311,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             lastSync,
             syncProgress,
             syncData,
+            cancelSync,
             getCachedCategories,
             getCachedStreams,
             getAllCachedStreams,

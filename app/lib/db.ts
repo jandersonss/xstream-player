@@ -1,7 +1,7 @@
 import { openDB, IDBPDatabase } from 'idb';
 
 const DB_NAME = 'xstream_player_db';
-const DB_VERSION = 7;
+const DB_VERSION = 8;
 
 export interface CachedCategory {
     category_id: string;
@@ -19,7 +19,19 @@ export interface CachedStream {
     rating?: string;
     added?: string;
     normalized_name?: string;
-    data: any; // Raw data from API
+    // Expanded fields to avoid storing raw data blob
+    container_extension?: string;
+    epg_channel_id?: string;
+    stream_type?: string;
+    cover?: string;
+    plot?: string;
+    cast?: string;
+    director?: string;
+    genre?: string;
+    release_date?: string;
+    rating_5based?: string;
+    backdrop_path?: string[];
+    last_modified?: string;
 }
 
 export interface SyncMetadata {
@@ -46,6 +58,7 @@ export const initDB = async (): Promise<IDBPDatabase> => {
                 const streamStore = db.createObjectStore('streams', { keyPath: 'id' });
                 streamStore.createIndex('category_id', 'category_id', { unique: false });
                 streamStore.createIndex('type', 'type', { unique: false });
+                streamStore.createIndex('type_category', ['type', 'category_id'], { unique: false });
             } else {
                 const streamStore = transaction.objectStore('streams');
                 if (!streamStore.indexNames.contains('category_id')) {
@@ -54,11 +67,26 @@ export const initDB = async (): Promise<IDBPDatabase> => {
                 if (!streamStore.indexNames.contains('type')) {
                     streamStore.createIndex('type', 'type', { unique: false });
                 }
+                // Add compound index for efficient type+category queries
+                if (!streamStore.indexNames.contains('type_category')) {
+                    streamStore.createIndex('type_category', ['type', 'category_id'], { unique: false });
+                }
 
                 if (oldVersion < 3) {
                     streamStore.clear();
                     if (db.objectStoreNames.contains('categories')) {
                         transaction.objectStore('categories').clear();
+                    }
+                }
+
+                // Clear old data format when upgrading to v8 (slim data)
+                if (oldVersion < 8) {
+                    streamStore.clear();
+                    if (db.objectStoreNames.contains('categories')) {
+                        transaction.objectStore('categories').clear();
+                    }
+                    if (db.objectStoreNames.contains('sync_metadata')) {
+                        transaction.objectStore('sync_metadata').clear();
                     }
                 }
             }
@@ -96,7 +124,7 @@ export const saveCategories = async (categories: CachedCategory[]) => {
     const tx = db.transaction('categories', 'readwrite');
     const store = tx.objectStore('categories');
     for (const cat of categories) {
-        await store.put(cat);
+        store.put(cat); // Fire-and-forget, no await per put
     }
     await tx.done;
 };
@@ -110,20 +138,31 @@ export const getCategories = async (type?: 'live' | 'movie' | 'series'): Promise
     return all;
 };
 
+/**
+ * Optimized saveStreams: fire-and-forget puts within a single transaction.
+ * Each put() is NOT awaited individually — only tx.done is awaited.
+ * This dramatically reduces IDB overhead on slow browsers like webOS 4.
+ */
 export const saveStreams = async (streams: CachedStream[]) => {
     const db = await initDB();
     const tx = db.transaction('streams', 'readwrite');
     const store = tx.objectStore('streams');
     for (const stream of streams) {
-        await store.put(stream);
+        store.put(stream); // Fire-and-forget, no await per put
     }
     await tx.done;
 };
 
 export const getStreams = async (categoryId: string, type: 'live' | 'movie' | 'series'): Promise<CachedStream[]> => {
     const db = await initDB();
-    const all = await db.getAllFromIndex('streams', 'category_id', String(categoryId));
-    return all.filter(s => s.type === type);
+    // Use compound index for efficient query
+    try {
+        return await db.getAllFromIndex('streams', 'type_category', [type, String(categoryId)]);
+    } catch {
+        // Fallback if compound index not available
+        const all = await db.getAllFromIndex('streams', 'category_id', String(categoryId));
+        return all.filter(s => s.type === type);
+    }
 };
 
 export const getAllStreams = async (type?: 'live' | 'movie' | 'series'): Promise<CachedStream[]> => {
@@ -132,6 +171,34 @@ export const getAllStreams = async (type?: 'live' | 'movie' | 'series'): Promise
         return db.getAllFromIndex('streams', 'type', type);
     }
     return db.getAll('streams');
+};
+
+/**
+ * Get count of streams by type without loading all data into memory.
+ * Uses cursor counting for memory efficiency on low-RAM devices.
+ */
+export const getStreamCount = async (type?: 'live' | 'movie' | 'series'): Promise<number> => {
+    const db = await initDB();
+    if (type) {
+        return db.countFromIndex('streams', 'type', type);
+    }
+    return db.count('streams');
+};
+
+/**
+ * Get streams by a list of IDs efficiently.
+ */
+export const getStreamsByIds = async (ids: (string | number)[]): Promise<CachedStream[]> => {
+    const db = await initDB();
+    const results: CachedStream[] = [];
+    const tx = db.transaction('streams', 'readonly');
+    const store = tx.objectStore('streams');
+    for (const id of ids) {
+        const item = await store.get(String(id));
+        if (item) results.push(item);
+    }
+    await tx.done;
+    return results;
 };
 
 export const saveSyncMetadata = async (meta: SyncMetadata) => {
@@ -171,7 +238,7 @@ export const clearExpiredTMDbCache = async (ttl: number = 1000 * 60 * 60 * 24) =
 
     for (const item of all) {
         if (now - item.timestamp > ttl) {
-            await store.delete(item.key);
+            store.delete(item.key); // Fire-and-forget
         }
     }
     await tx.done;
@@ -196,7 +263,7 @@ export const clearExpiredCarouselCache = async (currentDateKey: string) => {
 
     for (const key of allKeys) {
         if (key !== currentDateKey) {
-            await store.delete(key);
+            store.delete(key); // Fire-and-forget
         }
     }
     await tx.done;

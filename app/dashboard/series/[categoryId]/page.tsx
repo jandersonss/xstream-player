@@ -51,7 +51,19 @@ export default function SeriesList() {
                 // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'series');
                 if (cached && cached.length > 0) {
-                    setSeriesList(cached.map(s => ({ ...s.data, series_id: s.id })));
+                    setSeriesList(cached.map(s => ({
+                        series_id: s.id,
+                        name: s.name,
+                        cover: s.cover || s.icon || '',
+                        rating: s.rating || '',
+                        plot: s.plot || '',
+                        cast: s.cast || '',
+                        director: s.director || '',
+                        genre: s.genre || '',
+                        releaseDate: s.release_date || '',
+                        rating_5based: s.rating_5based || '',
+                        backdrop_path: s.backdrop_path || [],
+                    })));
                     setLoading(false);
                     return;
                 }

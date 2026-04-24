@@ -66,43 +66,81 @@ if (typeof window !== 'undefined') {
     if (typeof (window as any).AbortController === 'undefined') {
         (window as any).AbortController = class AbortController {
             signal = { aborted: false, addEventListener: () => { }, removeEventListener: () => { } };
-            abort() { this.signal.aborted = true; }
+            abort() { (this.signal as any).aborted = true; }
         };
     }
 
-    // On-screen Error Logger for debugging on TV
-    window.addEventListener('error', function (event) {
-        const errorDiv = document.createElement('div');
-        errorDiv.style.position = 'fixed';
-        errorDiv.style.top = '0';
-        errorDiv.style.left = '0';
-        errorDiv.style.width = '100%';
-        errorDiv.style.background = 'rgba(255,0,0,0.8)';
-        errorDiv.style.color = 'white';
-        errorDiv.style.padding = '10px';
-        errorDiv.style.zIndex = '9999';
-        errorDiv.style.fontSize = '12px';
-        errorDiv.innerText = 'Error: ' + event.message + ' at ' + event.filename + ':' + event.lineno;
-        document.body.appendChild(errorDiv);
-        console.error('Captured on-screen error:', event);
-    });
+    // structuredClone polyfill (Chrome 98+)
+    // Required by Next.js 16+ internals
+    if (typeof (window as any).structuredClone === 'undefined') {
+        (window as any).structuredClone = function structuredClone(obj: any) {
+            if (obj === null || typeof obj !== 'object') return obj;
+            try {
+                return JSON.parse(JSON.stringify(obj));
+            } catch {
+                return obj;
+            }
+        };
+    }
 
-    // Handle Unhandled Promise Rejections
-    window.addEventListener('unhandledrejection', function (event) {
-        const errorDiv = document.createElement('div');
-        errorDiv.style.position = 'fixed';
-        errorDiv.style.bottom = '0';
-        errorDiv.style.left = '0';
-        errorDiv.style.width = '100%';
-        errorDiv.style.background = 'rgba(255,165,0,0.8)';
-        errorDiv.style.color = 'black';
-        errorDiv.style.padding = '10px';
-        errorDiv.style.zIndex = '9999';
-        errorDiv.style.fontSize = '12px';
-        errorDiv.innerText = 'Promise Rejection: ' + (event.reason ? event.reason.message : 'Unknown');
-        document.body.appendChild(errorDiv);
-        console.error('Captured on-screen rejection:', event);
-    });
+    // Array.prototype.at polyfill (Chrome 92+)
+    if (!Array.prototype.at) {
+        (Array.prototype as any).at = function (index: number) {
+            const len = this.length;
+            const relativeIndex = index >= 0 ? index : len + index;
+            if (relativeIndex < 0 || relativeIndex >= len) return undefined;
+            return this[relativeIndex];
+        };
+    }
+
+    // String.prototype.replaceAll polyfill (Chrome 85+)
+    if (!String.prototype.replaceAll) {
+        (String.prototype as any).replaceAll = function (search: string | RegExp, replace: string) {
+            if (search instanceof RegExp) {
+                if (!search.global) {
+                    throw new TypeError('String.prototype.replaceAll called with a non-global RegExp argument');
+                }
+                return this.replace(search, replace);
+            }
+            return this.split(search).join(replace);
+        };
+    }
+
+    // On-screen Error Logger for debugging on TV (only in development)
+    if (process.env.NODE_ENV === 'development') {
+        window.addEventListener('error', function (event) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.top = '0';
+            errorDiv.style.left = '0';
+            errorDiv.style.width = '100%';
+            errorDiv.style.background = 'rgba(255,0,0,0.8)';
+            errorDiv.style.color = 'white';
+            errorDiv.style.padding = '10px';
+            errorDiv.style.zIndex = '9999';
+            errorDiv.style.fontSize = '12px';
+            errorDiv.innerText = 'Error: ' + event.message + ' at ' + event.filename + ':' + event.lineno;
+            document.body.appendChild(errorDiv);
+            console.error('Captured on-screen error:', event);
+        });
+
+        // Handle Unhandled Promise Rejections
+        window.addEventListener('unhandledrejection', function (event) {
+            const errorDiv = document.createElement('div');
+            errorDiv.style.position = 'fixed';
+            errorDiv.style.bottom = '0';
+            errorDiv.style.left = '0';
+            errorDiv.style.width = '100%';
+            errorDiv.style.background = 'rgba(255,165,0,0.8)';
+            errorDiv.style.color = 'black';
+            errorDiv.style.padding = '10px';
+            errorDiv.style.zIndex = '9999';
+            errorDiv.style.fontSize = '12px';
+            errorDiv.innerText = 'Promise Rejection: ' + (event.reason ? event.reason.message : 'Unknown');
+            document.body.appendChild(errorDiv);
+            console.error('Captured on-screen rejection:', event);
+        });
+    }
 
     // Check for IndexedDB
     if (!window.indexedDB) {

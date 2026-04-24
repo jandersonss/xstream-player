@@ -48,7 +48,14 @@ export default function MovieList() {
                 // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'movie');
                 if (cached && cached.length > 0) {
-                    setMovies(cached.map(s => ({ ...s.data, stream_id: s.id })));
+                    setMovies(cached.map(s => ({
+                        stream_id: s.id,
+                        name: s.name,
+                        stream_icon: s.icon || '',
+                        rating: s.rating || '',
+                        added: s.added || '',
+                        container_extension: s.container_extension || '',
+                    })));
                     setLoading(false);
                     return;
                 }
