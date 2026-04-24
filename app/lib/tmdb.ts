@@ -249,55 +249,28 @@ export const titlesMatch = (title1: string, title2: string, threshold: number = 
     return similarity >= threshold;
 };
 
-/**
- * Interface for pre-calculated normalized items
- */
-export interface PreparedItem<T> {
-    normalizedName: string;
-    original: T;
-}
 
-/**
- * Pre-calculate normalized titles for a list of items
- * Call this ONCE before running multiple matches
- */
-export const prepareForMatching = <T extends { name: string }>(items: T[]): PreparedItem<T>[] => {
-    return items.map(item => ({
-        normalizedName: normalizeTitle(item.name),
-        original: item
-    }));
-};
 
 /**
  * Find the best match for a title in a list of items
  * optimized to use pre-normalized items if provided
  */
-export const findBestMatch = <T extends { name: string }>(
+export const findBestMatch = <T extends { name: string; normalized_name?: string }>(
     targetTitle: string,
-    items: T[] | PreparedItem<T>[],
+    items: T[],
     threshold: number = 0.85
 ): { item: T; score: number } | null => {
     let bestMatch: T | null = null;
     let bestScore = 0;
     const normalizedTarget = normalizeTitle(targetTitle);
 
-    // Detect if items are prepared or raw
-    const isPrepared = items.length > 0 && 'normalizedName' in items[0];
-
     for (const entry of items) {
         let normalizedItem: string;
         let originalItem: T;
 
-        if (isPrepared) {
-            const p = entry as PreparedItem<T>;
-            normalizedItem = p.normalizedName;
-            originalItem = p.original;
-        } else {
-            // Slow path: normalize on the fly
-            const raw = entry as T;
-            normalizedItem = normalizeTitle(raw.name);
-            originalItem = raw;
-        }
+        const raw = entry as T;
+        normalizedItem = raw.normalized_name || normalizeTitle(raw.name);
+        originalItem = raw;
 
         // Exact match optimization
         if (normalizedTarget === normalizedItem) {

@@ -48,37 +48,42 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
 
     useEffect(() => {
         const initAuth = async () => {
-            // Priority 1: Check server-side config
             try {
-                const res = await fetch('/api/config');
-                const data = await res.json();
-                if (data && data.credentials) {
-                    setCredentials(data.credentials);
-                    setUser(data.user);
-                    setServer(data.server);
-                    setIsAuthenticated(true);
-                    setIsLoading(false);
-                    return;
+                // Priority 1: Check server-side config
+                try {
+                    const res = await fetch('/api/config');
+                    const data = await res.json();
+                    if (data && data.credentials) {
+                        setCredentials(data.credentials);
+                        setUser(data.user);
+                        setServer(data.server);
+                        setIsAuthenticated(true);
+                        setIsLoading(false);
+                        return;
+                    }
+                } catch (e) {
+                    console.error("Failed to fetch server config", e);
+                }
+
+                // Priority 2: Check local storage fallback
+                const stored = localStorage.getItem('xstream_auth');
+                if (stored) {
+                    try {
+                        const { credentials, user, server } = JSON.parse(stored);
+                        setCredentials(credentials);
+                        setUser(user);
+                        setServer(server);
+                        setIsAuthenticated(true);
+                    } catch (e) {
+                        console.error("Failed to parse stored auth", e);
+                        localStorage.removeItem('xstream_auth');
+                    }
                 }
             } catch (e) {
-                console.error("Failed to fetch server config", e);
+                console.error("Critical error in initAuth:", e);
+            } finally {
+                setIsLoading(false);
             }
-
-            // Priority 2: Check local storage fallback
-            const stored = localStorage.getItem('xstream_auth');
-            if (stored) {
-                try {
-                    const { credentials, user, server } = JSON.parse(stored);
-                    setCredentials(credentials);
-                    setUser(user);
-                    setServer(server);
-                    setIsAuthenticated(true);
-                } catch (e) {
-                    console.error("Failed to parse stored auth", e);
-                    localStorage.removeItem('xstream_auth');
-                }
-            }
-            setIsLoading(false);
         };
 
         initAuth();

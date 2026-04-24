@@ -100,7 +100,7 @@ export default function SubtitleSearchPanel({
 
     if (!isConfigured) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop- animate-in fade-in duration-200">
                 <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center animate-in zoom-in-95 duration-200">
                     <Subtitles size={48} className="text-gray-500 mx-auto mb-4" />
                     <h3 className="text-lg font-bold text-white mb-2">Legendas não configuradas</h3>
@@ -119,7 +119,7 @@ export default function SubtitleSearchPanel({
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm animate-in fade-in duration-200">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop- animate-in fade-in duration-200">
             <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-[#333]">

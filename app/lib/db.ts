@@ -18,6 +18,7 @@ export interface CachedStream {
     icon?: string;
     rating?: string;
     added?: string;
+    normalized_name?: string;
     data: any; // Raw data from API
 }
 

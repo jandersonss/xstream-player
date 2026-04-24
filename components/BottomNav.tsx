@@ -17,7 +17,7 @@ export default function BottomNav() {
     const { syncData, isSyncing, syncProgress } = useData();
 
     return (
-        <nav className="fixed bottom-0 left-0 right-0 bg-black/80 backdrop-blur-xl border-t border-white/10 flex items-center justify-around h-16 px-2 z-[60] md:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 bg-black/80  border-t border-white/10 flex items-center justify-around h-16 px-2 z-[60] md:hidden">
             {mobileLinks.map((link) => {
                 const Icon = link.icon;
                 const isActive = pathname === link.path || (link.path !== '/dashboard' && pathname.startsWith(link.path));

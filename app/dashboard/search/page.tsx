@@ -241,7 +241,7 @@ export default function SearchPage() {
                                                         {item.type === 'live' ? <Tv size={40} /> : item.type === 'movie' ? <Film size={40} /> : <Layers size={40} />}
                                                     </div>
                                                 )}
-                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                                <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-">
                                                     <Play className="text-white fill-current w-12 h-12 drop-shadow-lg scale-0 group-hover:scale-110 transition-transform duration-300" />
                                                 </div>
                                                 <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-xs font-bold uppercase text-white tracking-wider border border-white/10">

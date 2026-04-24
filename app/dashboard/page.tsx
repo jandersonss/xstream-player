@@ -18,7 +18,6 @@ import {
     generateDailyCarousels,
     titlesMatch,
     findBestMatch,
-    prepareForMatching,
     TMDbMovie,
     TMDbTVShow
 } from '../lib/tmdb';
@@ -139,17 +138,12 @@ export default function Dashboard() {
             console.warn('Failed to read carousel cache:', error);
         }
 
-        // Get all IPTV content for matching
         const [allMovies, allSeries] = await Promise.all([
             getAllCachedStreams('movie'),
             getAllCachedStreams('series')
         ]);
 
-        // OPTIMIZATION: Prepare databases for matching (normalize once)
-        console.time('prepareMatching');
-        const preparedMovies = prepareForMatching(allMovies);
-        const preparedSeries = prepareForMatching(allSeries);
-        console.timeEnd('prepareMatching');
+
 
         // Fetch genres
         const [movieGenres, tvGenres] = await Promise.all([
@@ -205,12 +199,10 @@ export default function Dashboard() {
                 // If trending item is a 'person' or other type, skip
                 if (!('title' in tmdbItem) && !('name' in tmdbItem)) continue;
 
-                // Select correct PREPARED DB
-                const preparedDatabase = isMovie ? preparedMovies : preparedSeries;
+                const targetDatabase = isMovie ? allMovies : allSeries;
                 const tmdbTitle = isMovie ? (tmdbItem as TMDbMovie).title : (tmdbItem as TMDbTVShow).name;
 
-                // Find BEST matching IPTV item using prepared DB
-                const matchResult = findBestMatch<EnrichedStream>(tmdbTitle, preparedDatabase, 0.85);
+                const matchResult = findBestMatch<EnrichedStream>(tmdbTitle, targetDatabase as any, 0.85);
 
                 if (matchResult && !matchedStreamIds.has(matchResult.item.id)) {
                     const iptvMatch = matchResult.item;
@@ -339,19 +331,19 @@ export default function Dashboard() {
                         <button
                             onClick={() => setShowSettings(true)}
                             data-focusable="true"
-                            className="bg-black/30 hover:bg-black/50 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/5 hover:border-red-500/50 flex items-center gap-1.5 transition-all group"
+                            className="bg-black/30 hover:bg-black/50  px-2.5 py-1 rounded-full border border-white/5 hover:border-red-500/50 flex items-center gap-1.5 transition-all group"
                         >
                             <Settings size={12} className="text-gray-400 group-hover:text-white transition-colors" />
                             <span className="font-medium text-[10px] md:text-xs text-gray-300">TMDb</span>
                             {isConfigured && <span className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>}
                         </button>
 
-                        <div className="bg-black/30 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
+                        <div className="bg-black/30  px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
                             <User size={12} />
                             <span>{user?.status === 'Active' ? 'Ativo' : user?.status}</span>
                         </div>
 
-                        <div className="bg-black/30 backdrop-blur-md px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
+                        <div className="bg-black/30  px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
                             <Calendar size={12} />
                             <span>{user?.exp_date ? formatDate(user.exp_date) : 'N/A'}</span>
                         </div>
@@ -412,7 +404,7 @@ export default function Dashboard() {
                                 <div className="p-3 bg-red-600 rounded-full group-hover:scale-110 transition-transform">
                                     <Tv size={24} className="text-white" />
                                 </div>
-                                <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">Transmissão ao Vivo</span>
+                                <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">Transmissão ao Vivo</span>
                             </div>
                             <h3 className="text-2xl font-bold text-white mb-1">TV ao Vivo</h3>
                             <p className="text-gray-300 text-sm line-clamp-1">Assista seus canais favoritos ao vivo.</p>
@@ -433,7 +425,7 @@ export default function Dashboard() {
                                 <div className="p-3 bg-blue-600 rounded-full group-hover:scale-110 transition-transform">
                                     <Film size={24} className="text-white" />
                                 </div>
-                                <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">On Demand</span>
+                                <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">On Demand</span>
                             </div>
                             <h3 className="text-2xl font-bold text-white mb-1">Filmes</h3>
                             <p className="text-gray-300 text-sm line-clamp-1">Últimos lançamentos e clássicos.</p>
@@ -454,7 +446,7 @@ export default function Dashboard() {
                                 <div className="p-3 bg-purple-600 rounded-full group-hover:scale-110 transition-transform">
                                     <Layers size={24} className="text-white" />
                                 </div>
-                                <span className="text-xs font-bold bg-white/20 backdrop-blur-md px-2 py-1 rounded text-white uppercase tracking-wider">Maratonar</span>
+                                <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">Maratonar</span>
                             </div>
                             <h3 className="text-2xl font-bold text-white mb-1">Séries</h3>
                             <p className="text-gray-300 text-sm line-clamp-1">Programas de TV e episódios.</p>

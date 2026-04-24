@@ -9,7 +9,6 @@ import { useTMDb } from '../app/context/TMDbContext';
 import {
     getDailySeed,
     shuffleWithSeed,
-    prepareForMatching,
     findBestMatch,
     getTMDbImageUrl,
     TMDbMovie,
@@ -58,6 +57,9 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const heroRef = useRef<HTMLDivElement>(null);
     const touchStartX = useRef<number | null>(null);
     const touchStartY = useRef<number | null>(null);
+
+    // Detect TV browsers to disable heavy iframe
+    const isTV = typeof window !== 'undefined' && /Web0S|WebOS|Tizen|SmartTV|Roku/i.test(navigator.userAgent);
 
     const handleNavigate = useCallback(() => {
         if (!heroItems.length) return;
@@ -144,7 +146,11 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     if (trailer) {
                         setVideoKey(trailer.key);
                         // Delay showing video to allow buffering behind backdrop
-                        setTimeout(() => setShowVideo(true), 2000);
+                        setTimeout(() => {
+                            if (!isTV) {
+                                setShowVideo(true);
+                            }
+                        }, 2000);
                     }
                 } catch (error) {
                     console.error('Failed to load video', error);
@@ -191,9 +197,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
 
             console.log(`HeroSection: Fetched ${movies.length} movies and ${series.length} series`);
 
-            // Prepare local DB for matching
-            const preparedMovies = prepareForMatching(movies);
-            const preparedSeries = prepareForMatching(series);
+
 
             let potentialItems: HeroItem[] = [];
 
@@ -212,9 +216,9 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         if (type === 'series' && isMovie) continue;
 
                         const title = isMovie ? (item as TMDbMovie).title : (item as TMDbTVShow).name;
-                        const db = isMovie ? preparedMovies : preparedSeries;
+                        const targetDb = isMovie ? movies : series;
 
-                        const match = findBestMatch<CachedStream>(title, db, 0.85);
+                        const match = findBestMatch<CachedStream>(title, targetDb as any, 0.85);
 
                         if (match && match.item.data && item.backdrop_path) {
                             potentialItems.push({
@@ -333,7 +337,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     />
 
                     {/* Video Player */}
-                    {videoKey && (
+                    {!isTV && videoKey && (
                         <div className={`absolute w-full h-full inset-0 transition-opacity duration-1000 ${showVideo ? 'opacity-100' : 'opacity-0'}`}>
                             <iframe
                                 ref={iframeRef}
@@ -356,7 +360,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded uppercase tracking-wider">
                             {currentItem.type === 'movie' ? 'Filme' : 'Série'}
                         </span>
-                        <span className="px-2 py-1 bg-white/20 backdrop-blur-md text-white text-xs font-bold rounded border border-white/10">
+                        <span className="px-2 py-1 bg-white/20  text-white text-xs font-bold rounded border border-white/10">
                             {currentItem.year}
                         </span>
                         <div className="flex items-center gap-1 text-yellow-500">

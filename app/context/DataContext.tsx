@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { useAuth } from './AuthContext';
 import * as db from '../lib/db';
+import { normalizeTitle } from '../lib/tmdb';
 
 interface DataContextType {
     isSyncing: boolean;
@@ -70,6 +71,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
                         icon: item.stream_icon || item.cover,
                         rating: item.rating,
                         added: item.added,
+                        normalized_name: normalizeTitle(item.name || ''),
                         data: item
                     }));
                     await db.saveStreams(batch);
