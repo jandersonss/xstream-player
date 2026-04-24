@@ -148,13 +148,13 @@ export default function MovieList() {
 
                                         {/* Overlay */}
                                         <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center">
-                                            <div className="bg-white/20 backdrop-blur-md p-4 rounded-full text-white border border-white/30">
+                                            <div className="bg-white/20  p-4 rounded-full text-white border border-white/30">
                                                 <Play fill="currentColor" size={24} className="ml-1" />
                                             </div>
                                         </div>
 
                                         {movie.rating && (
-                                            <div className="absolute top-2 right-2 bg-black/60 backdrop-blur-sm px-2 py-1 rounded text-xs font-bold text-yellow-500 flex items-center gap-1">
+                                            <div className="absolute top-2 right-2 bg-black/60 backdrop- px-2 py-1 rounded text-xs font-bold text-yellow-500 flex items-center gap-1">
                                                 <Star size={10} fill="currentColor" /> {movie.rating}
                                             </div>
                                         )}

@@ -24,7 +24,7 @@ export default function Sidebar() {
     const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
 
     return (
-        <aside className="hidden md:flex w-20 lg:w-72 h-full bg-black/60 backdrop-blur-xl border-r border-white/10 flex flex-col transition-all duration-300 relative z-50">
+        <aside className="hidden md:flex w-20 lg:w-72 h-full bg-black/60  border-r border-white/10 flex flex-col transition-all duration-300 relative z-50">
 
             {/* Logo Area */}
             <div className="h-24 flex items-center px-2 lg:px-8 border-b border-white/5 justify-center lg:justify-start">

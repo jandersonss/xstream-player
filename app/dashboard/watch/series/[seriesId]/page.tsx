@@ -320,7 +320,7 @@ export default function WatchSeriesPage() {
             {/* Background Backdrop */}
             <div className="absolute inset-0 overflow-hidden h-[60vh]">
                 <div
-                    className="absolute inset-0 bg-cover bg-top blur-sm opacity-40 scale-105"
+                    className="absolute inset-0 bg-cover bg-top  opacity-40 scale-105"
                     style={{ backgroundImage: `url(${series.info.cover})` }}
                 ></div>
                 <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#141414]/90 to-[#141414]"></div>

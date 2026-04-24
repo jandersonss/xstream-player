@@ -34,7 +34,7 @@ export default function FavoritesPage() {
                                             <Heart size={40} />
                                         </div>
                                     )}
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-">
                                         <Play className="text-white fill-current w-12 h-12 scale-0 group-hover:scale-110 transition-transform duration-300" />
                                     </div>
                                 </div>

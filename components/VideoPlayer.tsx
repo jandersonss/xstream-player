@@ -612,7 +612,7 @@ export default function VideoPlayer({
             {/* Buffering Indicator */}
             {isBuffering && (
                 <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-                    <div className="bg-black/60 backdrop-blur-md rounded-full p-6 shadow-2xl">
+                    <div className="bg-black/60  rounded-full p-6 shadow-2xl">
                         <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
                     </div>
                 </div>
@@ -621,7 +621,7 @@ export default function VideoPlayer({
             {/* Center Play/Pause Indicator */}
             {centerPlayPause.show && (
                 <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                    <div className="bg-black/70 backdrop-blur-md rounded-full p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
+                    <div className="bg-black/70  rounded-full p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
                         {centerPlayPause.playing ? (
                             <Play size={64} fill="white" className="text-white" />
                         ) : (
@@ -634,7 +634,7 @@ export default function VideoPlayer({
             {/* Skip Indicator */}
             {skipIndicator.show && (
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
-                    <div className="bg-black/80 backdrop-blur-md rounded-2xl px-8 py-4 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
+                    <div className="bg-black/80  rounded-2xl px-8 py-4 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <p className="text-white text-3xl font-bold">{skipIndicator.text}</p>
                     </div>
                 </div>
@@ -642,7 +642,7 @@ export default function VideoPlayer({
 
             {/* Error Overlay */}
             {error && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop-blur-sm z-30">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop- z-30">
                     <div className="text-center text-red-400 max-w-md mx-auto px-6">
                         <AlertTriangle size={64} className="mx-auto mb-4 drop-shadow-lg" />
                         <p className="text-lg font-medium">{error}</p>
@@ -665,7 +665,7 @@ export default function VideoPlayer({
                     <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
                         <button
                             onClick={onBack}
-                            className="bg-black/60 backdrop-blur-md hover:bg-white/20 p-2 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl"
+                            className="bg-black/60  hover:bg-white/20 p-2 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl"
                             title="Voltar"
                             aria-label="Voltar"
                         >
@@ -675,7 +675,7 @@ export default function VideoPlayer({
                 )}
 
                 {/* Bottom Controls */}
-                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent px-4 py-2 backdrop-blur-sm">
+                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent px-4 py-2 backdrop-">
                     {/* Progress Bar */}
                     {!isLive && (
                         <div className="mb-1 group/progress">
@@ -757,7 +757,7 @@ export default function VideoPlayer({
                                 onClick={togglePlay}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 bg-white/10 backdrop-blur-sm"
+                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 bg-white/10 backdrop-"
                                 aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
                             >
                                 {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
@@ -818,7 +818,7 @@ export default function VideoPlayer({
 
                                 {/* Volume Slider */}
                                 {showVolumeSlider && (
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/80 backdrop-blur-md rounded-xl p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
+                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/80  rounded-xl p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
                                         <div className="flex flex-col items-center gap-2">
                                             <span className="text-white text-xs font-medium">{volumePercent}%</span>
                                             <input

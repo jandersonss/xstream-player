@@ -53,12 +53,12 @@ export default function LoginPage() {
     <div className="min-h-screen flex items-center justify-center bg-[#050505] relative overflow-hidden">
       {/* Cinematic Background with Gradient Overlay */}
       <div className="absolute inset-0 z-0">
-        <div className="absolute inset-0 bg-[url('https://assets.nflxext.com/ffe/siteui/vlv3/c38a2d52-138e-48a3-ab68-36787ece46b3/eeb03fc9-99c6-438e-82d0-02aeb7154049/BR-en-20240101-popsignuptwoweeks-perspective_alpha_website_large.jpg')] bg-cover bg-center opacity-40 blur-sm scale-105"></div>
+        <div className="absolute inset-0 bg-[url('https://assets.nflxext.com/ffe/siteui/vlv3/c38a2d52-138e-48a3-ab68-36787ece46b3/eeb03fc9-99c6-438e-82d0-02aeb7154049/BR-en-20240101-popsignuptwoweeks-perspective_alpha_website_large.jpg')] bg-cover bg-center opacity-40  scale-105"></div>
         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/60 to-black/30"></div>
         <div className="absolute inset-0 bg-gradient-to-r from-black/80 via-transparent to-black/80"></div>
       </div>
 
-      <div className="w-full max-w-md p-8 sm:p-10 bg-black/60 backdrop-blur-2xl rounded-2xl shadow-2xl border border-white/10 relative z-10 mx-4 transition-all duration-500 hover:border-white/20 hover:shadow-red-900/10">
+      <div className="w-full max-w-md p-8 sm:p-10 bg-black/60  rounded-2xl shadow-2xl border border-white/10 relative z-10 mx-4 transition-all duration-500 hover:border-white/20 hover:shadow-red-900/10">
         <div className="text-center mb-10">
           <div className="inline-flex items-center justify-center p-4 bg-red-600 rounded-2xl mb-6 shadow-[0_0_30px_rgba(229,9,20,0.4)] transform hover:scale-105 transition-transform duration-300">
             <Play className="w-8 h-8 text-white fill-current ml-1" />
