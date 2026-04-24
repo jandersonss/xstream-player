@@ -20,6 +20,12 @@ export interface DeviceProfile {
     maxInMemory: number;
     /** Whether to yield to event loop between batches */
     yieldBetweenBatches: boolean;
+    /** How many items to accumulate before writing to IDB during stream sync */
+    streamBatchSize: number;
+    /** Whether to run multiple syncs (live, vod) in parallel */
+    parallelSync: boolean;
+    /** Whether the device supports NDJSON streaming (true if XHR is available) */
+    useStreaming: boolean;
     /** Description for logging */
     description: string;
 }
@@ -30,6 +36,9 @@ const PROFILES: Record<DeviceTier, DeviceProfile> = {
         syncPageSize: 500,
         maxInMemory: 500,
         yieldBetweenBatches: true,
+        streamBatchSize: 200,
+        parallelSync: false,
+        useStreaming: true,
         description: 'Low-end (webOS 4, legacy TV, ≤1GB RAM)'
     },
     medium: {
@@ -37,6 +46,9 @@ const PROFILES: Record<DeviceTier, DeviceProfile> = {
         syncPageSize: 1000,
         maxInMemory: 1000,
         yieldBetweenBatches: true,
+        streamBatchSize: 500,
+        parallelSync: true,
+        useStreaming: true,
         description: 'Mid-range (webOS 5/6, Tizen, 1-4GB RAM)'
     },
     high: {
@@ -44,6 +56,9 @@ const PROFILES: Record<DeviceTier, DeviceProfile> = {
         syncPageSize: 2000,
         maxInMemory: 2000,
         yieldBetweenBatches: false,
+        streamBatchSize: 1000,
+        parallelSync: true,
+        useStreaming: true,
         description: 'High-end (Desktop, modern browser, 4GB+ RAM)'
     },
     'ultra-high': {
@@ -51,6 +66,9 @@ const PROFILES: Record<DeviceTier, DeviceProfile> = {
         syncPageSize: 3000,
         maxInMemory: 3000,
         yieldBetweenBatches: false,
+        streamBatchSize: 2000,
+        parallelSync: true,
+        useStreaming: true,
         description: 'Ultra (Workstation, 16GB+ RAM, 12+ cores)'
     }
 };

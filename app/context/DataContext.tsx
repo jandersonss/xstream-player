@@ -4,6 +4,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback, use
 import { useAuth } from './AuthContext';
 import * as db from '../lib/db';
 import { getDeviceProfile } from '../lib/deviceProfile';
+import { streamSyncStreams } from '../lib/streamSync';
 
 interface DataContextType {
     isSyncing: boolean;
@@ -194,8 +195,26 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
             if (signal.aborted) return;
 
-            // 2. Fetch streams page by page (paginated)
-            await fetchStreamsPaginated(type, action, progressStart, progressWeight, signal);
+            // 2. Fetch streams
+            const profile = getDeviceProfile();
+            if (profile.useStreaming) {
+                console.log(`[Sync] Starting streaming sync for ${type} (${profile.description})`);
+                await streamSyncStreams({
+                    type,
+                    action,
+                    credentials,
+                    signal,
+                    mapItem: mapItemToSlimStream,
+                    onProgress: (processed, total) => {
+                        const fraction = total > 0 ? processed / total : 1;
+                        const currentProgress = progressStart + (fraction * progressWeight);
+                        setSyncProgress(Math.round(currentProgress));
+                    }
+                });
+            } else {
+                // Fallback to paginated sync
+                await fetchStreamsPaginated(type, action, progressStart, progressWeight, signal);
+            }
 
         } catch (error: any) {
             if (error.name === 'AbortError') {
@@ -232,10 +251,41 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setSyncProgress(0);
 
         try {
-            // Sequential sync to avoid overwhelming the browser/API
-            await fetchAllDataByType('live', 'get_live_streams', 0, 33, controller.signal);
-            await fetchAllDataByType('movie', 'get_vod_streams', 33, 33, controller.signal);
-            await fetchAllDataByType('series', 'get_series', 66, 34, controller.signal);
+            const profile = getDeviceProfile();
+            
+            if (profile.parallelSync && profile.useStreaming) {
+                // Parallel sync for medium+ devices
+                console.log('[Sync] Running parallel sync (live + vod)');
+                // Create intermediate progress trackers
+                let liveProgress = 0;
+                let vodProgress = 0;
+                
+                const updateCombinedProgress = () => {
+                    const combined = Math.min(90, liveProgress + vodProgress);
+                    setSyncProgress(Math.round(combined));
+                };
+
+                await Promise.all([
+                    fetchAllDataByType('live', 'get_live_streams', 0, 15, controller.signal).then(() => {
+                        liveProgress = 15;
+                        updateCombinedProgress();
+                    }),
+                    fetchAllDataByType('movie', 'get_vod_streams', 15, 75, controller.signal).then(() => {
+                        vodProgress = 75;
+                        updateCombinedProgress();
+                    })
+                ]);
+                
+                if (!controller.signal.aborted) {
+                    await fetchAllDataByType('series', 'get_series', 90, 10, controller.signal);
+                }
+            } else {
+                // Sequential sync to avoid overwhelming the browser/API on low-end devices
+                console.log('[Sync] Running sequential sync');
+                await fetchAllDataByType('live', 'get_live_streams', 0, 15, controller.signal);
+                await fetchAllDataByType('movie', 'get_vod_streams', 15, 75, controller.signal);
+                await fetchAllDataByType('series', 'get_series', 90, 10, controller.signal);
+            }
 
             if (!controller.signal.aborted) {
                 const timestamp = Date.now();
