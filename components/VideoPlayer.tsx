@@ -215,6 +215,19 @@ export default function VideoPlayer({
     };
 
     const hasAppliedInitialTime = useRef(false);
+    /** Snapshot de `initialTime` no momento em que `src` muda — evita recriar HLS quando o checkpoint atualiza. */
+    const initialSeekForActiveSrcRef = useRef(0);
+    const onProgressRef = useRef(onProgress);
+    const onMetadataRef = useRef(onMetadata);
+    const onNextRef = useRef(onNext);
+    const isSeekingRef = useRef(isSeeking);
+    isSeekingRef.current = isSeeking;
+
+    useEffect(() => {
+        onProgressRef.current = onProgress;
+        onMetadataRef.current = onMetadata;
+        onNextRef.current = onNext;
+    }, [onProgress, onMetadata, onNext]);
 
     // Show skip indicator
     const showSkipFeedback = useCallback((seconds: number) => {
@@ -384,40 +397,81 @@ export default function VideoPlayer({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [togglePlay, skip, adjustVolume, toggleFullscreen, toggleMute, jumpToPercent]);
 
-    // Video setup and HLS
+    // Video setup and HLS — deps só [src, autoPlay]: initialTime entra só como snapshot (seekTarget) ao trocar fonte; callbacks via refs (evita loop de checkpoint).
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
+
+        const seekTarget = initialTime > 0 ? initialTime : 0;
+        initialSeekForActiveSrcRef.current = seekTarget;
 
         setError('');
         setCurrentTime(0);
         setDuration(0);
         setIsBuffering(true);
+        setIsMetadataLoaded(false);
         hasAppliedInitialTime.current = false;
 
         const isHLS = src.toLowerCase().includes('.m3u8');
         const isDirectVideo = /\.(mp4|mkv|avi|webm|mov)$/i.test(src.split('?')[0]);
+        const isLiveHls = isHLS && /\/live\//i.test(src);
+        const useHlsJs = isHLS && Hls.isSupported();
 
-        let hls: Hls;
+        let hls: Hls | undefined;
+        /** Cancela espera por buffer no VOD nativo (progress/canplay + timeout). */
+        let cancelVodBufferedWait: (() => void) | undefined;
+        /** Enquanto true, `canplay` não zera o spinner (VOD autoplay aguardando buffer mínimo). */
+        let vodAutoplayAwaitBuffer = false;
 
-        const setupVideo = () => {
-            if (initialTime > 0 && !hasAppliedInitialTime.current) {
-                console.log('[VideoPlayer] Seeking to initial time:', initialTime);
-                video.currentTime = initialTime;
+        const bufferedAheadSeconds = (v: HTMLVideoElement): number => {
+            if (v.buffered.length === 0) return 0;
+            const t = v.currentTime;
+            for (let i = 0; i < v.buffered.length; i++) {
+                const start = v.buffered.start(i);
+                const end = v.buffered.end(i);
+                if (t >= start && t <= end) return end - t;
+            }
+            return Math.max(0, v.buffered.end(v.buffered.length - 1) - t);
+        };
+
+        const applyInitialSeek = () => {
+            if (seekTarget > 0 && !hasAppliedInitialTime.current) {
+                console.log('[VideoPlayer] Seeking to initial time:', seekTarget);
+                video.currentTime = seekTarget;
                 hasAppliedInitialTime.current = true;
             }
+        };
+
+        const setupVideoHls = () => {
+            applyInitialSeek();
             if (autoPlay) {
                 video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
             }
-            setIsBuffering(false);
         };
 
-        if (isHLS && Hls.isSupported()) {
+        if (useHlsJs) {
             console.log('[VideoPlayer] Initializing HLS.js for:', src);
+            // IPTV: buffer maior, ABR sobe devagar, live um pouco atrás da borda para reduzir underrun.
             hls = new Hls({
                 enableWorker: true,
-                lowLatencyMode: true,
-                backBufferLength: 90
+                lowLatencyMode: false,
+                backBufferLength: isLiveHls ? 45 : 90,
+                maxBufferLength: isLiveHls ? 50 : 90,
+                maxBufferHole: 0.25,
+                startFragPrefetch: true,
+                capLevelToPlayerSize: true,
+                abrBandWidthFactor: 0.92,
+                abrBandWidthUpFactor: 0.4,
+                maxStarvationDelay: 8,
+                maxLoadingDelay: 10,
+                ...(isLiveHls
+                    ? {
+                          liveDurationInfinity: true,
+                          liveSyncDurationCount: 5,
+                          liveMaxLatencyDurationCount: 14,
+                          initialLiveManifestSize: 2,
+                      }
+                    : {}),
             });
 
             hls.loadSource(src);
@@ -425,7 +479,7 @@ export default function VideoPlayer({
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 console.log('[VideoPlayer] HLS Manifest parsed.');
-                setupVideo();
+                setupVideoHls();
             });
 
             hls.on(Hls.Events.ERROR, (event, data) => {
@@ -434,13 +488,13 @@ export default function VideoPlayer({
                     setError(`Stream error: ${data.details}. Retrying...`);
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
-                            hls.startLoad();
+                            hls?.startLoad();
                             break;
                         case Hls.ErrorTypes.MEDIA_ERROR:
-                            hls.recoverMediaError();
+                            hls?.recoverMediaError();
                             break;
                         default:
-                            hls.destroy();
+                            hls?.destroy();
                             setError('Fatal playback error.');
                             break;
                     }
@@ -448,12 +502,6 @@ export default function VideoPlayer({
             });
         } else {
             video.src = src;
-            const handleLoadedMetadataInternal = () => {
-                setDuration(video.duration);
-                if (onMetadata) onMetadata(video.duration);
-                setupVideo();
-            };
-            video.addEventListener('loadedmetadata', handleLoadedMetadataInternal, { once: true });
 
             video.addEventListener('error', () => {
                 const error = video.error;
@@ -467,45 +515,105 @@ export default function VideoPlayer({
         }
 
         const updatePlayState = () => setIsPlaying(!video.paused);
+
+        const updateBufferedFromVideo = () => {
+            if (!video.buffered.length) return;
+            const end = video.buffered.end(video.buffered.length - 1);
+            const t = video.currentTime;
+            const d = video.duration;
+            if (Number.isFinite(d) && d > 0) {
+                setBufferedPercent(Math.min(100, Math.max(0, (end / d) * 100)));
+            } else {
+                const ahead = Math.max(0, end - t);
+                setBufferedPercent(Math.min(100, (ahead / 45) * 100));
+            }
+        };
+
         const handleTimeUpdate = () => {
-            if (!isSeeking) {
+            if (!isSeekingRef.current) {
                 setCurrentTime(video.currentTime);
             }
 
             const isAtStart = video.currentTime === 0;
-            const waitingForSeek = initialTime > 0 && !hasAppliedInitialTime.current;
+            const waitingForSeek = seekTarget > 0 && !hasAppliedInitialTime.current;
 
-            if (onProgress && (!isAtStart || !waitingForSeek)) {
-                onProgress(video.currentTime, video.duration);
+            const onProg = onProgressRef.current;
+            if (onProg && (!isAtStart || !waitingForSeek)) {
+                onProg(video.currentTime, video.duration);
+            }
+
+            if (!Number.isFinite(video.duration) || video.duration === 0) {
+                updateBufferedFromVideo();
             }
         };
         const handleLoadedMetadata = () => {
             console.log('[VideoPlayer] Metadata loaded. readyState:', video.readyState);
             setDuration(video.duration);
-            if (onMetadata) onMetadata(video.duration);
+            onMetadataRef.current?.(video.duration);
             setIsMetadataLoaded(true);
-            setupVideo();
+
+            if (useHlsJs) {
+                // HLS: seek + play vêm do MANIFEST_PARSED (setupVideoHls); aqui só metadata.
+                return;
+            }
+
+            // VOD / progressive nativo: não dar play em loadedmetadata (buffer quase zero → waiting em loop).
+            cancelVodBufferedWait?.();
+            applyInitialSeek();
+
+            const minBufferSec = 8;
+            const fallbackMs = 12000;
+
+            if (!autoPlay) {
+                setIsBuffering(false);
+                return;
+            }
+
+            vodAutoplayAwaitBuffer = true;
+
+            const tryPlayWhenBuffered = () => {
+                const ahead = bufferedAheadSeconds(video);
+                if (ahead >= minBufferSec) {
+                    cancelVodBufferedWait?.();
+                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+                }
+            };
+
+            const timeoutId = window.setTimeout(() => {
+                cancelVodBufferedWait?.();
+                video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+            }, fallbackMs);
+
+            cancelVodBufferedWait = () => {
+                vodAutoplayAwaitBuffer = false;
+                window.clearTimeout(timeoutId);
+                video.removeEventListener('progress', tryPlayWhenBuffered);
+                video.removeEventListener('canplay', tryPlayWhenBuffered);
+                cancelVodBufferedWait = undefined;
+            };
+
+            video.addEventListener('progress', tryPlayWhenBuffered);
+            video.addEventListener('canplay', tryPlayWhenBuffered);
+            tryPlayWhenBuffered();
         };
 
         const handleEnded = () => {
-            if (onNext) onNext();
+            onNextRef.current?.();
         };
 
         const handleWaiting = () => setIsBuffering(true);
         const handleCanPlay = () => {
             console.log('[VideoPlayer] Can play. readyState:', video.readyState);
-            setIsBuffering(false);
+            if (!vodAutoplayAwaitBuffer) {
+                setIsBuffering(false);
+            }
             setIsMetadataLoaded(true);
         };
 
         const handlePlaying = () => setIsBuffering(false);
 
         const handleProgress = () => {
-            if (video.buffered.length > 0) {
-                const bufferedEnd = video.buffered.end(video.buffered.length - 1);
-                const percent = (bufferedEnd / video.duration) * 100;
-                setBufferedPercent(percent);
-            }
+            updateBufferedFromVideo();
         };
 
         const handleVolumeChange = () => {
@@ -532,6 +640,7 @@ export default function VideoPlayer({
         video.addEventListener('volumechange', handleVolumeChange);
 
         return () => {
+            cancelVodBufferedWait?.();
             if (hls) hls.destroy();
             video.removeEventListener('play', updatePlayState);
             video.removeEventListener('pause', updatePlayState);
@@ -545,16 +654,17 @@ export default function VideoPlayer({
             video.removeEventListener('error', handleVideoError);
             video.removeEventListener('volumechange', handleVolumeChange);
         };
-    }, [src, initialTime, autoPlay, onMetadata, onNext, onProgress]);
+    }, [src, autoPlay]);
 
     useEffect(() => {
         const video = videoRef.current;
-        if (!video || !initialTime || hasAppliedInitialTime.current || !isMetadataLoaded) return;
+        const target = initialSeekForActiveSrcRef.current;
+        if (!video || !target || hasAppliedInitialTime.current || !isMetadataLoaded) return;
 
         const applySeek = () => {
-            if (initialTime > 0 && !hasAppliedInitialTime.current && video.currentTime < 5) {
-                console.log('[VideoPlayer] Applying initialTime late:', initialTime);
-                video.currentTime = initialTime;
+            if (target > 0 && !hasAppliedInitialTime.current && video.currentTime < 5) {
+                console.log('[VideoPlayer] Applying initialTime late:', target);
+                video.currentTime = target;
                 hasAppliedInitialTime.current = true;
             }
         };
@@ -562,14 +672,14 @@ export default function VideoPlayer({
         if (video.readyState >= 1) {
             applySeek();
         } else {
-            const onMetadata = () => {
+            const onLateMetadata = () => {
                 applySeek();
-                video.removeEventListener('loadedmetadata', onMetadata);
+                video.removeEventListener('loadedmetadata', onLateMetadata);
             };
-            video.addEventListener('loadedmetadata', onMetadata);
-            return () => video.removeEventListener('loadedmetadata', onMetadata);
+            video.addEventListener('loadedmetadata', onLateMetadata);
+            return () => video.removeEventListener('loadedmetadata', onLateMetadata);
         }
-    }, [initialTime]);
+    }, [src, isMetadataLoaded]);
 
     const isLive = duration === Infinity || duration === 0;
     const volumePercent = Math.round(volume * 100);
@@ -589,6 +699,7 @@ export default function VideoPlayer({
                 className="w-full h-full object-contain cursor-pointer"
                 poster={poster}
                 playsInline
+                preload="auto"
                 // crossOrigin="anonymous" // NEVER use this
                 onClick={togglePlay}
                 onDoubleClick={toggleFullscreen}
@@ -676,35 +787,35 @@ export default function VideoPlayer({
 
                 {/* Bottom Controls */}
                 <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent px-4 py-2 backdrop-">
-                    {/* Progress Bar */}
-                    {!isLive && (
-                        <div className="mb-1 group/progress">
-                            <div className="relative h-1 flex items-center">
-                                {/* Track Background */}
-                                <div className="absolute inset-0 bg-white/5 rounded-full" />
+                    {/* Barra de fundo + buffer (sempre); posição/seek só em VOD */}
+                    <div className="mb-1 group/progress">
+                        <div className="relative h-1 flex items-center">
+                            <div className="absolute inset-0 bg-white/5 rounded-full" />
 
-                                {/* Buffer Progress */}
-                                <div
-                                    className="absolute inset-y-0 left-0 bg-white/20 rounded-full transition-all duration-300"
-                                    style={{ width: `${bufferedPercent}%` }}
-                                />
+                            <div
+                                className="absolute inset-y-0 left-0 bg-white/25 rounded-full transition-all duration-300"
+                                style={{ width: `${Number.isFinite(bufferedPercent) ? bufferedPercent : 0}%` }}
+                                aria-hidden
+                            />
 
-                                {/* Active Progress (Red Bar) */}
-                                <div
-                                    className="absolute inset-y-0 left-0 bg-red-500 rounded-full pointer-events-none"
-                                    style={{ width: `${(currentTime / duration) * 100}%` }}
-                                />
+                            {!isLive && (
+                                <>
+                                    <div
+                                        className="absolute inset-y-0 left-0 bg-red-500 rounded-full pointer-events-none z-[1]"
+                                        style={{
+                                            width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%`
+                                        }}
+                                    />
 
-                                {/* Seek Input (Ghost) */}
-                                <input
-                                    type="range"
-                                    min={0}
-                                    max={duration || 0}
-                                    value={currentTime}
-                                    onChange={handleSeek}
-                                    onMouseDown={() => setIsSeeking(true)}
-                                    onMouseUp={() => setIsSeeking(false)}
-                                    className="absolute inset-0 w-full bg-transparent appearance-none cursor-pointer z-10
+                                    <input
+                                        type="range"
+                                        min={0}
+                                        max={duration || 0}
+                                        value={currentTime}
+                                        onChange={handleSeek}
+                                        onMouseDown={() => setIsSeeking(true)}
+                                        onMouseUp={() => setIsSeeking(false)}
+                                        className="absolute inset-0 w-full bg-transparent appearance-none cursor-pointer z-10
                                         [&::-webkit-slider-runnable-track]:bg-transparent
                                         [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
                                         [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-red-500 
@@ -715,11 +826,12 @@ export default function VideoPlayer({
                                         [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-red-500 
                                         [&::-moz-range-thumb]:shadow-lg [&::-moz-range-thumb]:cursor-pointer
                                         [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white"
-                                    aria-label="Progresso do vídeo"
-                                />
-                            </div>
+                                        aria-label="Progresso do vídeo"
+                                    />
+                                </>
+                            )}
                         </div>
-                    )}
+                    </div>
 
                     {/* Control Buttons */}
                     <div className="flex items-center justify-between gap-3">
