@@ -39,6 +39,13 @@ interface HeroSectionProps {
 
 const NEXT_DELAY = 30000;
 
+function firstStreamBackdropPath(stream: CachedStream): string | null {
+    const paths = stream.backdrop_path;
+    if (!paths?.length) return null;
+    const first = paths[0]?.trim();
+    return first || null;
+}
+
 export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const { user } = useAuth();
     const { getAllCachedStreams } = useData();
@@ -219,8 +226,16 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         const targetDb = isMovie ? movies : series;
 
                         const match = findBestMatch<CachedStream>(title, targetDb as any, 0.85);
+                        const stream = match?.item;
+                        const hasStreamDetail = !!(
+                            stream &&
+                            (stream.plot ||
+                                stream.cover ||
+                                stream.icon ||
+                                firstStreamBackdropPath(stream))
+                        );
 
-                        if (match && match.item.data && item.backdrop_path) {
+                        if (match && hasStreamDetail && item.backdrop_path) {
                             potentialItems.push({
                                 id: match.item.id as string,
                                 tmdbId: item.id, // Store the TMDB ID
@@ -258,8 +273,8 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
 
                     // Construct a fallback item
                     // Use icon as backdrop (will be blurred/streched but better than nothing)
-                    // Or check if 'backdrop_path' exists in item.data
-                    let backdrop = item.data?.backdrop_path ? getTMDbImageUrl(item.data.backdrop_path) : (item.icon || '');
+                    const streamBackdrop = firstStreamBackdropPath(item);
+                    let backdrop = streamBackdrop ? getTMDbImageUrl(streamBackdrop) : (item.icon || '');
                     // Verify URL valid
                     if (!backdrop || backdrop.includes('placeholder')) backdrop = item.icon || '';
                     if (!backdrop) continue; // Skip if no image at all
@@ -267,7 +282,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     potentialItems.push({
                         id: String(item.id),
                         title: item.name,
-                        description: item.data?.plot || item.data?.description || 'Sinopse indisponível.',
+                        description: item.plot || 'Sinopse indisponível.',
                         backdrop: backdrop,
                         poster: item.icon || '',
                         type: item.type === 'series' ? 'series' : 'movie',
