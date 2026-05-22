@@ -33,12 +33,16 @@ export function isValidRemoteAccessPin(pin: unknown): pin is string {
     return typeof pin === 'string' && PIN_PATTERN.test(pin);
 }
 
+function hasErrorCode(error: unknown, code: string) {
+    return typeof error === 'object' && error !== null && 'code' in error && error.code === code;
+}
+
 async function readRemoteAccessConfig(): Promise<RemoteAccessConfig> {
     try {
         const data = await fs.readFile(CONFIG_PATH, 'utf-8');
         return JSON.parse(data);
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
+    } catch (error: unknown) {
+        if (hasErrorCode(error, 'ENOENT')) {
             return {};
         }
         throw error;

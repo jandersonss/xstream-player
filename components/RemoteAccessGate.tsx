@@ -46,8 +46,8 @@ export default function RemoteAccessGate({ mode }: RemoteAccessGateProps) {
             }
 
             window.location.reload();
-        } catch (submitError: any) {
-            setError(submitError.message || 'Não foi possível validar o PIN.');
+        } catch (submitError: unknown) {
+            setError(submitError instanceof Error ? submitError.message : 'Não foi possível validar o PIN.');
             setIsSubmitting(false);
         }
     };
