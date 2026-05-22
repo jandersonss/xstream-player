@@ -2,6 +2,7 @@
 
 import Sidebar from '@/components/Sidebar';
 import BottomNav from '@/components/BottomNav';
+import Loader from '@/components/Loader';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
 import { useEffect } from 'react';
@@ -23,7 +24,7 @@ export default function DashboardLayout({
     if (isLoading) {
         return (
             <div className="min-h-screen flex items-center justify-center bg-black text-white">
-                <div className="w-16 h-16 border-4 border-red-600 border-t-transparent rounded-full animate-spin"></div>
+                <Loader />
             </div>
         );
     }
