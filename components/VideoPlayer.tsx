@@ -182,14 +182,9 @@ export default function VideoPlayer({
     }, [subtitleUrl]);
 
     useEffect(() => {
-        if (!isBuffering || error) {
-            setShowBufferingHelp(false);
-            return;
-        }
-
         const timeoutId = window.setTimeout(() => {
-            setShowBufferingHelp(true);
-        }, 15000);
+            setShowBufferingHelp(isBuffering && !error);
+        }, isBuffering && !error ? 15000 : 0);
 
         return () => window.clearTimeout(timeoutId);
     }, [isBuffering, error]);
@@ -522,12 +517,15 @@ export default function VideoPlayer({
         const seekTarget = initialTime > 0 ? initialTime : 0;
         initialSeekForActiveSrcRef.current = seekTarget;
 
-        setError('');
-        setCurrentTime(0);
-        setDuration(0);
-        setIsBuffering(true);
-        setIsMetadataLoaded(false);
-        setShowBufferingHelp(false);
+        const resetPlaybackStateTimer = window.setTimeout(() => {
+            const hasPlayableData = video.readyState >= 3 || !video.paused;
+            setError('');
+            setCurrentTime(0);
+            setDuration(0);
+            setIsBuffering(!hasPlayableData);
+            setIsMetadataLoaded(false);
+            setShowBufferingHelp(false);
+        }, 0);
         hasAppliedInitialTime.current = false;
 
         const playbackProfile = getPlaybackProfile();
@@ -828,6 +826,7 @@ export default function VideoPlayer({
         }
 
         return () => {
+            window.clearTimeout(resetPlaybackStateTimer);
             cancelBufferedAutoplayWait?.();
             playSettleTimers.forEach(timer => window.clearTimeout(timer));
             if (hls) hls.destroy();

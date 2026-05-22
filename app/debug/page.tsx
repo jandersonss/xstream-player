@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import Link from 'next/link';
 
 type CheckStatus = 'ok' | 'warn' | 'fail';
 
@@ -173,8 +174,12 @@ export default function DebugPage() {
     const [info, setInfo] = useState<BrowserInfo | null>(null);
 
     useEffect(() => {
-        setInfo(getBrowserInfo());
-        setChecks(buildChecks());
+        const timeoutId = window.setTimeout(() => {
+            setInfo(getBrowserInfo());
+            setChecks(buildChecks());
+        }, 0);
+
+        return () => window.clearTimeout(timeoutId);
     }, []);
 
     const hasFailures = checks.some(check => check.status === 'fail');
@@ -184,7 +189,7 @@ export default function DebugPage() {
         <main className="min-h-screen bg-[#111] text-white px-5 py-6">
             <div className="mx-auto max-w-5xl">
                 <div className="mb-6">
-                    <a href="/" className="text-red-300 underline font-semibold">Voltar ao app</a>
+                    <Link href="/" className="text-red-300 underline font-semibold">Voltar ao app</Link>
                     <h1 className="mt-4 text-3xl font-bold">Diagnostico do navegador</h1>
                     <p className="mt-2 text-gray-300">
                         Checklist das funcionalidades usadas pelo app nesta TV/browser.
