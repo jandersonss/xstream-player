@@ -90,6 +90,18 @@ class ErrorBoundary extends Component<Props, State> {
                     >
                         Recarregar App
                     </button>
+                    <a
+                        href="/debug"
+                        style={{
+                            marginTop: '16px',
+                            color: '#ffb3b3',
+                            fontSize: '16px',
+                            fontWeight: 'bold',
+                            textDecoration: 'underline'
+                        }}
+                    >
+                        Abrir diagnóstico
+                    </a>
                 </div>
             );
         }
