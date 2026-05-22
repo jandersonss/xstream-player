@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const SUMMARY_PATH = path.join(DATA_DIR, 'watch-progress.json');
@@ -9,6 +10,9 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ type: string; id: string }> }
 ) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const { type, id } = await params;
         const fileName = `${type}-${id}.json`;
@@ -28,6 +32,9 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ type: string; id: string }> }
 ) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const { type, id } = await params;
         const progress = await request.json();

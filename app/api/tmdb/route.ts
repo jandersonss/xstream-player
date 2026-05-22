@@ -1,8 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 const TMDB_API_BASE = 'https://api.themoviedb.org/3';
 
 export async function POST(request: NextRequest) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const body = await request.json();
         const { apiKey, endpoint, params } = body;

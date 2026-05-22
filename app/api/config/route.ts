@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 const CONFIG_PATH = path.join(process.cwd(), 'data', 'config.json');
 
-export async function GET() {
+export async function GET(request: Request) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const data = await fs.readFile(CONFIG_PATH, 'utf-8');
         return NextResponse.json(JSON.parse(data));
@@ -17,6 +21,9 @@ export async function GET() {
 }
 
 export async function POST(request: Request) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const body = await request.json();
         await fs.writeFile(CONFIG_PATH, JSON.stringify(body, null, 2));
