@@ -1,6 +1,10 @@
 import { NextResponse } from 'next/server';
+import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 export async function POST(request: Request) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const body = await request.json();
         const { username, password, hostUrl } = body;

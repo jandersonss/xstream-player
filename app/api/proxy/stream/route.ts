@@ -7,8 +7,12 @@ import {
     fetchWithRetry,
     parseResponse
 } from '../cache';
+import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 export async function POST(request: Request) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const body = await request.json();
         const { hostUrl, username, password, action, ...otherParams } = body;
