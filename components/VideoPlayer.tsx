@@ -4,6 +4,79 @@ import { useEffect, useRef, useState, useCallback } from 'react';
 import Hls from 'hls.js';
 import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft, Loader2, Subtitles } from 'lucide-react';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
+import { getDeviceProfile } from '@/app/lib/deviceProfile';
+
+type VideoPreloadMode = 'auto' | 'metadata' | 'none';
+
+interface PlaybackProfile {
+    isConstrained: boolean;
+    isTvDevice: boolean;
+    preload: VideoPreloadMode;
+    minBufferSec: number;
+    fallbackMs: number;
+    hls: {
+        enableWorker: boolean;
+        backBufferLength: number;
+        maxBufferLength: number;
+        startFragPrefetch: boolean;
+        abrBandWidthFactor: number;
+        abrBandWidthUpFactor: number;
+        maxStarvationDelay: number;
+        maxLoadingDelay: number;
+    };
+}
+
+function getPlaybackProfile(): PlaybackProfile {
+    if (typeof window === 'undefined') {
+        return {
+            isConstrained: false,
+            isTvDevice: false,
+            preload: 'metadata',
+            minBufferSec: 8,
+            fallbackMs: 12000,
+            hls: {
+                enableWorker: true,
+                backBufferLength: 90,
+                maxBufferLength: 90,
+                startFragPrefetch: true,
+                abrBandWidthFactor: 0.92,
+                abrBandWidthUpFactor: 0.4,
+                maxStarvationDelay: 8,
+                maxLoadingDelay: 10,
+            },
+        };
+    }
+
+    const deviceProfile = getDeviceProfile();
+    const ua = navigator.userAgent.toLowerCase();
+    const connection = (navigator as any).connection as {
+        effectiveType?: string;
+        saveData?: boolean;
+    } | undefined;
+    const effectiveType = connection?.effectiveType;
+    const isSlowNetwork = connection?.saveData === true || effectiveType === 'slow-2g' || effectiveType === '2g' || effectiveType === '3g';
+    const isTvDevice = /webos|web0s|tizen|smart-tv|smarttv|hbbtv|netcast/.test(ua);
+    const isConstrained = deviceProfile.tier === 'low' || isSlowNetwork;
+    const shouldConserveResources = isConstrained || isTvDevice;
+
+    return {
+        isConstrained,
+        isTvDevice,
+        preload: shouldConserveResources ? 'metadata' : 'auto',
+        minBufferSec: isConstrained ? 12 : isTvDevice ? 10 : 8,
+        fallbackMs: isConstrained ? 18000 : isTvDevice ? 15000 : 12000,
+        hls: {
+            enableWorker: !shouldConserveResources,
+            backBufferLength: isConstrained ? 30 : isTvDevice ? 45 : 90,
+            maxBufferLength: isConstrained ? 45 : isTvDevice ? 60 : 90,
+            startFragPrefetch: !isConstrained,
+            abrBandWidthFactor: isConstrained ? 0.8 : 0.92,
+            abrBandWidthUpFactor: isConstrained ? 0.25 : 0.4,
+            maxStarvationDelay: isConstrained ? 12 : 8,
+            maxLoadingDelay: isConstrained ? 14 : 10,
+        },
+    };
+}
 
 interface VideoPlayerProps {
     src: string;
@@ -55,6 +128,7 @@ export default function VideoPlayer({
     const [subtitleFontSize, setSubtitleFontSize] = useState(1.5);
     const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
     const [isMetadataLoaded, setIsMetadataLoaded] = useState(false);
+    const [preloadMode, setPreloadMode] = useState<VideoPreloadMode>('metadata');
 
     // Auto-enable subtitles when a new URL is provided
     useEffect(() => {
@@ -74,6 +148,10 @@ export default function VideoPlayer({
         if (savedSize) {
             setSubtitleFontSize(parseFloat(savedSize));
         }
+    }, []);
+
+    useEffect(() => {
+        setPreloadMode(getPlaybackProfile().preload);
     }, []);
 
     const saveFontSize = (size: number) => {
@@ -412,16 +490,21 @@ export default function VideoPlayer({
         setIsMetadataLoaded(false);
         hasAppliedInitialTime.current = false;
 
+        const playbackProfile = getPlaybackProfile();
+        video.preload = playbackProfile.preload;
+
         const isHLS = src.toLowerCase().includes('.m3u8');
         const isDirectVideo = /\.(mp4|mkv|avi|webm|mov)$/i.test(src.split('?')[0]);
         const isLiveHls = isHLS && /\/live\//i.test(src);
-        const useHlsJs = isHLS && Hls.isSupported();
+        const supportsNativeHls = isHLS && video.canPlayType('application/vnd.apple.mpegurl') !== '';
+        const useNativeHls = isHLS && supportsNativeHls;
+        const useHlsJs = isHLS && !useNativeHls && Hls.isSupported();
 
         let hls: Hls | undefined;
-        /** Cancela espera por buffer no VOD nativo (progress/canplay + timeout). */
-        let cancelVodBufferedWait: (() => void) | undefined;
-        /** Enquanto true, `canplay` não zera o spinner (VOD autoplay aguardando buffer mínimo). */
-        let vodAutoplayAwaitBuffer = false;
+        /** Cancela espera por buffer antes do autoplay (progress/canplay + timeout). */
+        let cancelBufferedAutoplayWait: (() => void) | undefined;
+        /** Enquanto true, `canplay` não zera o spinner (autoplay aguardando buffer mínimo). */
+        let autoplayAwaitBuffer = false;
 
         const bufferedAheadSeconds = (v: HTMLVideoElement): number => {
             if (v.buffered.length === 0) return 0;
@@ -442,28 +525,68 @@ export default function VideoPlayer({
             }
         };
 
+        const waitForBufferedAutoplay = () => {
+            if (!autoPlay) {
+                setIsBuffering(false);
+                return;
+            }
+
+            autoplayAwaitBuffer = true;
+
+            const tryPlayWhenBuffered = () => {
+                const ahead = bufferedAheadSeconds(video);
+                if (ahead >= playbackProfile.minBufferSec) {
+                    cancelBufferedAutoplayWait?.();
+                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+                }
+            };
+
+            const timeoutId = window.setTimeout(() => {
+                cancelBufferedAutoplayWait?.();
+                video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+            }, playbackProfile.fallbackMs);
+
+            cancelBufferedAutoplayWait = () => {
+                autoplayAwaitBuffer = false;
+                window.clearTimeout(timeoutId);
+                video.removeEventListener('progress', tryPlayWhenBuffered);
+                video.removeEventListener('canplay', tryPlayWhenBuffered);
+                video.removeEventListener('loadeddata', tryPlayWhenBuffered);
+                cancelBufferedAutoplayWait = undefined;
+            };
+
+            video.addEventListener('progress', tryPlayWhenBuffered);
+            video.addEventListener('canplay', tryPlayWhenBuffered);
+            video.addEventListener('loadeddata', tryPlayWhenBuffered);
+            tryPlayWhenBuffered();
+        };
+
         const setupVideoHls = () => {
             applyInitialSeek();
-            if (autoPlay) {
+            if (!autoPlay) {
+                setIsBuffering(false);
+            } else if (isLiveHls) {
                 video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+            } else {
+                waitForBufferedAutoplay();
             }
         };
 
         if (useHlsJs) {
-            console.log('[VideoPlayer] Initializing HLS.js for:', src);
-            // IPTV: buffer maior, ABR sobe devagar, live um pouco atrás da borda para reduzir underrun.
+            console.log('[VideoPlayer] Initializing HLS.js for:', src, playbackProfile);
+            // Ajusta CPU/RAM/buffer para TVs e conexões lentas.
             hls = new Hls({
-                enableWorker: true,
+                enableWorker: playbackProfile.hls.enableWorker,
                 lowLatencyMode: false,
-                backBufferLength: isLiveHls ? 45 : 90,
-                maxBufferLength: isLiveHls ? 50 : 90,
+                backBufferLength: isLiveHls ? Math.min(45, playbackProfile.hls.backBufferLength) : playbackProfile.hls.backBufferLength,
+                maxBufferLength: isLiveHls ? Math.min(50, playbackProfile.hls.maxBufferLength) : playbackProfile.hls.maxBufferLength,
                 maxBufferHole: 0.25,
-                startFragPrefetch: true,
+                startFragPrefetch: playbackProfile.hls.startFragPrefetch,
                 capLevelToPlayerSize: true,
-                abrBandWidthFactor: 0.92,
-                abrBandWidthUpFactor: 0.4,
-                maxStarvationDelay: 8,
-                maxLoadingDelay: 10,
+                abrBandWidthFactor: playbackProfile.hls.abrBandWidthFactor,
+                abrBandWidthUpFactor: playbackProfile.hls.abrBandWidthUpFactor,
+                maxStarvationDelay: playbackProfile.hls.maxStarvationDelay,
+                maxLoadingDelay: playbackProfile.hls.maxLoadingDelay,
                 ...(isLiveHls
                     ? {
                           liveDurationInfinity: true,
@@ -501,12 +624,17 @@ export default function VideoPlayer({
                 }
             });
         } else {
+            if (useNativeHls) {
+                console.log('[VideoPlayer] Using native HLS playback.');
+            }
             video.src = src;
 
             video.addEventListener('error', () => {
                 const error = video.error;
-                if (!isDirectVideo && !Hls.isSupported()) {
+                if (isHLS && !supportsNativeHls && !Hls.isSupported()) {
                     setError('Your browser does not support HLS playback.');
+                } else if (!isHLS && !isDirectVideo) {
+                    setError('Unsupported video format.');
                 } else {
                     setError(`Playback Error: ${error?.message || 'The video could not be loaded.'}`);
                 }
@@ -558,43 +686,17 @@ export default function VideoPlayer({
             }
 
             // VOD / progressive nativo: não dar play em loadedmetadata (buffer quase zero → waiting em loop).
-            cancelVodBufferedWait?.();
+            cancelBufferedAutoplayWait?.();
             applyInitialSeek();
-
-            const minBufferSec = 8;
-            const fallbackMs = 12000;
-
-            if (!autoPlay) {
-                setIsBuffering(false);
+            if (isLiveHls) {
+                if (autoPlay) {
+                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+                } else {
+                    setIsBuffering(false);
+                }
                 return;
             }
-
-            vodAutoplayAwaitBuffer = true;
-
-            const tryPlayWhenBuffered = () => {
-                const ahead = bufferedAheadSeconds(video);
-                if (ahead >= minBufferSec) {
-                    cancelVodBufferedWait?.();
-                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
-                }
-            };
-
-            const timeoutId = window.setTimeout(() => {
-                cancelVodBufferedWait?.();
-                video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
-            }, fallbackMs);
-
-            cancelVodBufferedWait = () => {
-                vodAutoplayAwaitBuffer = false;
-                window.clearTimeout(timeoutId);
-                video.removeEventListener('progress', tryPlayWhenBuffered);
-                video.removeEventListener('canplay', tryPlayWhenBuffered);
-                cancelVodBufferedWait = undefined;
-            };
-
-            video.addEventListener('progress', tryPlayWhenBuffered);
-            video.addEventListener('canplay', tryPlayWhenBuffered);
-            tryPlayWhenBuffered();
+            waitForBufferedAutoplay();
         };
 
         const handleEnded = () => {
@@ -604,7 +706,7 @@ export default function VideoPlayer({
         const handleWaiting = () => setIsBuffering(true);
         const handleCanPlay = () => {
             console.log('[VideoPlayer] Can play. readyState:', video.readyState);
-            if (!vodAutoplayAwaitBuffer) {
+            if (!autoplayAwaitBuffer) {
                 setIsBuffering(false);
             }
             setIsMetadataLoaded(true);
@@ -640,7 +742,7 @@ export default function VideoPlayer({
         video.addEventListener('volumechange', handleVolumeChange);
 
         return () => {
-            cancelVodBufferedWait?.();
+            cancelBufferedAutoplayWait?.();
             if (hls) hls.destroy();
             video.removeEventListener('play', updatePlayState);
             video.removeEventListener('pause', updatePlayState);
@@ -699,7 +801,7 @@ export default function VideoPlayer({
                 className="w-full h-full object-contain cursor-pointer"
                 poster={poster}
                 playsInline
-                preload="auto"
+                preload={preloadMode}
                 // crossOrigin="anonymous" // NEVER use this
                 onClick={togglePlay}
                 onDoubleClick={toggleFullscreen}
