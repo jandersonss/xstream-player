@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
+import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 const CONFIG_DIR = path.join(process.cwd(), 'data');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'tmdb-config.json');
@@ -20,7 +21,10 @@ async function ensureConfigDir() {
 }
 
 // GET - Read TMDb configuration
-export async function GET() {
+export async function GET(request: NextRequest) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const data = await fs.readFile(CONFIG_FILE, 'utf-8');
         const config: TMDbConfig = JSON.parse(data);
@@ -37,6 +41,9 @@ export async function GET() {
 
 // POST - Save TMDb configuration
 export async function POST(request: NextRequest) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const body = await request.json();
         const { apiKey } = body;
@@ -80,7 +87,10 @@ export async function POST(request: NextRequest) {
 }
 
 // DELETE - Remove TMDb configuration
-export async function DELETE() {
+export async function DELETE(request: NextRequest) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         await fs.unlink(CONFIG_FILE);
         return NextResponse.json({ success: true });

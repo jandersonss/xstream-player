@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server';
+import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 const OPENSUBTITLES_API_BASE = 'https://api.opensubtitles.com/api/v1';
 
@@ -49,6 +50,9 @@ async function fetchWithRetry(
 }
 
 export async function POST(request: Request) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const body = await request.json();
         const { action, apiKey, ...params } = body;
