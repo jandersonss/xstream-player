@@ -56,7 +56,7 @@ export const WatchProgressProvider = ({ children }: { children: ReactNode }) => 
             try {
                 const saved = localStorage.getItem('xstream_watch_progress');
                 return saved ? JSON.parse(saved) : {};
-            } catch (e) {
+            } catch {
                 return {};
             }
         }
