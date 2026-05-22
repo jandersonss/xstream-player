@@ -1,9 +1,103 @@
 'use client';
 
-import { useEffect, useRef, useState, useCallback } from 'react';
+import { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react';
 import Hls from 'hls.js';
 import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft, Loader2, Subtitles } from 'lucide-react';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
+import { getDeviceProfile } from '@/app/lib/deviceProfile';
+
+type VideoPreloadMode = 'auto' | 'metadata' | 'none';
+
+interface PlaybackProfile {
+    isConstrained: boolean;
+    isTvDevice: boolean;
+    preload: VideoPreloadMode;
+    minBufferSec: number;
+    fallbackMs: number;
+    hls: {
+        enableWorker: boolean;
+        backBufferLength: number;
+        maxBufferLength: number;
+        startFragPrefetch: boolean;
+        abrBandWidthFactor: number;
+        abrBandWidthUpFactor: number;
+        maxStarvationDelay: number;
+        maxLoadingDelay: number;
+    };
+}
+
+interface NavigatorConnectionInfo {
+    effectiveType?: string;
+    saveData?: boolean;
+}
+
+interface NavigatorWithConnection extends Navigator {
+    connection?: NavigatorConnectionInfo;
+}
+
+interface WebKitFullscreenDocument extends Document {
+    webkitFullscreenElement?: Element | null;
+    webkitExitFullscreen?: () => void;
+}
+
+interface WebKitVideoElement extends HTMLVideoElement {
+    webkitDisplayingFullscreen?: boolean;
+    webkitEnterFullscreen?: () => void;
+    webkitExitFullscreen?: () => void;
+}
+
+interface WebKitFullscreenContainer extends HTMLDivElement {
+    webkitRequestFullscreen?: () => void;
+}
+
+function getPlaybackProfile(): PlaybackProfile {
+    if (typeof window === 'undefined') {
+        return {
+            isConstrained: false,
+            isTvDevice: false,
+            preload: 'metadata',
+            minBufferSec: 8,
+            fallbackMs: 12000,
+            hls: {
+                enableWorker: true,
+                backBufferLength: 90,
+                maxBufferLength: 90,
+                startFragPrefetch: true,
+                abrBandWidthFactor: 0.92,
+                abrBandWidthUpFactor: 0.4,
+                maxStarvationDelay: 8,
+                maxLoadingDelay: 10,
+            },
+        };
+    }
+
+    const deviceProfile = getDeviceProfile();
+    const ua = navigator.userAgent.toLowerCase();
+    const connection = (navigator as NavigatorWithConnection).connection;
+    const effectiveType = connection?.effectiveType;
+    const isSlowNetwork = connection?.saveData === true || effectiveType === 'slow-2g' || effectiveType === '2g' || effectiveType === '3g';
+    const isTvDevice = /webos|web0s|tizen|smart-tv|smarttv|hbbtv|netcast/.test(ua);
+    const isConstrained = deviceProfile.tier === 'low' || isSlowNetwork;
+    const shouldConserveResources = isConstrained || isTvDevice;
+
+    return {
+        isConstrained,
+        isTvDevice,
+        preload: shouldConserveResources ? 'metadata' : 'auto',
+        minBufferSec: isConstrained ? 12 : isTvDevice ? 10 : 8,
+        fallbackMs: isConstrained ? 18000 : isTvDevice ? 15000 : 12000,
+        hls: {
+            enableWorker: !shouldConserveResources,
+            backBufferLength: isConstrained ? 30 : isTvDevice ? 45 : 90,
+            maxBufferLength: isConstrained ? 45 : isTvDevice ? 60 : 90,
+            startFragPrefetch: !isConstrained,
+            abrBandWidthFactor: isConstrained ? 0.8 : 0.92,
+            abrBandWidthUpFactor: isConstrained ? 0.25 : 0.4,
+            maxStarvationDelay: isConstrained ? 12 : 8,
+            maxLoadingDelay: isConstrained ? 14 : 10,
+        },
+    };
+}
 
 interface VideoPlayerProps {
     src: string;
@@ -52,39 +146,37 @@ export default function VideoPlayer({
     const [skipIndicator, setSkipIndicator] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [centerPlayPause, setCenterPlayPause] = useState<{ show: boolean; playing: boolean }>({ show: false, playing: false });
-    const [subtitleFontSize, setSubtitleFontSize] = useState(1.5);
-    const [subtitlesEnabled, setSubtitlesEnabled] = useState(true);
+    const [subtitleFontSize, setSubtitleFontSize] = useState(() => {
+        if (typeof window === 'undefined') return 1.5;
+        const savedSize = localStorage.getItem('xstream_subtitle_fontsize');
+        const parsedSize = savedSize ? Number.parseFloat(savedSize) : 1.5;
+        return Number.isFinite(parsedSize) ? parsedSize : 1.5;
+    });
+    const [disabledSubtitleUrl, setDisabledSubtitleUrl] = useState<string | null>(null);
     const [isMetadataLoaded, setIsMetadataLoaded] = useState(false);
-
-    // Auto-enable subtitles when a new URL is provided
-    useEffect(() => {
-        if (subtitleUrl) {
-            console.log('[VideoPlayer] received subtitleUrl:', subtitleUrl);
-            setSubtitlesEnabled(true);
-        }
-    }, [subtitleUrl]);
+    const [preloadMode] = useState<VideoPreloadMode>(() => getPlaybackProfile().preload);
+    const subtitlesEnabled = !subtitleUrl || disabledSubtitleUrl !== subtitleUrl;
 
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const skipIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const centerIconTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-    // Load saved font size
-    useEffect(() => {
-        const savedSize = localStorage.getItem('xstream_subtitle_fontsize');
-        if (savedSize) {
-            setSubtitleFontSize(parseFloat(savedSize));
+    const saveFontSize = useCallback((size: number) => {
+        setSubtitleFontSize(size);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('xstream_subtitle_fontsize', String(size));
         }
     }, []);
 
-    const saveFontSize = (size: number) => {
-        setSubtitleFontSize(size);
-        localStorage.setItem('xstream_subtitle_fontsize', String(size));
-    };
-
-    const changeFontSize = (delta: number) => {
+    const changeFontSize = useCallback((delta: number) => {
         const newSize = Math.max(0.8, Math.min(2.5, subtitleFontSize + delta));
         saveFontSize(newSize);
-    };
+    }, [saveFontSize, subtitleFontSize]);
+
+    const toggleSubtitles = useCallback(() => {
+        if (!subtitleUrl) return;
+        setDisabledSubtitleUrl(currentUrl => currentUrl === subtitleUrl ? null : subtitleUrl);
+    }, [subtitleUrl]);
 
     // Register custom back handler via navigation context
     useNavigationOverride(onBack ? () => {
@@ -95,14 +187,16 @@ export default function VideoPlayer({
     // Cross-platform fullscreen helpers
     // Unified Fullscreen Helpers
     const getFullscreenElement = useCallback((): Element | null => {
+        const fullscreenDocument = document as WebKitFullscreenDocument;
         return document.fullscreenElement
-            || (document as any).webkitFullscreenElement
+            || fullscreenDocument.webkitFullscreenElement
             || null;
     }, []);
 
     const isCurrentlyFullscreen = useCallback(() => {
         const video = videoRef.current;
-        return !!getFullscreenElement() || (video as any)?.webkitDisplayingFullscreen === true;
+        const webkitVideo = video as WebKitVideoElement | null;
+        return !!getFullscreenElement() || webkitVideo?.webkitDisplayingFullscreen === true;
     }, [getFullscreenElement]);
 
     const enterFullscreenMode = useCallback((isProgrammatic = false) => {
@@ -119,10 +213,13 @@ export default function VideoPlayer({
         }
 
         try {
+            const webkitVideo = video as WebKitVideoElement;
+            const webkitContainer = container as WebKitFullscreenContainer;
+
             // Priority 1: iOS Safari / Mobile Webkit on Video Element
             // Direct call is required synchronously during user gesture.
-            if ((video as any).webkitEnterFullscreen) {
-                (video as any).webkitEnterFullscreen();
+            if (webkitVideo.webkitEnterFullscreen) {
+                webkitVideo.webkitEnterFullscreen();
                 return;
             }
 
@@ -134,8 +231,8 @@ export default function VideoPlayer({
                 });
             }
             // Priority 3: Older Webkit container request
-            else if ((container as any).webkitRequestFullscreen) {
-                (container as any).webkitRequestFullscreen();
+            else if (webkitContainer.webkitRequestFullscreen) {
+                webkitContainer.webkitRequestFullscreen();
             }
         } catch (e) {
             if (!isProgrammatic) console.error('[VideoPlayer] Fullscreen attempt failed:', e);
@@ -144,12 +241,15 @@ export default function VideoPlayer({
 
     const exitFullscreenMode = useCallback(() => {
         try {
+            const fullscreenDocument = document as WebKitFullscreenDocument;
+            const webkitVideo = videoRef.current as WebKitVideoElement | null;
+
             if (document.exitFullscreen) {
                 document.exitFullscreen();
-            } else if ((document as any).webkitExitFullscreen) {
-                (document as any).webkitExitFullscreen();
-            } else if (videoRef.current && (videoRef.current as any).webkitExitFullscreen) {
-                (videoRef.current as any).webkitExitFullscreen();
+            } else if (fullscreenDocument.webkitExitFullscreen) {
+                fullscreenDocument.webkitExitFullscreen();
+            } else if (webkitVideo?.webkitExitFullscreen) {
+                webkitVideo.webkitExitFullscreen();
             }
         } catch (e) {
             console.error('[VideoPlayer] Exit fullscreen error:', e);
@@ -221,13 +321,16 @@ export default function VideoPlayer({
     const onMetadataRef = useRef(onMetadata);
     const onNextRef = useRef(onNext);
     const isSeekingRef = useRef(isSeeking);
-    isSeekingRef.current = isSeeking;
 
     useEffect(() => {
         onProgressRef.current = onProgress;
         onMetadataRef.current = onMetadata;
         onNextRef.current = onNext;
     }, [onProgress, onMetadata, onNext]);
+
+    useEffect(() => {
+        isSeekingRef.current = isSeeking;
+    }, [isSeeking]);
 
     // Show skip indicator
     const showSkipFeedback = useCallback((seconds: number) => {
@@ -365,9 +468,7 @@ export default function VideoPlayer({
                     break;
                 case 'c':
                     e.preventDefault();
-                    if (subtitleUrl) {
-                        setSubtitlesEnabled(prev => !prev);
-                    }
+                    toggleSubtitles();
                     break;
                 case ']':
                     e.preventDefault();
@@ -395,7 +496,7 @@ export default function VideoPlayer({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [togglePlay, skip, adjustVolume, toggleFullscreen, toggleMute, jumpToPercent]);
+    }, [togglePlay, skip, adjustVolume, toggleFullscreen, toggleMute, jumpToPercent, changeFontSize, toggleSubtitles]);
 
     // Video setup and HLS — deps só [src, autoPlay]: initialTime entra só como snapshot (seekTarget) ao trocar fonte; callbacks via refs (evita loop de checkpoint).
     useEffect(() => {
@@ -405,23 +506,30 @@ export default function VideoPlayer({
         const seekTarget = initialTime > 0 ? initialTime : 0;
         initialSeekForActiveSrcRef.current = seekTarget;
 
-        setError('');
-        setCurrentTime(0);
-        setDuration(0);
-        setIsBuffering(true);
-        setIsMetadataLoaded(false);
+        const resetPlaybackStateTimer = window.setTimeout(() => {
+            setError('');
+            setCurrentTime(0);
+            setDuration(0);
+            setIsBuffering(true);
+            setIsMetadataLoaded(false);
+        }, 0);
         hasAppliedInitialTime.current = false;
+
+        const playbackProfile = getPlaybackProfile();
+        video.preload = playbackProfile.preload;
 
         const isHLS = src.toLowerCase().includes('.m3u8');
         const isDirectVideo = /\.(mp4|mkv|avi|webm|mov)$/i.test(src.split('?')[0]);
         const isLiveHls = isHLS && /\/live\//i.test(src);
-        const useHlsJs = isHLS && Hls.isSupported();
+        const supportsNativeHls = isHLS && video.canPlayType('application/vnd.apple.mpegurl') !== '';
+        const useNativeHls = isHLS && supportsNativeHls;
+        const useHlsJs = isHLS && !useNativeHls && Hls.isSupported();
 
         let hls: Hls | undefined;
-        /** Cancela espera por buffer no VOD nativo (progress/canplay + timeout). */
-        let cancelVodBufferedWait: (() => void) | undefined;
-        /** Enquanto true, `canplay` não zera o spinner (VOD autoplay aguardando buffer mínimo). */
-        let vodAutoplayAwaitBuffer = false;
+        /** Cancela espera por buffer antes do autoplay (progress/canplay + timeout). */
+        let cancelBufferedAutoplayWait: (() => void) | undefined;
+        /** Enquanto true, `canplay` não zera o spinner (autoplay aguardando buffer mínimo). */
+        let autoplayAwaitBuffer = false;
 
         const bufferedAheadSeconds = (v: HTMLVideoElement): number => {
             if (v.buffered.length === 0) return 0;
@@ -442,28 +550,68 @@ export default function VideoPlayer({
             }
         };
 
+        const waitForBufferedAutoplay = () => {
+            if (!autoPlay) {
+                setIsBuffering(false);
+                return;
+            }
+
+            autoplayAwaitBuffer = true;
+
+            const tryPlayWhenBuffered = () => {
+                const ahead = bufferedAheadSeconds(video);
+                if (ahead >= playbackProfile.minBufferSec) {
+                    cancelBufferedAutoplayWait?.();
+                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+                }
+            };
+
+            const timeoutId = window.setTimeout(() => {
+                cancelBufferedAutoplayWait?.();
+                video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+            }, playbackProfile.fallbackMs);
+
+            cancelBufferedAutoplayWait = () => {
+                autoplayAwaitBuffer = false;
+                window.clearTimeout(timeoutId);
+                video.removeEventListener('progress', tryPlayWhenBuffered);
+                video.removeEventListener('canplay', tryPlayWhenBuffered);
+                video.removeEventListener('loadeddata', tryPlayWhenBuffered);
+                cancelBufferedAutoplayWait = undefined;
+            };
+
+            video.addEventListener('progress', tryPlayWhenBuffered);
+            video.addEventListener('canplay', tryPlayWhenBuffered);
+            video.addEventListener('loadeddata', tryPlayWhenBuffered);
+            tryPlayWhenBuffered();
+        };
+
         const setupVideoHls = () => {
             applyInitialSeek();
-            if (autoPlay) {
+            if (!autoPlay) {
+                setIsBuffering(false);
+            } else if (isLiveHls) {
                 video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+            } else {
+                waitForBufferedAutoplay();
             }
         };
 
         if (useHlsJs) {
-            console.log('[VideoPlayer] Initializing HLS.js for:', src);
-            // IPTV: buffer maior, ABR sobe devagar, live um pouco atrás da borda para reduzir underrun.
+            console.log('[VideoPlayer] Initializing HLS.js for:', src, playbackProfile);
+            // Ajusta CPU/RAM/buffer para TVs e conexões lentas.
             hls = new Hls({
-                enableWorker: true,
+                enableWorker: playbackProfile.hls.enableWorker,
                 lowLatencyMode: false,
-                backBufferLength: isLiveHls ? 45 : 90,
-                maxBufferLength: isLiveHls ? 50 : 90,
+                backBufferLength: isLiveHls ? Math.min(45, playbackProfile.hls.backBufferLength) : playbackProfile.hls.backBufferLength,
+                maxBufferLength: isLiveHls ? Math.min(50, playbackProfile.hls.maxBufferLength) : playbackProfile.hls.maxBufferLength,
                 maxBufferHole: 0.25,
-                startFragPrefetch: true,
+                startFragPrefetch: playbackProfile.hls.startFragPrefetch,
                 capLevelToPlayerSize: true,
-                abrBandWidthFactor: 0.92,
-                abrBandWidthUpFactor: 0.4,
-                maxStarvationDelay: 8,
-                maxLoadingDelay: 10,
+                abrBandWidthFactor: playbackProfile.hls.abrBandWidthFactor,
+                abrBandWidthUpFactor: playbackProfile.hls.abrBandWidthUpFactor,
+                maxStarvationDelay: playbackProfile.hls.maxStarvationDelay,
+                maxLoadingDelay: playbackProfile.hls.maxLoadingDelay,
                 ...(isLiveHls
                     ? {
                           liveDurationInfinity: true,
@@ -501,12 +649,17 @@ export default function VideoPlayer({
                 }
             });
         } else {
+            if (useNativeHls) {
+                console.log('[VideoPlayer] Using native HLS playback.');
+            }
             video.src = src;
 
             video.addEventListener('error', () => {
                 const error = video.error;
-                if (!isDirectVideo && !Hls.isSupported()) {
+                if (isHLS && !supportsNativeHls && !Hls.isSupported()) {
                     setError('Your browser does not support HLS playback.');
+                } else if (!isHLS && !isDirectVideo) {
+                    setError('Unsupported video format.');
                 } else {
                     setError(`Playback Error: ${error?.message || 'The video could not be loaded.'}`);
                 }
@@ -558,43 +711,17 @@ export default function VideoPlayer({
             }
 
             // VOD / progressive nativo: não dar play em loadedmetadata (buffer quase zero → waiting em loop).
-            cancelVodBufferedWait?.();
+            cancelBufferedAutoplayWait?.();
             applyInitialSeek();
-
-            const minBufferSec = 8;
-            const fallbackMs = 12000;
-
-            if (!autoPlay) {
-                setIsBuffering(false);
+            if (isLiveHls) {
+                if (autoPlay) {
+                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+                } else {
+                    setIsBuffering(false);
+                }
                 return;
             }
-
-            vodAutoplayAwaitBuffer = true;
-
-            const tryPlayWhenBuffered = () => {
-                const ahead = bufferedAheadSeconds(video);
-                if (ahead >= minBufferSec) {
-                    cancelVodBufferedWait?.();
-                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
-                }
-            };
-
-            const timeoutId = window.setTimeout(() => {
-                cancelVodBufferedWait?.();
-                video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
-            }, fallbackMs);
-
-            cancelVodBufferedWait = () => {
-                vodAutoplayAwaitBuffer = false;
-                window.clearTimeout(timeoutId);
-                video.removeEventListener('progress', tryPlayWhenBuffered);
-                video.removeEventListener('canplay', tryPlayWhenBuffered);
-                cancelVodBufferedWait = undefined;
-            };
-
-            video.addEventListener('progress', tryPlayWhenBuffered);
-            video.addEventListener('canplay', tryPlayWhenBuffered);
-            tryPlayWhenBuffered();
+            waitForBufferedAutoplay();
         };
 
         const handleEnded = () => {
@@ -604,7 +731,7 @@ export default function VideoPlayer({
         const handleWaiting = () => setIsBuffering(true);
         const handleCanPlay = () => {
             console.log('[VideoPlayer] Can play. readyState:', video.readyState);
-            if (!vodAutoplayAwaitBuffer) {
+            if (!autoplayAwaitBuffer) {
                 setIsBuffering(false);
             }
             setIsMetadataLoaded(true);
@@ -640,7 +767,8 @@ export default function VideoPlayer({
         video.addEventListener('volumechange', handleVolumeChange);
 
         return () => {
-            cancelVodBufferedWait?.();
+            window.clearTimeout(resetPlaybackStateTimer);
+            cancelBufferedAutoplayWait?.();
             if (hls) hls.destroy();
             video.removeEventListener('play', updatePlayState);
             video.removeEventListener('pause', updatePlayState);
@@ -683,12 +811,15 @@ export default function VideoPlayer({
 
     const isLive = duration === Infinity || duration === 0;
     const volumePercent = Math.round(volume * 100);
+    const containerStyle: CSSProperties & Record<'--subtitle-font-size', string> = {
+        '--subtitle-font-size': `${subtitleFontSize}rem`,
+    };
 
     return (
         <div
             ref={containerRef}
             className="relative w-full max-h-[100vh] aspect-video bg-black group overflow-hidden rounded-xl shadow-2xl border border-white/10"
-            style={{ '--subtitle-font-size': `${subtitleFontSize}rem` } as any}
+            style={containerStyle}
             onMouseMove={handleInteraction}
             onMouseLeave={() => isPlaying && setShowControls(false)}
 
@@ -699,7 +830,7 @@ export default function VideoPlayer({
                 className="w-full h-full object-contain cursor-pointer"
                 poster={poster}
                 playsInline
-                preload="auto"
+                preload={preloadMode}
                 // crossOrigin="anonymous" // NEVER use this
                 onClick={togglePlay}
                 onDoubleClick={toggleFullscreen}
@@ -1008,7 +1139,7 @@ export default function VideoPlayer({
                             {/* Subtitle Toggle */}
                             {subtitleUrl && (
                                 <button
-                                    onClick={() => setSubtitlesEnabled(prev => !prev)}
+                                    onClick={toggleSubtitles}
                                     data-focusable="true"
                                     tabIndex={0}
                                     className={`transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 ${subtitlesEnabled ? 'text-emerald-400 hover:text-emerald-300' : 'text-white/40 hover:text-white/70'} hover:scale-110`}
