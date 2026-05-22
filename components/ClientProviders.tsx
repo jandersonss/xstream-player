@@ -1,5 +1,6 @@
 'use client';
 
+import { usePathname } from 'next/navigation';
 import TvNavigationProvider from '@/components/TvNavigationProvider';
 import { AuthProvider } from '../app/context/AuthContext';
 import { FavoritesProvider } from '../app/context/FavoritesContext';
@@ -10,6 +11,12 @@ import { TMDbProvider } from '../app/context/TMDbContext';
 import { SubtitleProvider } from '../app/context/SubtitleContext';
 
 export function ClientProviders({ children }: { children: React.ReactNode }) {
+    const pathname = usePathname();
+
+    if (pathname === '/debug' || pathname?.startsWith('/debug/')) {
+        return <>{children}</>;
+    }
+
     return (
         <AuthProvider>
             <DataProvider>
