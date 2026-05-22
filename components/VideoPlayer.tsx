@@ -50,6 +50,8 @@ interface WebKitFullscreenContainer extends HTMLDivElement {
     webkitRequestFullscreen?: () => void;
 }
 
+const DEBUG_PATH = '/debug';
+
 function getPlaybackProfile(): PlaybackProfile {
     if (typeof window === 'undefined') {
         return {
@@ -155,6 +157,7 @@ export default function VideoPlayer({
     const [disabledSubtitleUrl, setDisabledSubtitleUrl] = useState<string | null>(null);
     const [isMetadataLoaded, setIsMetadataLoaded] = useState(false);
     const [preloadMode] = useState<VideoPreloadMode>(() => getPlaybackProfile().preload);
+    const [showBufferingHelp, setShowBufferingHelp] = useState(false);
     const subtitlesEnabled = !subtitleUrl || disabledSubtitleUrl !== subtitleUrl;
 
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -177,6 +180,19 @@ export default function VideoPlayer({
         if (!subtitleUrl) return;
         setDisabledSubtitleUrl(currentUrl => currentUrl === subtitleUrl ? null : subtitleUrl);
     }, [subtitleUrl]);
+
+    useEffect(() => {
+        if (!isBuffering || error) {
+            setShowBufferingHelp(false);
+            return;
+        }
+
+        const timeoutId = window.setTimeout(() => {
+            setShowBufferingHelp(true);
+        }, 15000);
+
+        return () => window.clearTimeout(timeoutId);
+    }, [isBuffering, error]);
 
     // Register custom back handler via navigation context
     useNavigationOverride(onBack ? () => {
@@ -506,26 +522,31 @@ export default function VideoPlayer({
         const seekTarget = initialTime > 0 ? initialTime : 0;
         initialSeekForActiveSrcRef.current = seekTarget;
 
-        const resetPlaybackStateTimer = window.setTimeout(() => {
-            setError('');
-            setCurrentTime(0);
-            setDuration(0);
-            setIsBuffering(true);
-            setIsMetadataLoaded(false);
-        }, 0);
+        setError('');
+        setCurrentTime(0);
+        setDuration(0);
+        setIsBuffering(true);
+        setIsMetadataLoaded(false);
+        setShowBufferingHelp(false);
         hasAppliedInitialTime.current = false;
 
         const playbackProfile = getPlaybackProfile();
         video.preload = playbackProfile.preload;
 
+        const userAgent = typeof navigator !== 'undefined' ? navigator.userAgent.toLowerCase() : '';
+        const isLegacyWebOs = /webos|web0s/.test(userAgent) && playbackProfile.isConstrained;
         const isHLS = src.toLowerCase().includes('.m3u8');
         const isDirectVideo = /\.(mp4|mkv|avi|webm|mov)$/i.test(src.split('?')[0]);
         const isLiveHls = isHLS && /\/live\//i.test(src);
-        const supportsNativeHls = isHLS && video.canPlayType('application/vnd.apple.mpegurl') !== '';
-        const useNativeHls = isHLS && supportsNativeHls;
+        const supportsNativeHls = isHLS && (
+            video.canPlayType('application/vnd.apple.mpegurl') !== '' ||
+            video.canPlayType('application/x-mpegURL') !== ''
+        );
+        const useNativeHls = isHLS && (supportsNativeHls || isLegacyWebOs);
         const useHlsJs = isHLS && !useNativeHls && Hls.isSupported();
 
         let hls: Hls | undefined;
+        const playSettleTimers: number[] = [];
         /** Cancela espera por buffer antes do autoplay (progress/canplay + timeout). */
         let cancelBufferedAutoplayWait: (() => void) | undefined;
         /** Enquanto true, `canplay` não zera o spinner (autoplay aguardando buffer mínimo). */
@@ -543,10 +564,36 @@ export default function VideoPlayer({
         };
 
         const applyInitialSeek = () => {
-            if (seekTarget > 0 && !hasAppliedInitialTime.current) {
+            if (seekTarget > 0 && !hasAppliedInitialTime.current && video.readyState >= 1) {
                 console.log('[VideoPlayer] Seeking to initial time:', seekTarget);
                 video.currentTime = seekTarget;
                 hasAppliedInitialTime.current = true;
+            }
+        };
+
+        const safePlay = () => {
+            try {
+                const playResult = video.play() as Promise<void> | undefined;
+                const settleTimer = window.setTimeout(() => {
+                    if (!video.paused || video.readyState >= 2) {
+                        setIsBuffering(false);
+                    }
+                }, 1500);
+                playSettleTimers.push(settleTimer);
+
+                if (playResult && typeof playResult.catch === 'function') {
+                    playResult.catch(e => {
+                        console.warn('[VideoPlayer] Play failed:', e);
+                        setIsBuffering(false);
+                        setShowControls(true);
+                        setShowBufferingHelp(true);
+                    });
+                }
+            } catch (e) {
+                console.warn('[VideoPlayer] Play failed:', e);
+                setIsBuffering(false);
+                setShowControls(true);
+                setShowBufferingHelp(true);
             }
         };
 
@@ -562,13 +609,13 @@ export default function VideoPlayer({
                 const ahead = bufferedAheadSeconds(video);
                 if (ahead >= playbackProfile.minBufferSec) {
                     cancelBufferedAutoplayWait?.();
-                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+                    safePlay();
                 }
             };
 
             const timeoutId = window.setTimeout(() => {
                 cancelBufferedAutoplayWait?.();
-                video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+                safePlay();
             }, playbackProfile.fallbackMs);
 
             cancelBufferedAutoplayWait = () => {
@@ -590,8 +637,8 @@ export default function VideoPlayer({
             applyInitialSeek();
             if (!autoPlay) {
                 setIsBuffering(false);
-            } else if (isLiveHls) {
-                video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+            } else if (isLiveHls || playbackProfile.isTvDevice) {
+                safePlay();
             } else {
                 waitForBufferedAutoplay();
             }
@@ -630,7 +677,7 @@ export default function VideoPlayer({
                 setupVideoHls();
             });
 
-            hls.on(Hls.Events.ERROR, (event, data) => {
+            hls.on(Hls.Events.ERROR, (_event, data) => {
                 console.error('[VideoPlayer] HLS Error:', data.type, data.details, data.fatal ? '(FATAL)' : '');
                 if (data.fatal) {
                     setError(`Stream error: ${data.details}. Retrying...`);
@@ -653,6 +700,7 @@ export default function VideoPlayer({
                 console.log('[VideoPlayer] Using native HLS playback.');
             }
             video.src = src;
+            video.load();
 
             video.addEventListener('error', () => {
                 const error = video.error;
@@ -715,7 +763,15 @@ export default function VideoPlayer({
             applyInitialSeek();
             if (isLiveHls) {
                 if (autoPlay) {
-                    video.play().catch(e => console.warn('[VideoPlayer] Play failed:', e));
+                    safePlay();
+                } else {
+                    setIsBuffering(false);
+                }
+                return;
+            }
+            if (playbackProfile.isTvDevice) {
+                if (autoPlay) {
+                    safePlay();
                 } else {
                     setIsBuffering(false);
                 }
@@ -766,9 +822,14 @@ export default function VideoPlayer({
         video.addEventListener('error', handleVideoError);
         video.addEventListener('volumechange', handleVolumeChange);
 
+        if (!useHlsJs) {
+            if (video.readyState >= 1) handleLoadedMetadata();
+            if (video.readyState >= 3) handleCanPlay();
+        }
+
         return () => {
-            window.clearTimeout(resetPlaybackStateTimer);
             cancelBufferedAutoplayWait?.();
+            playSettleTimers.forEach(timer => window.clearTimeout(timer));
             if (hls) hls.destroy();
             video.removeEventListener('play', updatePlayState);
             video.removeEventListener('pause', updatePlayState);
@@ -854,8 +915,16 @@ export default function VideoPlayer({
             {/* Buffering Indicator */}
             {isBuffering && (
                 <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-                    <div className="bg-black/60  rounded-full p-6 shadow-2xl">
+                    <div className="bg-black/70 rounded-2xl p-6 shadow-2xl text-center max-w-sm mx-4">
                         <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
+                        {showBufferingHelp && (
+                            <div className="mt-4 text-white text-sm pointer-events-auto">
+                                <p className="mb-2">O carregamento está demorando.</p>
+                                <a href={DEBUG_PATH} className="text-red-300 underline font-semibold">
+                                    Abrir diagnóstico
+                                </a>
+                            </div>
+                        )}
                     </div>
                 </div>
             )}
@@ -888,6 +957,9 @@ export default function VideoPlayer({
                     <div className="text-center text-red-400 max-w-md mx-auto px-6">
                         <AlertTriangle size={64} className="mx-auto mb-4 drop-shadow-lg" />
                         <p className="text-lg font-medium">{error}</p>
+                        <a href={DEBUG_PATH} className="mt-4 inline-block text-red-200 underline font-semibold">
+                            Abrir diagnóstico
+                        </a>
                     </div>
                 </div>
             )}
