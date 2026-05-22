@@ -26,6 +26,15 @@ interface PlaybackProfile {
     };
 }
 
+interface NavigatorConnectionInfo {
+    effectiveType?: string;
+    saveData?: boolean;
+}
+
+interface NavigatorWithConnection extends Navigator {
+    connection?: NavigatorConnectionInfo;
+}
+
 function getPlaybackProfile(): PlaybackProfile {
     if (typeof window === 'undefined') {
         return {
@@ -49,10 +58,7 @@ function getPlaybackProfile(): PlaybackProfile {
 
     const deviceProfile = getDeviceProfile();
     const ua = navigator.userAgent.toLowerCase();
-    const connection = (navigator as any).connection as {
-        effectiveType?: string;
-        saveData?: boolean;
-    } | undefined;
+    const connection = (navigator as NavigatorWithConnection).connection;
     const effectiveType = connection?.effectiveType;
     const isSlowNetwork = connection?.saveData === true || effectiveType === 'slow-2g' || effectiveType === '2g' || effectiveType === '3g';
     const isTvDevice = /webos|web0s|tizen|smart-tv|smarttv|hbbtv|netcast/.test(ua);

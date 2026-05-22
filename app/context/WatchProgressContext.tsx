@@ -27,15 +27,21 @@ interface WatchProgressState {
     isLoaded: boolean;
 }
 
+interface NavigatorConnectionInfo {
+    effectiveType?: string;
+    saveData?: boolean;
+}
+
+interface NavigatorWithConnection extends Navigator {
+    connection?: NavigatorConnectionInfo;
+}
+
 const WatchProgressContext = createContext<WatchProgressState | undefined>(undefined);
 
 function getProgressSyncThresholdSec(): number {
     if (typeof window === 'undefined') return 5;
 
-    const connection = (navigator as any).connection as {
-        effectiveType?: string;
-        saveData?: boolean;
-    } | undefined;
+    const connection = (navigator as NavigatorWithConnection).connection;
     const effectiveType = connection?.effectiveType;
 
     if (connection?.saveData === true || effectiveType === 'slow-2g' || effectiveType === '2g') return 30;
