@@ -22,6 +22,16 @@ interface ServerInfo {
     time_now: string;
 }
 
+interface StoredAuthData {
+    credentials: {
+        username: string;
+        password: string;
+        hostUrl: string;
+    };
+    user: UserInfo;
+    server: ServerInfo;
+}
+
 interface AuthState {
     user: UserInfo | null;
     server: ServerInfo | null;
@@ -38,6 +48,42 @@ interface AuthState {
 
 const AuthContext = createContext<AuthState | undefined>(undefined);
 
+function readStoredAuth(): StoredAuthData | null {
+    try {
+        const stored = localStorage.getItem('xstream_auth');
+        if (!stored) return null;
+
+        const parsed = JSON.parse(stored) as StoredAuthData;
+        if (!parsed.credentials || !parsed.user || !parsed.server) return null;
+
+        return parsed;
+    } catch (e) {
+        console.error("Failed to parse stored auth", e);
+        localStorage.removeItem('xstream_auth');
+        return null;
+    }
+}
+
+async function fetchJsonWithTimeout<T>(url: string, timeoutMs = 6000): Promise<T | null> {
+    let timeoutId: number | undefined;
+
+    try {
+        const response = await Promise.race([
+            fetch(url),
+            new Promise<never>((_, reject) => {
+                timeoutId = window.setTimeout(() => reject(new Error('Request timeout')), timeoutMs);
+            })
+        ]);
+
+        return await response.json() as T;
+    } catch (e) {
+        console.warn(`Request failed or timed out: ${url}`, e);
+        return null;
+    } finally {
+        if (timeoutId) window.clearTimeout(timeoutId);
+    }
+}
+
 export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [user, setUser] = useState<UserInfo | null>(null);
     const [server, setServer] = useState<ServerInfo | null>(null);
@@ -49,38 +95,46 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const initAuth = async () => {
             try {
-                // Priority 1: Check server-side config
-                try {
-                    const res = await fetch('/api/config');
-                    const data = await res.json();
-                    if (data && data.credentials) {
-                        setCredentials(data.credentials);
-                        setUser(data.user);
-                        setServer(data.server);
-                        setIsAuthenticated(true);
-                        setIsLoading(false);
-                        return;
-                    }
-                } catch (e) {
-                    console.error("Failed to fetch server config", e);
+                const storedAuth = readStoredAuth();
+                if (storedAuth) {
+                    setCredentials(storedAuth.credentials);
+                    setUser(storedAuth.user);
+                    setServer(storedAuth.server);
+                    setIsAuthenticated(true);
+                    setIsLoading(false);
                 }
 
-                // Priority 2: Check local storage fallback
-                const stored = localStorage.getItem('xstream_auth');
-                if (stored) {
+                const data = await fetchJsonWithTimeout<Partial<StoredAuthData>>('/api/config');
+                if (data?.credentials && data.user && data.server) {
+                    setCredentials(data.credentials);
+                    setUser(data.user);
+                    setServer(data.server);
+                    setIsAuthenticated(true);
+
                     try {
-                        const { credentials, user, server } = JSON.parse(stored);
-                        setCredentials(credentials);
-                        setUser(user);
-                        setServer(server);
-                        setIsAuthenticated(true);
+                        localStorage.setItem('xstream_auth', JSON.stringify(data));
                     } catch (e) {
-                        console.error("Failed to parse stored auth", e);
-                        localStorage.removeItem('xstream_auth');
+                        console.warn("Failed to cache server auth", e);
                     }
+                } else if (!storedAuth) {
+                    setIsAuthenticated(false);
                 }
             } catch (e) {
                 console.error("Critical error in initAuth:", e);
+                if (!readStoredAuth()) {
+                    setUser(null);
+                    setServer(null);
+                    setCredentials(null);
+                    setIsAuthenticated(false);
+                } else {
+                    const storedAuth = readStoredAuth();
+                    if (storedAuth) {
+                        setCredentials(storedAuth.credentials);
+                        setUser(storedAuth.user);
+                        setServer(storedAuth.server);
+                        setIsAuthenticated(true);
+                    }
+                }
             } finally {
                 setIsLoading(false);
             }
