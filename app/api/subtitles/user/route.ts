@@ -1,10 +1,14 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
+import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 const SUBTITLES_DIR = path.join(process.cwd(), 'data', 'subtitles');
 
 export async function GET(request: Request) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const { searchParams } = new URL(request.url);
         const streamId = searchParams.get('streamId');
@@ -31,6 +35,9 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const body = await request.json();
         const { streamId, vtt, language } = body;
@@ -60,6 +67,9 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
+    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
+    if (remoteAccessResponse) return remoteAccessResponse;
+
     try {
         const { searchParams } = new URL(request.url);
         const streamId = searchParams.get('streamId');
