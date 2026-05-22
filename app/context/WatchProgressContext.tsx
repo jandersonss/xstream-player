@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
+import { getDeviceProfile } from '@/app/lib/deviceProfile';
 
 export interface WatchProgress {
     streamId: string | number;
@@ -26,7 +27,28 @@ interface WatchProgressState {
     isLoaded: boolean;
 }
 
+interface NavigatorConnectionInfo {
+    effectiveType?: string;
+    saveData?: boolean;
+}
+
+interface NavigatorWithConnection extends Navigator {
+    connection?: NavigatorConnectionInfo;
+}
+
 const WatchProgressContext = createContext<WatchProgressState | undefined>(undefined);
+
+function getProgressSyncThresholdSec(): number {
+    if (typeof window === 'undefined') return 5;
+
+    const connection = (navigator as NavigatorWithConnection).connection;
+    const effectiveType = connection?.effectiveType;
+
+    if (connection?.saveData === true || effectiveType === 'slow-2g' || effectiveType === '2g') return 30;
+    if (effectiveType === '3g') return 20;
+
+    return getDeviceProfile().tier === 'low' ? 15 : 5;
+}
 
 export const WatchProgressProvider = ({ children }: { children: ReactNode }) => {
     const [progressMap, setProgressMap] = useState<Record<string, WatchProgress>>(() => {
@@ -34,7 +56,7 @@ export const WatchProgressProvider = ({ children }: { children: ReactNode }) => 
             try {
                 const saved = localStorage.getItem('xstream_watch_progress');
                 return saved ? JSON.parse(saved) : {};
-            } catch (e) {
+            } catch {
                 return {};
             }
         }
@@ -117,14 +139,16 @@ export const WatchProgressProvider = ({ children }: { children: ReactNode }) => 
 
             const updatedProgress = { ...progress, duration: finalDuration };
 
-            // Only update if progress has changed significantly (more than 5 seconds)
+            const minProgressDiff = getProgressSyncThresholdSec();
+
+            // Only update if progress has changed significantly
             // or if it's a new entry, or if duration finally arrived, or if episode changed
             const progressDiff = existing ? Math.abs(existing.progress - progress.progress) : 0;
             const isNewEntry = !existing;
             const episodeChanged = existing?.episodeId !== progress.episodeId;
             const durationArrived = !existing?.duration && finalDuration > 0;
 
-            if (isNewEntry || progressDiff > 5 || episodeChanged || durationArrived) {
+            if (isNewEntry || progressDiff > minProgressDiff || episodeChanged || durationArrived) {
                 // Sync to granular API immediately
                 const type = progress.type;
                 const id = contentId;
