@@ -15,6 +15,26 @@ export const metadata: Metadata = {
   description: "Premium Web IPTV Player",
 };
 
+const legacyRedirectScript = `
+(function () {
+  try {
+    var path = window.location.pathname || '';
+    var search = window.location.search || '';
+    if (path.indexOf('/legacy') === 0 || path.indexOf('/debug') === 0 || path.indexOf('/api') === 0) return;
+    if (search.indexOf('forceModern=1') !== -1) return;
+
+    var ua = String(navigator.userAgent || '').toLowerCase();
+    var isWebOs = ua.indexOf('webos') !== -1 || ua.indexOf('web0s') !== -1;
+    var chromeMatch = ua.match(/chrome\\/(\\d+)/);
+    var chromeVersion = chromeMatch ? parseInt(chromeMatch[1], 10) : 0;
+
+    if (isWebOs && (!chromeVersion || chromeVersion < 72)) {
+      window.location.replace('/legacy');
+    }
+  } catch (e) {}
+})();
+`;
+
 export default async function RootLayout({
   children,
 }: Readonly<{
@@ -31,6 +51,7 @@ export default async function RootLayout({
   return (
     <html lang="en">
       <body className="antialiased font-sans">
+        <script dangerouslySetInnerHTML={{ __html: legacyRedirectScript }} />
         {shouldGateRemoteAccess ? (
           <RemoteAccessGate mode={remoteAccess.configured ? "verify" : "setup"} />
         ) : (
