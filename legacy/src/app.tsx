@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
+import { fetchTmdbSuggestions, SuggestionCarousel, SuggestionItem } from './suggestions';
 
 type ContentType = 'live' | 'movie' | 'series';
 type AppView = 'home' | ContentType;
@@ -361,6 +362,85 @@ function ContinueWatchingCarousel({
     );
 }
 
+function SuggestionsCarousel({
+    carousel,
+    onPlay,
+}: {
+    carousel: SuggestionCarousel;
+    onPlay: (item: SuggestionItem) => void;
+}) {
+    if (!carousel.items.length) return null;
+
+    return (
+        <section className="legacy-section">
+            <h2 className="legacy-section-title">{carousel.title}</h2>
+            <div className="legacy-carousel">
+                {carousel.items.map(item => (
+                    <button
+                        key={`${carousel.id}-${item.id}`}
+                        className="legacy-carousel-card"
+                        onClick={() => onPlay(item)}
+                        type="button"
+                    >
+                        <img src={item.image || PLACEHOLDER} alt={item.name} />
+                        <div className="legacy-carousel-overlay" />
+                        <p>{item.name}</p>
+                        {(item.rating || item.year) ? (
+                            <span className="legacy-carousel-meta">
+                                {item.rating ? `★ ${item.rating}` : ''}{item.year ? ` · ${item.year}` : ''}
+                            </span>
+                        ) : null}
+                    </button>
+                ))}
+            </div>
+        </section>
+    );
+}
+
+function TmdbSettingsPanel({
+    apiKey,
+    onApiKeyChange,
+    onSave,
+    onClose,
+    loading,
+    error,
+    success,
+}: {
+    apiKey: string;
+    onApiKeyChange: (value: string) => void;
+    onSave: () => void;
+    onClose: () => void;
+    loading: boolean;
+    error: string;
+    success: boolean;
+}) {
+    return (
+        <div className="legacy-modal-backdrop">
+            <div className="legacy-modal">
+                <h2 className="legacy-title">Configurar TMDb</h2>
+                <p className="legacy-muted">
+                    Informe sua chave de API do TMDb para exibir sugestoes personalizadas na home.
+                </p>
+                {error && <div className="legacy-error">{error}</div>}
+                {success && <div className="legacy-success">Chave salva com sucesso.</div>}
+                <label className="legacy-label">Chave de API</label>
+                <input
+                    className="legacy-input"
+                    value={apiKey}
+                    onChange={event => onApiKeyChange(event.target.value)}
+                    placeholder="Cole sua API key do TMDb"
+                />
+                <div className="legacy-modal-actions">
+                    <button className="legacy-button inline" type="button" onClick={onClose} disabled={loading}>Cancelar</button>
+                    <button className="legacy-button primary legacy-button-inline-primary" type="button" onClick={onSave} disabled={loading}>
+                        {loading ? 'Salvando...' : 'Salvar'}
+                    </button>
+                </div>
+            </div>
+        </div>
+    );
+}
+
 function LegacyApp() {
     const [auth, setAuth] = useState<AuthData | null>(null);
     const [loadingAuth, setLoadingAuth] = useState(true);
@@ -376,6 +456,16 @@ function LegacyApp() {
     const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
     const [heroIndex, setHeroIndex] = useState(0);
     const [continueWatching, setContinueWatching] = useState<WatchProgress[]>([]);
+    const [tmdbApiKey, setTmdbApiKey] = useState<string | null>(null);
+    const [tmdbCarousels, setTmdbCarousels] = useState<SuggestionCarousel[]>([]);
+    const [loadingTmdb, setLoadingTmdb] = useState(false);
+    const [showTmdbSettings, setShowTmdbSettings] = useState(false);
+    const [tmdbSettingsKey, setTmdbSettingsKey] = useState('');
+    const [tmdbSaveLoading, setTmdbSaveLoading] = useState(false);
+    const [tmdbSaveError, setTmdbSaveError] = useState('');
+    const [tmdbSaveSuccess, setTmdbSaveSuccess] = useState(false);
+    const [iptvMovies, setIptvMovies] = useState<StreamItem[]>([]);
+    const [iptvSeries, setIptvSeries] = useState<StreamItem[]>([]);
 
     useEffect(() => {
         const stored = readStoredAuth();
@@ -436,12 +526,15 @@ function LegacyApp() {
             proxy<StreamItem[]>(auth.credentials, 'get_series'),
         ])
             .then(([movies, series]) => {
-                const pool = [
-                    ...(Array.isArray(movies) ? movies.slice(0, 80) : []),
-                    ...(Array.isArray(series) ? series.slice(0, 80) : []),
-                ].filter(item => contentImage(item) !== PLACEHOLDER);
+                const movieList = Array.isArray(movies) ? movies : [];
+                const seriesList = Array.isArray(series) ? series : [];
+                setIptvMovies(movieList);
+                setIptvSeries(seriesList);
 
-                const selected = pool.slice(0, 12).map((item, index) => {
+                const pool = movieList.slice(0, 80).concat(seriesList.slice(0, 80))
+                    .filter(item => contentImage(item) !== PLACEHOLDER);
+
+                const selected = pool.slice(0, 12).map(item => {
                     const type: 'movie' | 'series' = item.series_id ? 'series' : 'movie';
                     const image = contentImage(item);
                     return {
@@ -469,6 +562,29 @@ function LegacyApp() {
         }, HERO_INTERVAL_MS);
         return () => window.clearInterval(timer);
     }, [heroItems.length]);
+
+    useEffect(() => {
+        if (!auth) return;
+
+        requestJson<{ apiKey?: string | null }>('/api/tmdb/config', 'GET', undefined, 10000)
+            .then(data => {
+                if (data && data.apiKey) {
+                    setTmdbApiKey(data.apiKey);
+                    setTmdbSettingsKey(data.apiKey);
+                }
+            })
+            .catch(() => undefined);
+    }, [auth]);
+
+    useEffect(() => {
+        if (!auth || !tmdbApiKey || (!iptvMovies.length && !iptvSeries.length)) return;
+
+        setLoadingTmdb(true);
+        fetchTmdbSuggestions(requestJson, tmdbApiKey, iptvMovies, iptvSeries)
+            .then(carousels => setTmdbCarousels(carousels))
+            .catch(() => setTmdbCarousels([]))
+            .finally(() => setLoadingTmdb(false));
+    }, [auth, tmdbApiKey, iptvMovies, iptvSeries]);
 
     const navItems = useMemo(() => [
         { view: 'home' as AppView, label: 'Inicio' },
@@ -572,6 +688,50 @@ function LegacyApp() {
         });
     };
 
+    const saveTmdbConfig = () => {
+        if (!tmdbSettingsKey.trim()) {
+            setTmdbSaveError('Informe a chave de API');
+            return;
+        }
+
+        setTmdbSaveLoading(true);
+        setTmdbSaveError('');
+        setTmdbSaveSuccess(false);
+
+        requestJson<{ success?: boolean; error?: string }>('/api/tmdb/config', 'POST', { apiKey: tmdbSettingsKey.trim() }, 20000)
+            .then(data => {
+                if (data.error) throw new Error(data.error);
+                setTmdbApiKey(tmdbSettingsKey.trim());
+                setTmdbSaveSuccess(true);
+                setTimeout(() => {
+                    setShowTmdbSettings(false);
+                    setTmdbSaveSuccess(false);
+                }, 1200);
+            })
+            .catch(err => setTmdbSaveError(err instanceof Error ? err.message : 'Falha ao salvar'))
+            .finally(() => setTmdbSaveLoading(false));
+    };
+
+    const openSuggestionItem = (item: SuggestionItem) => {
+        if (!auth) return;
+        if (item.type === 'movie') {
+            setPlayer({
+                title: item.name,
+                src: streamUrl(auth.credentials, 'movie', item.id),
+                poster: item.image,
+            });
+            return;
+        }
+
+        setView('series');
+        setActiveType('series');
+        setLoading(true);
+        proxy<SeriesInfo>(auth.credentials, 'get_series_info', { series_id: item.id })
+            .then(data => setSeriesInfo(data))
+            .catch(err => setError(err instanceof Error ? err.message : 'Falha ao carregar serie'))
+            .finally(() => setLoading(false));
+    };
+
     const logout = () => {
         removeAuth();
         setAuth(null);
@@ -658,6 +818,23 @@ function LegacyApp() {
                                 onChangeIndex={setHeroIndex}
                             />
                             <ContinueWatchingCarousel items={continueWatching} onPlay={openContinueWatching} />
+
+                            <div className="legacy-tmdb-bar">
+                                <span className="legacy-muted">
+                                    {tmdbApiKey ? 'Sugestoes TMDb ativas' : 'Configure o TMDb para ver sugestoes'}
+                                </span>
+                                <button className="legacy-button inline" type="button" onClick={() => setShowTmdbSettings(true)}>
+                                    {tmdbApiKey ? 'TMDb' : 'Configurar TMDb'}
+                                </button>
+                                {tmdbApiKey && <span className="legacy-tmdb-dot" />}
+                            </div>
+
+                            {loadingTmdb && <div className="legacy-loading">Carregando sugestoes TMDb...</div>}
+
+                            {tmdbCarousels.map(carousel => (
+                                <SuggestionsCarousel key={carousel.id} carousel={carousel} onPlay={openSuggestionItem} />
+                            ))}
+
                             <div className="legacy-category-cards">
                                 <button className="legacy-category-card" onClick={() => openBrowse('live')} type="button">
                                     <div className="legacy-category-card-bg" style={{ backgroundImage: `url(${CARD_LIVE_BG})` }} />
@@ -752,6 +929,21 @@ function LegacyApp() {
                     )}
                 </section>
             </div>
+            {showTmdbSettings && (
+                <TmdbSettingsPanel
+                    apiKey={tmdbSettingsKey}
+                    onApiKeyChange={setTmdbSettingsKey}
+                    onSave={saveTmdbConfig}
+                    onClose={() => {
+                        setShowTmdbSettings(false);
+                        setTmdbSaveError('');
+                        setTmdbSaveSuccess(false);
+                    }}
+                    loading={tmdbSaveLoading}
+                    error={tmdbSaveError}
+                    success={tmdbSaveSuccess}
+                />
+            )}
         </div>
     );
 }

@@ -63,6 +63,15 @@ html, body { background: #050505; color: #fff; margin: 0; }
 .legacy-category-card-content { position: absolute; inset: 0; padding: 18px; display: flex; flex-direction: column; justify-content: flex-end; background: linear-gradient(to top, #000 25%, rgba(0,0,0,0.35)); z-index: 1; color: #fff; }
 .legacy-category-card h3 { margin: 6px 0 4px; font-size: 22px; }
 .legacy-category-card p { margin: 0; color: #d4d4d4; font-size: 13px; }
+
+.legacy-carousel-meta { position: absolute; left: 10px; right: 10px; bottom: 34px; font-size: 11px; color: #fbbf24; z-index: 2; }
+.legacy-tmdb-bar { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 8px 24px 4px; }
+.legacy-tmdb-dot { width: 8px; height: 8px; border-radius: 50%; background: #22c55e; display: inline-block; box-shadow: 0 0 8px rgba(34,197,94,0.6); }
+.legacy-modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 2000; display: flex; align-items: center; justify-content: center; padding: 20px; }
+.legacy-modal { width: 100%; max-width: 480px; background: #171717; border: 1px solid #333; border-radius: 18px; padding: 24px; }
+.legacy-modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
+.legacy-button-inline-primary { width: auto; min-width: 120px; }
+.legacy-success { padding: 12px; border: 1px solid #22c55e; background: rgba(34,197,94,0.12); border-radius: 12px; color: #bbf7d0; margin-bottom: 12px; }
 .legacy-series-cover { max-width: 220px; border-radius: 12px; margin: 12px 24px; display: block; }
 @media (max-width: 900px) {
     .legacy-layout { display: block; }
