@@ -21,15 +21,19 @@ const legacyRedirectScript = `
     var path = window.location.pathname || '';
     var search = window.location.search || '';
     if (path.indexOf('/legacy') === 0 || path.indexOf('/debug') === 0 || path.indexOf('/api') === 0) return;
-    if (search.indexOf('forceModern=1') !== -1) return;
+    if (search.indexOf('forceModern=1') !== -1 || search.indexOf('forceLegacy=1') !== -1) return;
 
     var ua = String(navigator.userAgent || '').toLowerCase();
     var isWebOs = ua.indexOf('webos') !== -1 || ua.indexOf('web0s') !== -1;
     var chromeMatch = ua.match(/chrome\\/(\\d+)/);
     var chromeVersion = chromeMatch ? parseInt(chromeMatch[1], 10) : 0;
+    var needsLegacy = (isWebOs && (!chromeVersion || chromeVersion < 72))
+      || typeof Promise === 'undefined'
+      || typeof fetch === 'undefined';
 
-    if (isWebOs && (!chromeVersion || chromeVersion < 72)) {
-      window.location.replace('/legacy');
+    if (needsLegacy) {
+      var target = '/legacy?redirect=' + encodeURIComponent(path + search);
+      window.location.replace(target);
     }
   } catch (e) {}
 })();
