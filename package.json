@@ -4,7 +4,8 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
+    "build": "npm run build:legacy && next build",
+    "build:legacy": "mkdir -p public/legacy .legacy-tmp && esbuild legacy/src/entry.ts --bundle --format=iife --global-name=XStreamLegacy --target=es2015 --outfile=.legacy-tmp/app.js --jsx=automatic --minify && babel .legacy-tmp/app.js --out-file public/legacy/app.js --config-file ./legacy/babel.config.json --minified",
     "start": "next start",
     "lint": "eslint"
   },
@@ -18,10 +19,14 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
+    "@babel/cli": "^7.28.6",
+    "@babel/core": "^7.29.0",
+    "@babel/preset-env": "^7.29.5",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
     "autoprefixer": "^10.4.17",
+    "esbuild": "^0.28.0",
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "postcss": "^8.4.35",
