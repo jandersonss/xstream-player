@@ -13,7 +13,12 @@ import { SubtitleProvider } from '../app/context/SubtitleContext';
 export function ClientProviders({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
-    if (pathname === '/debug' || pathname?.startsWith('/debug/')) {
+    if (
+        pathname === '/debug' ||
+        pathname?.startsWith('/debug/') ||
+        pathname === '/legacy' ||
+        pathname?.startsWith('/legacy/')
+    ) {
         return <>{children}</>;
     }
 
