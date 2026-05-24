@@ -19,6 +19,7 @@
 
 # production
 /build
+.legacy-tmp/
 
 # misc
 .DS_Store
