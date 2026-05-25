@@ -949,6 +949,11 @@ function LegacyApp() {
 }
 
 const rootElement = document.getElementById('legacy-root');
+const bootElement = document.getElementById('legacy-boot');
+
+if (bootElement && bootElement.parentNode) {
+    bootElement.parentNode.removeChild(bootElement);
+}
 
 if (rootElement) {
     createRoot(rootElement).render(<LegacyApp />);

@@ -112,9 +112,10 @@ export default function LegacyPage() {
         <main className="legacy-shell">
             <script dangerouslySetInnerHTML={{ __html: modernRedirectScript }} />
             <style dangerouslySetInnerHTML={{ __html: legacyStyles }} />
-            <div id="legacy-root">
-                <div className="legacy-loading" style={{ padding: 24 }}>Carregando XStream...</div>
+            <div id="legacy-boot" className="legacy-loading" suppressHydrationWarning>
+                Carregando XStream...
             </div>
+            <div id="legacy-root" suppressHydrationWarning />
             <script src="/legacy/app.js" defer />
         </main>
     );
