@@ -1,12 +1,12 @@
 import { NextResponse } from 'next/server';
 import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
-import * as cache from '@/app/lib/sqliteCache';
+import * as library from '@/app/lib/sqliteCache';
 import type { ContentType } from '@/app/lib/dbTypes';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-type CacheAction =
+type LibraryAction =
     | 'saveDetail'
     | 'getDetail'
     | 'saveCategories'
@@ -26,15 +26,15 @@ type CacheAction =
     | 'getCarouselCache'
     | 'clearExpiredCarouselCache';
 
-interface CacheRequestBody {
-    action?: CacheAction;
+interface LibraryRequestBody {
+    action?: LibraryAction;
     id?: string | number;
     ids?: (string | number)[];
     type?: ContentType | string;
     categoryId?: string;
-    categories?: Parameters<typeof cache.saveCategories>[0];
-    streams?: Parameters<typeof cache.saveStreams>[0];
-    meta?: Parameters<typeof cache.saveSyncMetadata>[0];
+    categories?: Parameters<typeof library.saveCategories>[0];
+    streams?: Parameters<typeof library.saveStreams>[0];
+    meta?: Parameters<typeof library.saveSyncMetadata>[0];
     key?: string;
     dateKey?: string;
     currentDateKey?: string;
@@ -51,59 +51,59 @@ export async function POST(request: Request) {
     if (remoteAccessResponse) return remoteAccessResponse;
 
     try {
-        const body = await request.json() as CacheRequestBody;
+        const body = await request.json() as LibraryRequestBody;
 
         switch (body.action) {
             case 'saveDetail':
-                cache.saveDetail(body.id ?? '', body.data);
+                library.saveDetail(body.id ?? '', body.data);
                 return NextResponse.json({ success: true });
             case 'getDetail':
-                return jsonData(cache.getDetail(body.id ?? ''));
+                return jsonData(library.getDetail(body.id ?? ''));
             case 'saveCategories':
-                cache.saveCategories(body.categories ?? []);
+                library.saveCategories(body.categories ?? []);
                 return NextResponse.json({ success: true });
             case 'getCategories':
-                return jsonData(cache.getCategories(body.type as ContentType | undefined));
+                return jsonData(library.getCategories(body.type as ContentType | undefined));
             case 'saveStreams':
-                cache.saveStreams(body.streams ?? []);
+                library.saveStreams(body.streams ?? []);
                 return NextResponse.json({ success: true });
             case 'getStreams':
-                return jsonData(cache.getStreams(String(body.categoryId ?? ''), body.type as ContentType));
+                return jsonData(library.getStreams(String(body.categoryId ?? ''), body.type as ContentType));
             case 'getAllStreams':
-                return jsonData(cache.getAllStreams(body.type as ContentType | undefined));
+                return jsonData(library.getAllStreams(body.type as ContentType | undefined));
             case 'getStreamCount':
-                return jsonData(cache.getStreamCount(body.type as ContentType | undefined));
+                return jsonData(library.getStreamCount(body.type as ContentType | undefined));
             case 'getStreamsByIds':
-                return jsonData(cache.getStreamsByIds(body.ids ?? []));
+                return jsonData(library.getStreamsByIds(body.ids ?? []));
             case 'saveSyncMetadata':
-                if (body.meta) cache.saveSyncMetadata(body.meta);
+                if (body.meta) library.saveSyncMetadata(body.meta);
                 return NextResponse.json({ success: true });
             case 'getSyncMetadata':
-                return jsonData(cache.getSyncMetadata(String(body.type ?? '')));
+                return jsonData(library.getSyncMetadata(String(body.type ?? '')));
             case 'clearCache':
-                cache.clearCache();
+                library.clearCache();
                 return NextResponse.json({ success: true });
             case 'saveTMDbCache':
-                cache.saveTMDbCache(String(body.key ?? ''), body.data);
+                library.saveTMDbCache(String(body.key ?? ''), body.data);
                 return NextResponse.json({ success: true });
             case 'getTMDbCache':
-                return jsonData(cache.getTMDbCache(String(body.key ?? '')));
+                return jsonData(library.getTMDbCache(String(body.key ?? '')));
             case 'clearExpiredTMDbCache':
-                cache.clearExpiredTMDbCache(body.ttl ?? 1000 * 60 * 60 * 24);
+                library.clearExpiredTMDbCache(body.ttl ?? 1000 * 60 * 60 * 24);
                 return NextResponse.json({ success: true });
             case 'saveCarouselCache':
-                cache.saveCarouselCache(String(body.dateKey ?? ''), Array.isArray(body.data) ? body.data : []);
+                library.saveCarouselCache(String(body.dateKey ?? ''), Array.isArray(body.data) ? body.data : []);
                 return NextResponse.json({ success: true });
             case 'getCarouselCache':
-                return jsonData(cache.getCarouselCache(String(body.dateKey ?? '')));
+                return jsonData(library.getCarouselCache(String(body.dateKey ?? '')));
             case 'clearExpiredCarouselCache':
-                cache.clearExpiredCarouselCache(String(body.currentDateKey ?? ''));
+                library.clearExpiredCarouselCache(String(body.currentDateKey ?? ''));
                 return NextResponse.json({ success: true });
             default:
-                return NextResponse.json({ error: 'Invalid cache action' }, { status: 400 });
+                return NextResponse.json({ error: 'Invalid library action' }, { status: 400 });
         }
     } catch (error) {
-        console.error('[Cache] Request failed:', error);
-        return NextResponse.json({ error: 'Cache request failed' }, { status: 500 });
+        console.error('[Library] Request failed:', error);
+        return NextResponse.json({ error: 'Library request failed' }, { status: 500 });
     }
 }
