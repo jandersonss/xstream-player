@@ -1,270 +1,106 @@
-import { openDB, IDBPDatabase } from 'idb';
+import type { CachedCategory, CachedStream, ContentType, SavedSubtitle, SyncMetadata } from './dbTypes';
 
-const DB_NAME = 'xstream_player_db';
-const DB_VERSION = 8;
+export type { CachedCategory, CachedStream, ContentType, SavedSubtitle, SyncMetadata };
 
-export interface CachedCategory {
-    category_id: string;
-    category_name: string;
-    parent_id: number;
-    type: 'live' | 'movie' | 'series';
+interface CacheResponse<T> {
+    data: T | null;
 }
 
-export interface CachedStream {
-    id: string | number;
-    category_id: string;
-    name: string;
-    type: 'live' | 'movie' | 'series';
-    icon?: string;
-    rating?: string;
-    added?: string;
-    normalized_name?: string;
-    // Expanded fields to avoid storing raw data blob
-    container_extension?: string;
-    epg_channel_id?: string;
-    stream_type?: string;
-    cover?: string;
-    plot?: string;
-    cast?: string;
-    director?: string;
-    genre?: string;
-    release_date?: string;
-    rating_5based?: string;
-    backdrop_path?: string[];
-    last_modified?: string;
-}
-
-export interface SyncMetadata {
-    type: 'live' | 'movie' | 'series' | 'categories';
-    lastSync: number;
-}
-
-// --- User Subtitles (Interface shared for type safety, but storage is server-side) ---
-export interface SavedSubtitle {
-    streamId: string;
-    vtt: string;
-    language: string;
-    timestamp: number;
-}
-
-export const initDB = async (): Promise<IDBPDatabase> => {
-    return openDB(DB_NAME, DB_VERSION, {
-        upgrade(db, oldVersion, newVersion, transaction) {
-            if (!db.objectStoreNames.contains('categories')) {
-                db.createObjectStore('categories', { keyPath: 'category_id' });
-            }
-
-            if (!db.objectStoreNames.contains('streams')) {
-                const streamStore = db.createObjectStore('streams', { keyPath: 'id' });
-                streamStore.createIndex('category_id', 'category_id', { unique: false });
-                streamStore.createIndex('type', 'type', { unique: false });
-                streamStore.createIndex('type_category', ['type', 'category_id'], { unique: false });
-            } else {
-                const streamStore = transaction.objectStore('streams');
-                if (!streamStore.indexNames.contains('category_id')) {
-                    streamStore.createIndex('category_id', 'category_id', { unique: false });
-                }
-                if (!streamStore.indexNames.contains('type')) {
-                    streamStore.createIndex('type', 'type', { unique: false });
-                }
-                // Add compound index for efficient type+category queries
-                if (!streamStore.indexNames.contains('type_category')) {
-                    streamStore.createIndex('type_category', ['type', 'category_id'], { unique: false });
-                }
-
-                if (oldVersion < 3) {
-                    streamStore.clear();
-                    if (db.objectStoreNames.contains('categories')) {
-                        transaction.objectStore('categories').clear();
-                    }
-                }
-
-                // Clear old data format when upgrading to v8 (slim data)
-                if (oldVersion < 8) {
-                    streamStore.clear();
-                    if (db.objectStoreNames.contains('categories')) {
-                        transaction.objectStore('categories').clear();
-                    }
-                    if (db.objectStoreNames.contains('sync_metadata')) {
-                        transaction.objectStore('sync_metadata').clear();
-                    }
-                }
-            }
-
-            if (!db.objectStoreNames.contains('sync_metadata')) {
-                db.createObjectStore('sync_metadata', { keyPath: 'type' });
-            }
-            if (!db.objectStoreNames.contains('details')) {
-                db.createObjectStore('details', { keyPath: 'id' });
-            }
-            if (!db.objectStoreNames.contains('tmdb_cache')) {
-                db.createObjectStore('tmdb_cache', { keyPath: 'key' });
-            }
-            if (!db.objectStoreNames.contains('carousel_cache')) {
-                db.createObjectStore('carousel_cache', { keyPath: 'date' });
-            }
-            // Note: user_subtitles store was migrated to server-side in v7
-        },
+async function requestCache<T>(action: string, payload: Record<string, unknown> = {}): Promise<T | undefined> {
+    const response = await fetch('/api/cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...payload }),
     });
-};
+
+    if (!response.ok) {
+        throw new Error(`Cache action failed: ${action}`);
+    }
+
+    const body = await response.json() as CacheResponse<T>;
+    return body.data ?? undefined;
+}
+
+async function writeCache(action: string, payload: Record<string, unknown> = {}) {
+    const response = await fetch('/api/cache', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action, ...payload }),
+    });
+
+    if (!response.ok) {
+        throw new Error(`Cache action failed: ${action}`);
+    }
+}
 
 export const saveDetail = async (id: string | number, data: any) => {
-    const db = await initDB();
-    await db.put('details', { id: String(id), data, timestamp: Date.now() });
+    await writeCache('saveDetail', { id, data });
 };
 
 export const getDetail = async (id: string | number): Promise<any | undefined> => {
-    const db = await initDB();
-    const entry = await db.get('details', String(id));
-    return entry?.data;
+    return requestCache<any>('getDetail', { id });
 };
 
 export const saveCategories = async (categories: CachedCategory[]) => {
-    const db = await initDB();
-    const tx = db.transaction('categories', 'readwrite');
-    const store = tx.objectStore('categories');
-    for (const cat of categories) {
-        store.put(cat); // Fire-and-forget, no await per put
-    }
-    await tx.done;
+    await writeCache('saveCategories', { categories });
 };
 
-export const getCategories = async (type?: 'live' | 'movie' | 'series'): Promise<CachedCategory[]> => {
-    const db = await initDB();
-    const all = await db.getAll('categories');
-    if (type) {
-        return all.filter(cat => cat.type === type);
-    }
-    return all;
+export const getCategories = async (type?: ContentType): Promise<CachedCategory[]> => {
+    return await requestCache<CachedCategory[]>('getCategories', { type }) ?? [];
 };
 
-/**
- * Optimized saveStreams: fire-and-forget puts within a single transaction.
- * Each put() is NOT awaited individually — only tx.done is awaited.
- * This dramatically reduces IDB overhead on slow browsers like webOS 4.
- */
 export const saveStreams = async (streams: CachedStream[]) => {
-    const db = await initDB();
-    const tx = db.transaction('streams', 'readwrite');
-    const store = tx.objectStore('streams');
-    for (const stream of streams) {
-        store.put(stream); // Fire-and-forget, no await per put
-    }
-    await tx.done;
+    await writeCache('saveStreams', { streams });
 };
 
-export const getStreams = async (categoryId: string, type: 'live' | 'movie' | 'series'): Promise<CachedStream[]> => {
-    const db = await initDB();
-    // Use compound index for efficient query
-    try {
-        return await db.getAllFromIndex('streams', 'type_category', [type, String(categoryId)]);
-    } catch {
-        // Fallback if compound index not available
-        const all = await db.getAllFromIndex('streams', 'category_id', String(categoryId));
-        return all.filter(s => s.type === type);
-    }
+export const getStreams = async (categoryId: string, type: ContentType): Promise<CachedStream[]> => {
+    return await requestCache<CachedStream[]>('getStreams', { categoryId, type }) ?? [];
 };
 
-export const getAllStreams = async (type?: 'live' | 'movie' | 'series'): Promise<CachedStream[]> => {
-    const db = await initDB();
-    if (type) {
-        return db.getAllFromIndex('streams', 'type', type);
-    }
-    return db.getAll('streams');
+export const getAllStreams = async (type?: ContentType): Promise<CachedStream[]> => {
+    return await requestCache<CachedStream[]>('getAllStreams', { type }) ?? [];
 };
 
-/**
- * Get count of streams by type without loading all data into memory.
- * Uses cursor counting for memory efficiency on low-RAM devices.
- */
-export const getStreamCount = async (type?: 'live' | 'movie' | 'series'): Promise<number> => {
-    const db = await initDB();
-    if (type) {
-        return db.countFromIndex('streams', 'type', type);
-    }
-    return db.count('streams');
+export const getStreamCount = async (type?: ContentType): Promise<number> => {
+    return await requestCache<number>('getStreamCount', { type }) ?? 0;
 };
 
-/**
- * Get streams by a list of IDs efficiently.
- */
 export const getStreamsByIds = async (ids: (string | number)[]): Promise<CachedStream[]> => {
-    const db = await initDB();
-    const results: CachedStream[] = [];
-    const tx = db.transaction('streams', 'readonly');
-    const store = tx.objectStore('streams');
-    for (const id of ids) {
-        const item = await store.get(String(id));
-        if (item) results.push(item);
-    }
-    await tx.done;
-    return results;
+    return await requestCache<CachedStream[]>('getStreamsByIds', { ids }) ?? [];
 };
 
 export const saveSyncMetadata = async (meta: SyncMetadata) => {
-    const db = await initDB();
-    await db.put('sync_metadata', meta);
+    await writeCache('saveSyncMetadata', { meta });
 };
 
 export const getSyncMetadata = async (type: string): Promise<SyncMetadata | undefined> => {
-    const db = await initDB();
-    return db.get('sync_metadata', type);
+    return requestCache<SyncMetadata>('getSyncMetadata', { type });
 };
 
 export const clearCache = async () => {
-    const db = await initDB();
-    await db.clear('categories');
-    await db.clear('streams');
-    await db.clear('sync_metadata');
-    await db.clear('details');
+    await writeCache('clearCache');
 };
 
 export const saveTMDbCache = async (key: string, data: any) => {
-    const db = await initDB();
-    await db.put('tmdb_cache', { key, data, timestamp: Date.now() });
+    await writeCache('saveTMDbCache', { key, data });
 };
 
 export const getTMDbCache = async (key: string): Promise<{ data: any; timestamp: number } | undefined> => {
-    const db = await initDB();
-    return db.get('tmdb_cache', key);
+    return requestCache<{ data: any; timestamp: number }>('getTMDbCache', { key });
 };
 
 export const clearExpiredTMDbCache = async (ttl: number = 1000 * 60 * 60 * 24) => {
-    const db = await initDB();
-    const all = await db.getAll('tmdb_cache');
-    const now = Date.now();
-    const tx = db.transaction('tmdb_cache', 'readwrite');
-    const store = tx.objectStore('tmdb_cache');
-
-    for (const item of all) {
-        if (now - item.timestamp > ttl) {
-            store.delete(item.key); // Fire-and-forget
-        }
-    }
-    await tx.done;
+    await writeCache('clearExpiredTMDbCache', { ttl });
 };
 
 export const saveCarouselCache = async (dateKey: string, data: any[]) => {
-    const db = await initDB();
-    await db.put('carousel_cache', { date: dateKey, data, timestamp: Date.now() });
+    await writeCache('saveCarouselCache', { dateKey, data });
 };
 
 export const getCarouselCache = async (dateKey: string): Promise<any[] | undefined> => {
-    const db = await initDB();
-    const entry = await db.get('carousel_cache', dateKey);
-    return entry?.data;
+    return requestCache<any[]>('getCarouselCache', { dateKey });
 };
 
 export const clearExpiredCarouselCache = async (currentDateKey: string) => {
-    const db = await initDB();
-    const allKeys = await db.getAllKeys('carousel_cache');
-    const tx = db.transaction('carousel_cache', 'readwrite');
-    const store = tx.objectStore('carousel_cache');
-
-    for (const key of allKeys) {
-        if (key !== currentDateKey) {
-            store.delete(key); // Fire-and-forget
-        }
-    }
-    await tx.done;
+    await writeCache('clearExpiredCarouselCache', { currentDateKey });
 };

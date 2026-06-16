@@ -47,7 +47,7 @@ export async function streamSyncStreams(options: StreamSyncOptions): Promise<voi
         const flushBatch = async () => {
             if (batch.length > 0) {
                 const currentBatch = [...batch];
-                batch = []; // Clear immediately to free memory
+                batch = []; // Clear immediately to free memory before server-side SQLite write
                 await db.saveStreams(currentBatch);
                 processedItems += currentBatch.length;
                 if (totalItems > 0) {

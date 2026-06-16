@@ -71,7 +71,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
     /**
      * Fetch streams page by page from the paginated proxy.
-     * Each page is processed and saved to IDB immediately, so the client
+     * Each page is processed and saved to SQLite immediately, so the client
      * never holds more than SYNC_PAGE_SIZE items in memory at once.
      */
     const fetchStreamsPaginated = async (
