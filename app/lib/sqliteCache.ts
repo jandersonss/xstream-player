@@ -99,7 +99,7 @@ function getConnection() {
             stream_type TEXT,
             cover TEXT,
             plot TEXT,
-            cast TEXT,
+            "cast" TEXT,
             director TEXT,
             genre TEXT,
             release_date TEXT,
@@ -144,7 +144,7 @@ function getConnection() {
 
 const streamColumns = `
     id, category_id, name, type, icon, rating, added, normalized_name,
-    container_extension, epg_channel_id, stream_type, cover, plot, cast,
+    container_extension, epg_channel_id, stream_type, cover, plot, "cast",
     director, genre, release_date, rating_5based, backdrop_path_json,
     last_modified
 `;
@@ -212,7 +212,7 @@ export function saveStreams(streams: CachedStream[]) {
             stream_type = excluded.stream_type,
             cover = excluded.cover,
             plot = excluded.plot,
-            cast = excluded.cast,
+            "cast" = excluded."cast",
             director = excluded.director,
             genre = excluded.genre,
             release_date = excluded.release_date,
