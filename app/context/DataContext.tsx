@@ -59,6 +59,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         setSyncProgress(0);
 
         try {
+            console.log('[DataContext] Starting server-side sync via /api/sync');
             const startResponse = await fetch('/api/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -71,6 +72,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
             const startBody = await startResponse.json() as { job: ServerSyncJob };
             activeJobIdRef.current = startBody.job.id;
+            setSyncProgress(startBody.job.progress);
 
             while (!cancelPollingRef.current && activeJobIdRef.current) {
                 const statusResponse = await fetch(`/api/sync?jobId=${encodeURIComponent(activeJobIdRef.current)}`);

@@ -45,40 +45,17 @@ export default function MovieList() {
                     setCategoryName(category.category_name);
                 }
 
-                // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'movie');
-                if (cached && cached.length > 0) {
-                    setMovies(cached.map(s => ({
-                        stream_id: s.id,
-                        name: s.name,
-                        stream_icon: s.icon || '',
-                        rating: s.rating || '',
-                        added: s.added || '',
-                        container_extension: s.container_extension || '',
-                    })));
-                    setLoading(false);
-                    return;
-                }
-
-                // Fallback to fetch
-                const res = await fetch('/api/proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...credentials,
-                        action: 'get_vod_streams',
-                        category_id: categoryId
-                    })
-                });
-
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    setMovies(data);
-                } else {
-                    setMovies([]);
-                }
+                setMovies(cached.map(s => ({
+                    stream_id: s.id,
+                    name: s.name,
+                    stream_icon: s.icon || '',
+                    rating: s.rating || '',
+                    added: s.added || '',
+                    container_extension: s.container_extension || '',
+                })));
             } catch (err) {
-                setError('Falha ao buscar filmes');
+                setError('Falha ao buscar filmes no SQLite');
             } finally {
                 setLoading(false);
             }

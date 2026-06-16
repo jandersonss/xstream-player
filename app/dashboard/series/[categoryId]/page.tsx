@@ -48,44 +48,22 @@ export default function SeriesList() {
                     setCategoryName(category.category_name);
                 }
 
-                // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'series');
-                if (cached && cached.length > 0) {
-                    setSeriesList(cached.map(s => ({
-                        series_id: s.id,
-                        name: s.name,
-                        cover: s.cover || s.icon || '',
-                        rating: s.rating || '',
-                        plot: s.plot || '',
-                        cast: s.cast || '',
-                        director: s.director || '',
-                        genre: s.genre || '',
-                        releaseDate: s.release_date || '',
-                        rating_5based: s.rating_5based || '',
-                        backdrop_path: s.backdrop_path || [],
-                    })));
-                    setLoading(false);
-                    return;
-                }
-
-                const res = await fetch('/api/proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...credentials,
-                        action: 'get_series',
-                        category_id: categoryId
-                    })
-                });
-
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    setSeriesList(data);
-                } else {
-                    setSeriesList([]);
-                }
+                setSeriesList(cached.map(s => ({
+                    series_id: s.id,
+                    name: s.name,
+                    cover: s.cover || s.icon || '',
+                    rating: s.rating || '',
+                    plot: s.plot || '',
+                    cast: s.cast || '',
+                    director: s.director || '',
+                    genre: s.genre || '',
+                    releaseDate: s.release_date || '',
+                    rating_5based: s.rating_5based || '',
+                    backdrop_path: s.backdrop_path || [],
+                })));
             } catch (err) {
-                setError('Falha ao buscar séries');
+                setError('Falha ao buscar séries no SQLite');
             } finally {
                 setLoading(false);
             }
