@@ -33,12 +33,12 @@ async function writeCache(action: string, payload: Record<string, unknown> = {})
     }
 }
 
-export const saveDetail = async (id: string | number, data: any) => {
+export const saveDetail = async (id: string | number, data: unknown) => {
     await writeCache('saveDetail', { id, data });
 };
 
-export const getDetail = async (id: string | number): Promise<any | undefined> => {
-    return requestCache<any>('getDetail', { id });
+export const getDetail = async <T = unknown>(id: string | number): Promise<T | undefined> => {
+    return requestCache<T>('getDetail', { id });
 };
 
 export const saveCategories = async (categories: CachedCategory[]) => {
@@ -81,24 +81,24 @@ export const clearCache = async () => {
     await writeCache('clearCache');
 };
 
-export const saveTMDbCache = async (key: string, data: any) => {
+export const saveTMDbCache = async (key: string, data: unknown) => {
     await writeCache('saveTMDbCache', { key, data });
 };
 
-export const getTMDbCache = async (key: string): Promise<{ data: any; timestamp: number } | undefined> => {
-    return requestCache<{ data: any; timestamp: number }>('getTMDbCache', { key });
+export const getTMDbCache = async <T = unknown>(key: string): Promise<{ data: T; timestamp: number } | undefined> => {
+    return requestCache<{ data: T; timestamp: number }>('getTMDbCache', { key });
 };
 
 export const clearExpiredTMDbCache = async (ttl: number = 1000 * 60 * 60 * 24) => {
     await writeCache('clearExpiredTMDbCache', { ttl });
 };
 
-export const saveCarouselCache = async (dateKey: string, data: any[]) => {
+export const saveCarouselCache = async (dateKey: string, data: unknown[]) => {
     await writeCache('saveCarouselCache', { dateKey, data });
 };
 
-export const getCarouselCache = async (dateKey: string): Promise<any[] | undefined> => {
-    return requestCache<any[]>('getCarouselCache', { dateKey });
+export const getCarouselCache = async <T = never>(dateKey: string): Promise<T[] | undefined> => {
+    return requestCache<T[]>('getCarouselCache', { dateKey });
 };
 
 export const clearExpiredCarouselCache = async (currentDateKey: string) => {
