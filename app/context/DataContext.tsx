@@ -13,8 +13,8 @@ interface DataContextType {
     getCachedCategories: (type: 'live' | 'movie' | 'series') => Promise<db.CachedCategory[]>;
     getCachedStreams: (categoryId: string, type: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
     getAllCachedStreams: (type?: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
-    getCachedDetail: (id: string | number) => Promise<any | undefined>;
-    saveCachedDetail: (id: string | number, data: any) => Promise<void>;
+    getCachedDetail: <T = Record<string, unknown>>(id: string | number) => Promise<T | undefined>;
+    saveCachedDetail: (id: string | number, data: unknown) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -154,11 +154,11 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return db.getAllStreams(type);
     }, []);
 
-    const getCachedDetail = useCallback(async (id: string | number) => {
-        return db.getDetail(id);
+    const getCachedDetail = useCallback(async <T = Record<string, unknown>,>(id: string | number) => {
+        return db.getDetail<T>(id);
     }, []);
 
-    const saveCachedDetail = useCallback(async (id: string | number, data: any) => {
+    const saveCachedDetail = useCallback(async (id: string | number, data: unknown) => {
         await db.saveDetail(id, data);
     }, []);
 
