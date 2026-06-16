@@ -7,14 +7,14 @@ interface CacheResponse<T> {
 }
 
 async function requestCache<T>(action: string, payload: Record<string, unknown> = {}): Promise<T | undefined> {
-    const response = await fetch('/api/cache', {
+    const response = await fetch('/api/library', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...payload }),
     });
 
     if (!response.ok) {
-        throw new Error(`Cache action failed: ${action}`);
+        throw new Error(`Library action failed: ${action}`);
     }
 
     const body = await response.json() as CacheResponse<T>;
@@ -22,14 +22,14 @@ async function requestCache<T>(action: string, payload: Record<string, unknown> 
 }
 
 async function writeCache(action: string, payload: Record<string, unknown> = {}) {
-    const response = await fetch('/api/cache', {
+    const response = await fetch('/api/library', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...payload }),
     });
 
     if (!response.ok) {
-        throw new Error(`Cache action failed: ${action}`);
+        throw new Error(`Library action failed: ${action}`);
     }
 }
 
