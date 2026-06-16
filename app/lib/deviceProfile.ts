@@ -20,7 +20,7 @@ export interface DeviceProfile {
     maxInMemory: number;
     /** Whether to yield to event loop between batches */
     yieldBetweenBatches: boolean;
-    /** How many items to accumulate before writing to IDB during stream sync */
+    /** How many items to accumulate before writing to SQLite during stream sync */
     streamBatchSize: number;
     /** Whether to run multiple syncs (live, vod) in parallel */
     parallelSync: boolean;
