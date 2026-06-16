@@ -19,7 +19,7 @@ interface SyncJob {
     controller: AbortController;
 }
 
-interface SyncJobResponse extends Omit<SyncJob, 'controller'> { }
+type SyncJobResponse = Omit<SyncJob, 'controller'>;
 
 const globalSyncState = globalThis as typeof globalThis & {
     xstreamSyncJobs?: Map<string, SyncJob>;
@@ -34,8 +34,16 @@ function jobs() {
 }
 
 function publicJob(job: SyncJob): SyncJobResponse {
-    const { controller: _controller, ...safeJob } = job;
-    return safeJob;
+    return {
+        id: job.id,
+        status: job.status,
+        progress: job.progress,
+        message: job.message,
+        startedAt: job.startedAt,
+        updatedAt: job.updatedAt,
+        lastSync: job.lastSync,
+        error: job.error,
+    };
 }
 
 function currentRunningJob() {

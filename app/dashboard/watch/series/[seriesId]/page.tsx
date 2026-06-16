@@ -88,7 +88,7 @@ export default function WatchSeriesPage() {
         const loadSeriesInfo = async () => {
             try {
                 // Try cache first
-                const cached = await getCachedDetail(seriesId);
+                const cached = await getCachedDetail<SeriesInfo>(seriesId);
                 if (cached) {
                     setSeries(cached);
                     // Set initial season if available
