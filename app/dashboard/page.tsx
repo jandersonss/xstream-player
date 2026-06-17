@@ -11,23 +11,7 @@ import { useEffect, useState, useMemo } from 'react';
 import ContentCarousel from '@/components/ContentCarousel';
 import HeroSection from '@/components/HeroSection';
 import TMDbSettingsModal from '@/components/TMDbSettingsModal';
-import {
-    getTMDbImageUrl,
-    getDailySeed,
-    shuffleWithSeed,
-    generateDailyCarousels,
-    titlesMatch,
-    findBestMatch,
-    TMDbMovie,
-    TMDbTVShow
-} from '../lib/tmdb';
-import {
-    CachedStream,
-    CachedCategory,
-    saveCarouselCache,
-    getCarouselCache,
-    clearExpiredCarouselCache
-} from '../lib/db';
+import { CachedStream } from '../lib/db';
 
 
 interface EnrichedStream extends CachedStream {
@@ -42,17 +26,9 @@ interface EnrichedStream extends CachedStream {
 
 export default function Dashboard() {
     const { user, server } = useAuth();
-    const { lastSync, getCachedCategories, getAllCachedStreams, getCachedStreams } = useData();
+    const { lastSync } = useData();
     const { progressMap } = useWatchProgress();
-    const {
-        isConfigured,
-        fetchMovieGenres,
-        fetchTVGenres,
-        fetchMoviesByYear,
-        fetchMoviesByGenre,
-        fetchTVByGenre,
-        fetchTrending
-    } = useTMDb();
+    const { isConfigured } = useTMDb();
 
     const [greeting, setGreeting] = useState('Welcome back');
     const [showSettings, setShowSettings] = useState(false);
@@ -91,25 +67,15 @@ export default function Dashboard() {
         else setGreeting('Boa noite');
     }, []);
 
-    // Load carousels based on TMDb configuration
-    // Load carousels based on TMDb configuration
+    // Load carousels from backend
     useEffect(() => {
         const loadCarousels = async () => {
             setIsLoadingCarousels(true);
-            const allCarousels: CarouselData[] = [];
-
             try {
-                // Always load IPTV carousels
-                const iptvCarousels = await fetchIPTVCarousels();
-                allCarousels.push(...iptvCarousels);
-
-                if (isConfigured) {
-                    // TMDb configured: Load TMDB carousels filtered by IPTV availability
-                    const tmdbCarousels = await fetchTMDbCarousels();
-                    allCarousels.unshift(...tmdbCarousels);
-                }
-
-                setCarouselData(allCarousels);
+                const response = await fetch('/api/catalog/carousels');
+                if (!response.ok) throw new Error('Failed to fetch carousels');
+                const result = await response.json();
+                setCarouselData(result.data || []);
             } catch (error) {
                 console.error('Failed to load carousels:', error);
             } finally {
@@ -119,171 +85,6 @@ export default function Dashboard() {
 
         loadCarousels();
     }, [isConfigured, lastSync]);
-
-    const fetchTMDbCarousels = async (): Promise<CarouselData[]> => {
-        // Daily cache key (YYYY-MM-DD)
-        const today = new Date();
-        const dateKey = today.toISOString().split('T')[0];
-
-        // Check cache first
-        try {
-            const cachedData = await getCarouselCache(dateKey);
-            if (cachedData && cachedData.length > 0) {
-                console.log('Using cached carousels for', dateKey);
-                // Clean up old caches in background
-                clearExpiredCarouselCache(dateKey).catch(console.error);
-                return cachedData;
-            }
-        } catch (error) {
-            console.warn('Failed to read carousel cache:', error);
-        }
-
-        const [allMovies, allSeries] = await Promise.all([
-            getAllCachedStreams('movie'),
-            getAllCachedStreams('series')
-        ]);
-
-
-
-        // Fetch genres
-        const [movieGenres, tvGenres] = await Promise.all([
-            fetchMovieGenres(),
-            fetchTVGenres()
-        ]);
-
-        // Generate daily carousels
-        const carousels = generateDailyCarousels(movieGenres, tvGenres, 4);
-
-        // Fetch and filter TMDb content
-        const dataPromises = carousels.map(async (carousel) => {
-            let tmdbItems: (TMDbMovie | TMDbTVShow)[] = [];
-
-            try {
-                if (carousel.type === 'trending') {
-                    tmdbItems = await fetchTrending();
-                } else if (carousel.type === 'movie') {
-                    if (carousel.year) {
-                        tmdbItems = await fetchMoviesByYear(carousel.year);
-                    } else if (carousel.genreId) {
-                        tmdbItems = await fetchMoviesByGenre(carousel.genreId);
-                    }
-                } else if (carousel.type === 'tv' && carousel.genreId) {
-                    tmdbItems = await fetchTVByGenre(carousel.genreId);
-                }
-            } catch (error) {
-                console.error(`Failed to fetch TMDb data for ${carousel.id}:`, error);
-                return {
-                    id: carousel.id,
-                    title: carousel.title,
-                    type: carousel.type === 'tv' ? 'series' as const : 'movie' as const,
-                    data: [] as EnrichedStream[]
-                };
-            }
-
-            // Filter TMDb items to only those available in IPTV
-            const filteredItems: EnrichedStream[] = [];
-            const matchedStreamIds = new Set<number | string>(); // Track matched items to avoid duplicates
-
-            for (const tmdbItem of tmdbItems) {
-                // Determine the correct database and type for THIS item
-                // This fixes the issue where trending (mixed) items were all searched in movies DB
-                let isMovie = false;
-                if (carousel.type === 'trending') {
-                    // For trending, check the media_type if available or infer from title
-                    isMovie = 'title' in tmdbItem;
-                } else {
-                    // For specific carousels, use the carousel type
-                    isMovie = carousel.type === 'movie';
-                }
-
-                // If trending item is a 'person' or other type, skip
-                if (!('title' in tmdbItem) && !('name' in tmdbItem)) continue;
-
-                const targetDatabase = isMovie ? allMovies : allSeries;
-                const tmdbTitle = isMovie ? (tmdbItem as TMDbMovie).title : (tmdbItem as TMDbTVShow).name;
-
-                const matchResult = findBestMatch<EnrichedStream>(tmdbTitle, targetDatabase as any, 0.85);
-
-                if (matchResult && !matchedStreamIds.has(matchResult.item.id)) {
-                    const iptvMatch = matchResult.item;
-
-                    // Mark this stream as matched
-                    matchedStreamIds.add(iptvMatch.id);
-
-                    filteredItems.push({
-                        ...iptvMatch,
-                        tmdbData: {
-                            poster: getTMDbImageUrl(tmdbItem.poster_path),
-                            backdrop: getTMDbImageUrl(tmdbItem.backdrop_path),
-                            rating: tmdbItem.vote_average,
-                            overview: tmdbItem.overview,
-                            year: isMovie
-                                ? new Date((tmdbItem as TMDbMovie).release_date || '').getFullYear()
-                                : new Date((tmdbItem as TMDbTVShow).first_air_date || '').getFullYear()
-                        }
-                    });
-                }
-
-                // Limit to 20 items per carousel
-                if (filteredItems.length >= 20) break;
-            }
-
-            return {
-                id: carousel.id,
-                title: carousel.title,
-                type: carousel.type === 'tv' ? 'series' as const : 'movie' as const,
-                data: filteredItems
-            };
-        });
-
-        const results = await Promise.all(dataPromises);
-
-        // Filter out empty carousels
-        const validResults = results.filter(r => r.data.length > 0);
-
-        // Cache the results
-        if (validResults.length > 0) {
-            saveCarouselCache(dateKey, validResults).catch(console.error);
-        }
-
-        return validResults;
-    };
-
-    const fetchIPTVCarousels = async (): Promise<CarouselData[]> => {
-        // Load categories
-        const [movieCategories, seriesCategories] = await Promise.all([
-            getCachedCategories('movie'),
-            getCachedCategories('series')
-        ]);
-
-        // Generate daily selection (max 4 carousels)
-        const seed = getDailySeed();
-        const allCategories = [
-            ...movieCategories.map(cat => ({ type: 'movie' as const, category: cat })),
-            ...seriesCategories.map(cat => ({ type: 'series' as const, category: cat }))
-        ];
-
-        const shuffled = shuffleWithSeed(allCategories, seed);
-        const selected = shuffled.slice(0, 4);
-
-        // Load content for each category using indexed query (no full table scan)
-        const dataPromises = selected.map(async ({ type, category }) => {
-            const categoryStreams = await getCachedStreams(category.category_id, type);
-
-            return {
-                id: `${type}-${category.category_id}`,
-                title: category.category_name,
-                type,
-                data: categoryStreams.slice(0, 20),
-                categoryId: category.category_id
-            };
-        });
-
-        const results = await Promise.all(dataPromises);
-
-        // Filter out empty carousels
-        return results.filter(r => r.data.length > 0);
-    };
 
     const formatDate = (timestamp: string) => {
         if (!timestamp) return 'Ilimitado';
