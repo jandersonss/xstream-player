@@ -19,6 +19,9 @@ import type { CachedStream } from './dbTypes';
 const CONFIG_FILE = path.join(process.cwd(), 'data', 'tmdb-config.json');
 const TMDB_API_BASE = 'https://api.themoviedb.org/3';
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
+// Bump when the cached carousel/hero item shape or image sizes change, so a
+// same-day cache written by an older build is not served to a newer client.
+const CACHE_VERSION = 'v2';
 
 async function getApiKey(): Promise<string | null> {
     try {
@@ -165,7 +168,14 @@ export async function getIPTVCarousels(): Promise<any[]> {
                 id: `${type}-${category.category_id}`,
                 title: category.category_name,
                 type,
-                data: categoryStreams.slice(0, 20),
+                data: categoryStreams.slice(0, 20).map(stream => ({
+                    id: stream.id,
+                    name: stream.name,
+                    image: stream.icon || 'https://via.placeholder.com/300x450?text=Sem+Poster',
+                    rating: stream.rating,
+                    year: undefined,
+                    type: stream.type
+                })),
                 categoryId: category.category_id
             };
         });
@@ -179,16 +189,18 @@ export async function getIPTVCarousels(): Promise<any[]> {
 
 export async function getTMDbCarousels(apiKey: string): Promise<any[]> {
     const today = new Date();
-    const dateKey = today.toISOString().split('T')[0];
+    const dayStamp = today.toISOString().split('T')[0];
+    const dateKey = `${CACHE_VERSION}-${dayStamp}`;
 
     // Check cache first
     try {
         const cachedData = library.getCarouselCache(dateKey);
         if (cachedData && cachedData.length > 0) {
             console.log('[catalogServer] Using cached carousels for', dateKey);
-            // Clean up old caches in background
+            // Clean up old caches in background. The pattern must keep today's
+            // hero entries too — they live in the same table.
             try {
-                library.clearExpiredCarouselCache(dateKey);
+                library.clearExpiredCarouselCache(`${CACHE_VERSION}-%${dayStamp}`);
             } catch (err) {
                 console.error('[catalogServer] Failed to clear expired carousel cache:', err);
             }
@@ -261,15 +273,17 @@ export async function getTMDbCarousels(apiKey: string): Promise<any[]> {
                             ? (tmdbItem as TMDbMovie).release_date
                             : (tmdbItem as TMDbTVShow).first_air_date;
 
+                        const tmdbPoster = getTMDbImageUrl(tmdbItem.poster_path, 'w342');
+                        const tmdbRating = tmdbItem.vote_average;
+                        const tmdbYear = getYear(yearStr);
+
                         filteredItems.push({
-                            ...iptvMatch,
-                            tmdbData: {
-                                poster: getTMDbImageUrl(tmdbItem.poster_path),
-                                backdrop: getTMDbImageUrl(tmdbItem.backdrop_path),
-                                rating: tmdbItem.vote_average,
-                                overview: tmdbItem.overview,
-                                year: getYear(yearStr)
-                            }
+                            id: iptvMatch.id,
+                            name: iptvMatch.name,
+                            image: tmdbPoster || iptvMatch.icon || 'https://via.placeholder.com/300x450?text=Sem+Poster',
+                            rating: tmdbRating || iptvMatch.rating,
+                            year: tmdbYear,
+                            type: iptvMatch.type
                         });
                     }
 
@@ -327,7 +341,7 @@ export async function getBackendCarousels(): Promise<any[]> {
 
 export async function getBackendHeroItems(type: 'all' | 'movie' | 'series' = 'all'): Promise<any[]> {
     const today = new Date();
-    const dateKey = `hero-${type}-${today.toISOString().split('T')[0]}`;
+    const dateKey = `${CACHE_VERSION}-hero-${type}-${today.toISOString().split('T')[0]}`;
 
     // 1. Check Cache
     try {
@@ -405,8 +419,8 @@ export async function getBackendHeroItems(type: 'all' | 'movie' | 'series' = 'al
                         tmdbId: item.id,
                         title: title,
                         description: item.overview,
-                        backdrop: getTMDbImageUrl(item.backdrop_path),
-                        poster: getTMDbImageUrl(item.poster_path),
+                        backdrop: getTMDbImageUrl(item.backdrop_path, 'w1280'),
+                        poster: getTMDbImageUrl(item.poster_path, 'w342'),
                         type: isMovie ? 'movie' : 'series',
                         rating: item.vote_average,
                         year: getYear(yearStr),
@@ -435,7 +449,7 @@ export async function getBackendHeroItems(type: 'all' | 'movie' | 'series' = 'al
             if (potentialItems.some(pi => pi.id === String(item.id))) continue;
 
             const firstBackdrop = item.backdrop_path && item.backdrop_path.length > 0 ? item.backdrop_path[0] : null;
-            let backdrop = firstBackdrop ? getTMDbImageUrl(firstBackdrop) : (item.icon || '');
+            let backdrop = firstBackdrop ? getTMDbImageUrl(firstBackdrop, 'w1280') : (item.icon || '');
             if (!backdrop || backdrop.includes('placeholder')) backdrop = item.icon || '';
             if (!backdrop) continue;
 

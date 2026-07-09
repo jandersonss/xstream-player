@@ -48,7 +48,7 @@ export const useTvNavigation = () => {
                     return;
                 }
                 e.preventDefault();
-                handleDirectionalNav(e.key);
+                handleDirectionalNav(e.key, e.repeat);
             }
         };
 
@@ -57,7 +57,27 @@ export const useTvNavigation = () => {
     }, [router, getActiveBackHandler]);
 };
 
-function handleDirectionalNav(direction: string) {
+// Holding a directional key on a TV remote fires a burst of auto-repeat
+// keydown events, and each one triggers a full querySelectorAll +
+// getBoundingClientRect scan over every focusable element (160+ on the home
+// screen), which stutters on weak TV CPUs. Auto-repeat is rate limited to one
+// scan per NAV_REPEAT_MIN_INTERVAL_MS; deliberate presses always run, since
+// dropping one of those would lose input the user meant to give us.
+const NAV_REPEAT_MIN_INTERVAL_MS = 100;
+let navLastExecTime = 0;
+
+function handleDirectionalNav(direction: string, isAutoRepeat: boolean) {
+    const now = performance.now();
+
+    if (isAutoRepeat && now - navLastExecTime < NAV_REPEAT_MIN_INTERVAL_MS) {
+        return;
+    }
+
+    navLastExecTime = now;
+    runDirectionalNav(direction);
+}
+
+function runDirectionalNav(direction: string) {
     const focusableElements = Array.from(document.querySelectorAll('[data-focusable="true"]')) as HTMLElement[];
     const activeElement = document.activeElement as HTMLElement;
 

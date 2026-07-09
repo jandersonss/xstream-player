@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
 
 // Simplified Item for Favorites (storing just enough to render a card)
 export interface FavoriteItem {
@@ -23,6 +23,10 @@ const FavoritesContext = createContext<FavoritesState | undefined>(undefined);
 export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
     const [favorites, setFavorites] = useState<FavoriteItem[]>([]);
     const [isLoaded, setIsLoaded] = useState(false);
+    // Tracks whether `favorites` has been changed by the user (add/remove)
+    // since the initial load, so the load itself doesn't trigger a redundant
+    // POST right after the GET on every boot.
+    const hasUserChangeRef = useRef(false);
 
     // Load from Backend on mount
     useEffect(() => {
@@ -51,13 +55,20 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
         loadFavorites();
     }, []);
 
-    // Save to Backend whenever favorites change
+    // The local cache must track whatever we last saw, including the list the
+    // backend just handed us — otherwise the offline fallback in loadFavorites
+    // would serve stale data forever.
     useEffect(() => {
         if (isLoaded) {
-            // Update localStorage as a local cache/backup
             localStorage.setItem('xstream_favorites', JSON.stringify(favorites));
+        }
+    }, [favorites, isLoaded]);
 
-            // Sync with backend
+    // Writing back to the backend, on the other hand, is only warranted for
+    // real user-driven add/remove changes: posting the list we just fetched
+    // would be a redundant round trip on every boot.
+    useEffect(() => {
+        if (isLoaded && hasUserChangeRef.current) {
             const syncFavorites = async () => {
                 try {
                     await fetch('/api/favorites', {
@@ -74,6 +85,7 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
     }, [favorites, isLoaded]);
 
     const addFavorite = (item: FavoriteItem) => {
+        hasUserChangeRef.current = true;
         setFavorites(prev => {
             if (prev.some(f => f.id === item.id && f.type === item.type)) return prev;
             return [...prev, item];
@@ -81,6 +93,7 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
     };
 
     const removeFavorite = (id: string | number, type: 'live' | 'movie' | 'series') => {
+        hasUserChangeRef.current = true;
         setFavorites(prev => prev.filter(item => !(item.id === id && item.type === type)));
     };
 
