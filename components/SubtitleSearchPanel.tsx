@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import { Search, Download, Loader2, Subtitles, X, Globe } from 'lucide-react';
 import { useSubtitle, SubtitleResult } from '../app/context/SubtitleContext';
 
@@ -41,12 +41,16 @@ export default function SubtitleSearchPanel({
     onSubtitleSelected,
     onClose,
 }: SubtitleSearchPanelProps) {
-    const { searchSubtitles, downloadSubtitle, isConfigured, remainingDownloads } = useSubtitle();
+    const { searchSubtitles, downloadSubtitle, isConfigured, isConfigResolved, remainingDownloads, ensureConfigLoaded } = useSubtitle();
     const [results, setResults] = useState<SubtitleResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [isDownloading, setIsDownloading] = useState<number | null>(null);
     const [selectedLanguage, setSelectedLanguage] = useState('pt-BR');
     const [hasSearched, setHasSearched] = useState(false);
+
+    useEffect(() => {
+        ensureConfigLoaded();
+    }, [ensureConfigLoaded]);
 
     const handleSearch = useCallback(async () => {
         setIsSearching(true);
@@ -97,6 +101,17 @@ export default function SubtitleSearchPanel({
             onClose();
         }
     }, [downloadSubtitle, onSubtitleSelected, onClose]);
+
+    // `ensureConfigLoaded` only runs after the first paint, so gating on
+    // "resolved" (rather than "loading") avoids flashing the not-configured
+    // message at a user who does have a key saved.
+    if (!isConfigResolved) {
+        return (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
+                <Loader2 size={32} className="text-white animate-spin" />
+            </div>
+        );
+    }
 
     if (!isConfigured) {
         return (

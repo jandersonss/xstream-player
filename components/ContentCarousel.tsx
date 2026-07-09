@@ -62,6 +62,10 @@ export default function ContentCarousel({
                             <img
                                 src={item.image}
                                 alt={item.name}
+                                loading="lazy"
+                                decoding="async"
+                                width={200}
+                                height={300}
                                 className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                             />
                             <div className="absolute inset-0 bg-gradient-to-t from-black via-black/20 to-transparent"></div>

@@ -35,6 +35,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
     const [lastSync, setLastSync] = useState<number | null>(null);
     const activeJobIdRef = useRef<string | null>(null);
     const cancelPollingRef = useRef(false);
+    const isSyncingRef = useRef(false);
+    const initializedForRef = useRef<string | null>(null);
 
     const cancelSync = useCallback(() => {
         cancelPollingRef.current = true;
@@ -46,15 +48,17 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         }
 
         activeJobIdRef.current = null;
+        isSyncingRef.current = false;
         setIsSyncing(false);
         setSyncProgress(0);
         console.log('Sync cancelled by user');
     }, []);
 
     const syncData = useCallback(async () => {
-        if (!credentials || isSyncing) return;
+        if (!credentials || isSyncingRef.current) return;
 
         cancelPollingRef.current = false;
+        isSyncingRef.current = true;
         setIsSyncing(true);
         setSyncProgress(0);
 
@@ -109,11 +113,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         } finally {
             activeJobIdRef.current = null;
             setTimeout(() => {
+                isSyncingRef.current = false;
                 setIsSyncing(false);
                 setSyncProgress(0);
             }, 1000);
         }
-    }, [credentials, isSyncing]);
+    }, [credentials]);
 
     // Cleanup on unmount
     useEffect(() => {
@@ -122,7 +127,20 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         };
     }, []);
 
+    // Runs the initial metadata check + auto-sync once per set of credentials,
+    // as soon as they become available (they start as null and are filled in
+    // asynchronously by AuthContext). Keying on the credentials identity, and
+    // not on a plain boolean, matters twice: a sync failure must not re-trigger
+    // this effect (the identity is unchanged), but a different account logging
+    // in must, since this provider outlives logout — it lives in the root
+    // layout, so `logout()` only navigates and never unmounts it.
     useEffect(() => {
+        if (!credentials) return;
+
+        const identity = `${credentials.hostUrl}|${credentials.username}`;
+        if (initializedForRef.current === identity) return;
+        initializedForRef.current = identity;
+
         const initData = async () => {
             const meta = await db.getSyncMetadata('categories');
             if (meta) {
@@ -131,18 +149,18 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
                 // Check if last sync was more than 24h ago
                 const oneDay = 24 * 60 * 60 * 1000;
                 const now = Date.now();
-                if (credentials && !isSyncing && (now - meta.lastSync > oneDay)) {
+                if (now - meta.lastSync > oneDay) {
                     console.log('Sincronizando conteúdo automaticamente (diário)...');
                     syncData();
                 }
-            } else if (credentials && !isSyncing) {
+            } else {
                 // Auto sync if no data found but logged in
                 console.log('Sincronizando conteúdo automaticamente...');
                 syncData();
             }
         };
         initData();
-    }, [credentials, isSyncing, syncData]);
+    }, [credentials, syncData]);
 
     const getCachedCategories = useCallback(async (type: 'live' | 'movie' | 'series') => {
         return db.getCategories(type);

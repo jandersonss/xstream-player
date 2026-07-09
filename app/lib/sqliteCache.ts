@@ -361,8 +361,11 @@ export function getCarouselCache(dateKey: string): unknown[] | undefined {
     return row ? parseJson<unknown[] | undefined>(row.data_json, undefined) : undefined;
 }
 
-export function clearExpiredCarouselCache(currentDateKey: string) {
+// `keepPattern` is a SQL LIKE pattern matching every key that is still current.
+// The carousel and hero entries share this table under different keys, so an
+// exact-match eviction would drop the hero cache on every carousel request.
+export function clearExpiredCarouselCache(keepPattern: string) {
     getConnection()
-        .prepare('DELETE FROM carousel_cache WHERE date <> ?')
-        .run(currentDateKey);
+        .prepare('DELETE FROM carousel_cache WHERE date NOT LIKE ?')
+        .run(keepPattern);
 }
