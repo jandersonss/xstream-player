@@ -7,21 +7,18 @@ import { useTMDb } from '../context/TMDbContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, TrendingUp } from 'lucide-react';
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import ContentCarousel from '@/components/ContentCarousel';
 import HeroSection from '@/components/HeroSection';
 import TMDbSettingsModal from '@/components/TMDbSettingsModal';
-import { CachedStream } from '../lib/db';
 
-
-interface EnrichedStream extends CachedStream {
-    tmdbData?: {
-        poster: string;
-        backdrop: string;
-        rating: number;
-        overview: string;
-        year: number;
-    };
+interface CarouselItemData {
+    id: string | number;
+    name: string;
+    image: string;
+    rating?: number | string;
+    year?: number;
+    type: 'movie' | 'series';
 }
 
 export default function Dashboard() {
@@ -36,13 +33,43 @@ export default function Dashboard() {
         id: string;
         title: string;
         type: 'movie' | 'series';
-        data: EnrichedStream[];
+        data: CarouselItemData[];
         categoryId?: string | number;
     }
 
     const [carouselData, setCarouselData] = useState<CarouselData[]>([]);
     const [isLoadingCarousels, setIsLoadingCarousels] = useState(false);
     const router = useRouter();
+
+    // Progressive reveal: only the first 3 carousels render on mount; the rest
+    // reveal in batches as the sentinel scrolls into view. Falls back to a
+    // manual button so carousels stay reachable even when IntersectionObserver
+    // is the no-op polyfill from app/polyfills.ts (older WebOS browsers).
+    const CAROUSEL_BATCH_SIZE = 3;
+    const [visibleCarouselCount, setVisibleCarouselCount] = useState(CAROUSEL_BATCH_SIZE);
+    const carouselSentinelRef = useRef<HTMLDivElement | null>(null);
+    const visibleCarousels = carouselData.slice(0, visibleCarouselCount);
+    const hasMoreCarousels = visibleCarouselCount < carouselData.length;
+
+    useEffect(() => {
+        setVisibleCarouselCount(CAROUSEL_BATCH_SIZE);
+    }, [carouselData]);
+
+    useEffect(() => {
+        const sentinel = carouselSentinelRef.current;
+        if (!sentinel || typeof IntersectionObserver === 'undefined') return;
+
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting) {
+                    setVisibleCarouselCount(prev => Math.min(prev + CAROUSEL_BATCH_SIZE, carouselData.length));
+                }
+            },
+            { threshold: 0.1 }
+        );
+        observer.observe(sentinel);
+        return () => observer.disconnect();
+    }, [hasMoreCarousels, carouselData.length, visibleCarouselCount]);
 
     const continueWatching = useMemo(() => {
         return Object.values(progressMap)
@@ -90,19 +117,6 @@ export default function Dashboard() {
         if (!timestamp) return 'Ilimitado';
         const date = new Date(parseInt(timestamp) * 1000);
         return date.toLocaleDateString();
-    };
-
-    const transformStreamToCarouselItem = (stream: EnrichedStream, type: 'movie' | 'series') => {
-        return {
-            id: stream.id,
-            name: stream.name,
-            image: stream.tmdbData?.poster || stream.icon || 'https://via.placeholder.com/300x450?text=Sem+Poster',
-            rating: stream.tmdbData?.rating || stream.rating,
-            year: stream.tmdbData?.year,
-            href: stream.type === 'movie'
-                ? `/dashboard/watch/movie/${stream.id}`
-                : `/dashboard/watch/series/${stream.id}`
-        };
     };
 
     const getCarouselIcon = (carouselId: string) => {
@@ -167,10 +181,13 @@ export default function Dashboard() {
 
                 {/* Dynamic Carousels */}
                 {
-                    carouselData.map((carousel) => {
-                        const items = carousel.data.map(stream =>
-                            transformStreamToCarouselItem(stream, carousel.type)
-                        );
+                    visibleCarousels.map((carousel) => {
+                        const items = carousel.data.map(item => ({
+                            ...item,
+                            href: item.type === 'movie'
+                                ? `/dashboard/watch/movie/${item.id}`
+                                : `/dashboard/watch/series/${item.id}`
+                        }));
 
                         return (
                             <ContentCarousel
@@ -186,6 +203,22 @@ export default function Dashboard() {
                     })
                 }
 
+                {/* Sentinel to progressively reveal remaining carousels; button is a fallback
+                    for browsers where IntersectionObserver is a no-op polyfill (see app/polyfills.ts) */}
+                {
+                    hasMoreCarousels && (
+                        <div ref={carouselSentinelRef} className="flex justify-center py-4">
+                            <button
+                                data-focusable="true"
+                                onClick={() => setVisibleCarouselCount(prev => Math.min(prev + CAROUSEL_BATCH_SIZE, carouselData.length))}
+                                className="px-4 py-2 text-sm text-gray-400 hover:text-white border border-[#333] rounded-lg transition-colors"
+                            >
+                                Carregar mais categorias
+                            </button>
+                        </div>
+                    )
+                }
+
                 {/* Main Categories Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 mb-6">
                     <Link
@@ -195,7 +228,7 @@ export default function Dashboard() {
                         className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
                     >
                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?q=80&w=2070&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
 
                         <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
                             <div className="flex items-center justify-between mb-2">
@@ -216,7 +249,7 @@ export default function Dashboard() {
                         className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
                     >
                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=2525&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
 
                         <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
                             <div className="flex items-center justify-between mb-2">
@@ -237,7 +270,7 @@ export default function Dashboard() {
                         className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
                     >
                         <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=2669&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
 
                         <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
                             <div className="flex items-center justify-between mb-2">

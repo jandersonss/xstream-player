@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 import { SavedSubtitle } from '../lib/db';
 
 interface SubtitleConfig {
@@ -34,7 +34,11 @@ interface SubtitleContextType {
     config: SubtitleConfig | null;
     isConfigured: boolean;
     isLoading: boolean;
+    /** False until the lazy config load has settled, so UIs don't read `isConfigured` too early. */
+    isConfigResolved: boolean;
     remainingDownloads: number | null;
+    /** Loads the config on first real need. Subtitle UIs must call this on mount/open. */
+    ensureConfigLoaded: () => Promise<void>;
     saveConfig: (apiKey: string) => Promise<boolean>;
     clearConfig: () => Promise<void>;
     searchSubtitles: (params: {
@@ -55,29 +59,50 @@ const SubtitleContext = createContext<SubtitleContextType | undefined>(undefined
 
 export function SubtitleProvider({ children }: { children: ReactNode }) {
     const [config, setConfig] = useState<SubtitleConfig | null>(null);
-    const [isLoading, setIsLoading] = useState(true);
+    const [isLoading, setIsLoading] = useState(false);
+    const [isConfigResolved, setIsConfigResolved] = useState(false);
     const [remainingDownloads, setRemainingDownloads] = useState<number | null>(null);
     // Best practice: cache search results to reduce redundant API calls
     const searchCacheRef = useRef<Map<string, { data: SubtitleResult[]; timestamp: number }>>(new Map());
+    // Mirrors `config` so callbacks can read it after awaiting the lazy load,
+    // where the value captured in their closure would still be stale.
+    const configRef = useRef<SubtitleConfig | null>(null);
+    // Holds the in-flight (or settled) load so concurrent callers share it.
+    const configLoadRef = useRef<Promise<void> | null>(null);
 
-    useEffect(() => {
+    const applyConfig = useCallback((next: SubtitleConfig | null) => {
+        configRef.current = next;
+        setConfig(next);
+        setIsConfigResolved(true);
+        // A config written locally is authoritative, so a later lazy load
+        // must not re-fetch and clobber it.
+        configLoadRef.current = Promise.resolve();
+    }, []);
+
+    const ensureConfigLoaded = useCallback((): Promise<void> => {
+        if (configLoadRef.current) return configLoadRef.current;
+
         const loadConfig = async () => {
+            setIsLoading(true);
             try {
                 const response = await fetch('/api/subtitles/config');
                 if (response.ok) {
                     const data = await response.json();
                     if (data.apiKey) {
-                        setConfig({ apiKey: data.apiKey });
+                        applyConfig({ apiKey: data.apiKey });
                     }
                 }
             } catch (error) {
                 console.error('[SubtitleContext] Failed to load config:', error);
             } finally {
                 setIsLoading(false);
+                setIsConfigResolved(true);
             }
         };
-        loadConfig();
-    }, []);
+
+        configLoadRef.current = loadConfig();
+        return configLoadRef.current;
+    }, [applyConfig]);
 
     const saveConfigHandler = useCallback(async (apiKey: string): Promise<boolean> => {
         try {
@@ -97,24 +122,24 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
             }
 
             const { config: newConfig } = await response.json();
-            setConfig({ apiKey: newConfig.apiKey });
+            applyConfig({ apiKey: newConfig.apiKey });
             return true;
         } catch (error) {
             console.error('[SubtitleContext] Failed to save config:', error);
             return false;
         }
-    }, []);
+    }, [applyConfig]);
 
     const clearConfigHandler = useCallback(async () => {
         try {
             await fetch('/api/subtitles/config', {
                 method: 'DELETE',
             });
-            setConfig(null);
+            applyConfig(null);
         } catch (error) {
             console.error('[SubtitleContext] Failed to clear config:', error);
         }
-    }, []);
+    }, [applyConfig]);
 
     const searchSubtitles = useCallback(async (params: {
         query?: string;
@@ -125,7 +150,9 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
         tmdb_id?: number | string;
         parent_tmdb_id?: number | string;
     }): Promise<SubtitleResult[]> => {
-        if (!config) return [];
+        await ensureConfigLoaded();
+        const activeConfig = configRef.current;
+        if (!activeConfig) return [];
 
         // Best practice: cache search results (5 min TTL)
         const cacheKey = JSON.stringify(params);
@@ -140,7 +167,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'search',
-                    apiKey: config.apiKey,
+                    apiKey: activeConfig.apiKey,
                     ...params,
                 }),
             });
@@ -161,10 +188,12 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
             console.error('[SubtitleContext] Search error:', error);
             return [];
         }
-    }, [config]);
+    }, [ensureConfigLoaded]);
 
     const downloadSubtitle = useCallback(async (fileId: number, streamId: string): Promise<string | null> => {
-        if (!config) return null;
+        await ensureConfigLoaded();
+        const activeConfig = configRef.current;
+        if (!activeConfig) return null;
 
         try {
             const response = await fetch('/api/subtitles', {
@@ -172,7 +201,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                     action: 'download',
-                    apiKey: config.apiKey,
+                    apiKey: activeConfig.apiKey,
                     file_id: fileId,
                 }),
             });
@@ -224,7 +253,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
             console.error('[SubtitleContext] Download error:', error);
             return null;
         }
-    }, [config]);
+    }, [ensureConfigLoaded]);
 
     const getSavedSubtitle = useCallback(async (streamId: string) => {
         try {
@@ -254,7 +283,9 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
                 config,
                 isConfigured: !!config,
                 isLoading,
+                isConfigResolved,
                 remainingDownloads,
+                ensureConfigLoaded,
                 saveConfig: saveConfigHandler,
                 clearConfig: clearConfigHandler,
                 searchSubtitles,

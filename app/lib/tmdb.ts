@@ -48,11 +48,11 @@ export interface CarouselConfig {
     year?: number;
 }
 
-const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p/w500';
+const TMDB_IMAGE_BASE = 'https://image.tmdb.org/t/p';
 
-export const getTMDbImageUrl = (path: string | null): string => {
+export const getTMDbImageUrl = (path: string | null, size: string = 'w500'): string => {
     if (!path) return 'https://via.placeholder.com/300x450?text=Sem+Poster';
-    return `${TMDB_IMAGE_BASE}${path}`;
+    return `${TMDB_IMAGE_BASE}/${size}${path}`;
 };
 
 /**
