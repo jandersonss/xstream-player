@@ -157,10 +157,6 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
 
     const currentItem = heroItems[currentIndex];
 
-    // Background Image URL (using high res original if possible, but w500 is base in helper)
-    // We might want to construct a w1280 URL manually for valid backdrops
-    const backdropUrl = currentItem.backdrop.replace('w500', 'original');
-
     return (
         <div
             ref={heroRef}
@@ -182,7 +178,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     {/* Fallback Image */}
                     <div
                         className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-in-out transform scale-105 group-hover:scale-110 ${showVideo ? 'opacity-0' : 'opacity-100'}`}
-                        style={{ backgroundImage: `url(${backdropUrl})` }}
+                        style={{ backgroundImage: `url(${currentItem.backdrop})` }}
                     />
 
                     {/* Video Player */}

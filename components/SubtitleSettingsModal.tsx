@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { X, Key, CheckCircle, AlertCircle, ExternalLink, Trash2 } from 'lucide-react';
 import { useSubtitle } from '../app/context/SubtitleContext';
 
@@ -10,11 +10,17 @@ interface SubtitleSettingsModalProps {
 }
 
 export default function SubtitleSettingsModal({ isOpen, onClose }: SubtitleSettingsModalProps) {
-    const { config, saveConfig, clearConfig, isConfigured } = useSubtitle();
+    const { config, saveConfig, clearConfig, isConfigured, ensureConfigLoaded } = useSubtitle();
     const [apiKey, setApiKey] = useState(config?.apiKey || '');
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
+
+    // This modal is mounted by the Sidebar on every dashboard route, so the
+    // config is only fetched once it is actually opened.
+    useEffect(() => {
+        if (isOpen) ensureConfigLoaded();
+    }, [isOpen, ensureConfigLoaded]);
 
     if (!isOpen) return null;
 
