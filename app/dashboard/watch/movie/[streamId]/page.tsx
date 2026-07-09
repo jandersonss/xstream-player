@@ -74,7 +74,7 @@ export default function WatchMoviePage() {
         const loadMovieInfo = async () => {
             try {
                 // Try cache first
-                const cached = await getCachedDetail(streamId);
+                const cached = await getCachedDetail<MovieInfo>(streamId);
                 if (cached && cached.info && cached.movie_data) {
                     setMovie(cached);
                     setLoading(false);

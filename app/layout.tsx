@@ -29,7 +29,7 @@ const legacyRedirectScript = `
     var chromeVersion = chromeMatch ? parseInt(chromeMatch[1], 10) : 0;
 
     if (isWebOs && (!chromeVersion || chromeVersion < 72)) {
-      window.location.replace('/legacy');
+      window.location.replace('/legacy/index.html');
     }
   } catch (e) {}
 })();

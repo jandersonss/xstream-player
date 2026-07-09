@@ -47,40 +47,18 @@ export default function LiveStreams() {
                     setCategoryName(category.category_name);
                 }
 
-                // Try cache first
                 const cached = await getCachedStreams(categoryId as string, 'live');
-                if (cached && cached.length > 0) {
-                    setStreams(cached.map(s => ({
-                        stream_id: s.id,
-                        name: s.name,
-                        stream_icon: s.icon || '',
-                        epg_channel_id: s.epg_channel_id || '',
-                        added: s.added || '',
-                        category_id: s.category_id,
-                        stream_type: s.stream_type || '',
-                    })));
-                    setLoading(false);
-                    return;
-                }
-
-                const res = await fetch('/api/proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...credentials,
-                        action: 'get_live_streams',
-                        category_id: categoryId
-                    })
-                });
-
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    setStreams(data);
-                } else {
-                    setStreams([]);
-                }
+                setStreams(cached.map(s => ({
+                    stream_id: s.id,
+                    name: s.name,
+                    stream_icon: s.icon || '',
+                    epg_channel_id: s.epg_channel_id || '',
+                    added: s.added || '',
+                    category_id: s.category_id,
+                    stream_type: s.stream_type || '',
+                })));
             } catch (err) {
-                setError('Falha ao buscar canais');
+                setError('Falha ao buscar canais no SQLite');
             } finally {
                 setLoading(false);
             }

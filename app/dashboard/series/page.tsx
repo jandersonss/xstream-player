@@ -30,31 +30,10 @@ export default function SeriesCategories() {
 
         const loadData = async () => {
             try {
-                // Try cache first
                 const cached = await getCachedCategories('series');
-                if (cached && cached.length > 0) {
-                    setCategories(cached);
-                    setLoading(false);
-                    return;
-                }
-
-                const res = await fetch('/api/proxy', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        ...credentials,
-                        action: 'get_series_categories'
-                    })
-                });
-
-                const data = await res.json();
-                if (Array.isArray(data)) {
-                    setCategories(data);
-                } else {
-                    setError('Falha ao carregar categorias');
-                }
+                setCategories(cached);
             } catch (err) {
-                setError('Erro ao buscar categorias');
+                setError('Erro ao buscar categorias no SQLite');
             } finally {
                 setLoading(false);
             }

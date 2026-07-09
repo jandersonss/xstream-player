@@ -10,9 +10,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "better-sqlite3": "^12.11.1",
     "framer-motion": "^12.31.0",
     "hls.js": "^1.6.15",
-    "idb": "^8.0.3",
     "lucide-react": "^0.563.0",
     "next": "16.1.6",
     "react": "19.2.3",
@@ -22,6 +22,7 @@
     "@babel/cli": "^7.28.6",
     "@babel/core": "^7.29.0",
     "@babel/preset-env": "^7.29.5",
+    "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
     "@types/react-dom": "^19",
