@@ -142,8 +142,4 @@ if (typeof window !== 'undefined') {
         });
     }
 
-    // Check for IndexedDB
-    if (!window.indexedDB) {
-        console.error("IndexedDB is not supported in this browser.");
-    }
 }

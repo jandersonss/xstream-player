@@ -13,7 +13,7 @@ const nextConfig: NextConfig = {
       },
     ],
   },
-  transpilePackages: ['lucide-react', 'framer-motion', 'idb', 'next'],
+  transpilePackages: ['lucide-react', 'framer-motion', 'next'],
   output: "standalone",
 };
 

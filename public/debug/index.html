@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Diagnóstico do Navegador</title>
+    <style>
+        html, body { background: #111; color: #fff; margin: 0; padding: 0; font-family: sans-serif; }
+        .container { max-width: 1000px; margin: 0 auto; padding: 24px 20px; }
+        .btn-back { color: #fca5a5; text-decoration: underline; font-weight: 600; cursor: pointer; background: transparent; border: none; padding: 0; font-size: 16px; }
+        h1 { font-size: 28px; font-weight: 700; margin: 16px 0 8px; }
+        p { margin: 0 0 16px; color: #d1d5db; }
+        .debug-card { border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
+        .debug-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+        .debug-card-header h3 { font-size: 18px; font-weight: 600; margin: 0; }
+        .debug-detail { margin-top: 8px; font-size: 14px; color: #d1d5db; word-break: break-word; }
+        .debug-pill { display: inline-block; width: fit-content; border-radius: 999px; border: 1px solid; padding: 4px 12px; font-size: 12px; font-weight: 700; }
+        .debug-ok { color: #6ee7b7; background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); }
+        .debug-warn { color: #fef08a; background: rgba(234,179,8,0.15); border-color: rgba(234,179,8,0.3); }
+        .debug-fail { color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); }
+        #browser-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-size: 14px; }
+        #browser-info p { margin: 0; word-break: break-word; }
+        .section-box { border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 16px; margin-bottom: 24px; background: rgba(0,0,0,0.2); }
+        .summary-box { border-color: rgba(234,179,8,0.5); background: rgba(234,179,8,0.1); border-radius: 12px; border: 1px solid rgba(234,179,8,0.3); padding: 16px; margin-bottom: 24px; }
+        @media (max-width: 700px) { #browser-info { grid-template-columns: 1fr; } .debug-card-header { align-items: flex-start; flex-direction: column; } }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="mb-6">
+            <button onclick="window.location.href='/legacy/index.html'" class="btn-back">
+                Voltar ao app legacy
+            </button>
+            <h1>Diagnóstico do Navegador</h1>
+            <p>Checklist independente de React/Next.js para TVs e browsers antigos.</p>
+        </div>
+
+        <section class="summary-box">
+            <h2 id="summary-title" style="margin:0 0 8px; font-size:20px;">Aguardando diagnóstico...</h2>
+            <p id="summary-detail" style="margin:0; font-size:14px;">
+                Se esta mensagem não mudar, o JavaScript básico também não executou neste navegador.
+            </p>
+        </section>
+
+        <section class="section-box">
+            <h2 style="margin:0 0 12px; font-size:20px;">Informações do Browser</h2>
+            <div id="browser-info">
+                <p>Aguardando script de diagnóstico...</p>
+            </div>
+        </section>
+
+        <section class="section-box">
+            <h2 style="margin:0 0 12px; font-size:20px;">Último Erro JavaScript Capturado</h2>
+            <p id="last-error" style="margin:0; font-size:14px; font-family:monospace;">Aguardando script de diagnóstico...</p>
+        </section>
+
+        <section id="checks">
+            <div class="debug-card">
+                <div class="debug-card-header">
+                    <h3>Script de diagnóstico</h3>
+                    <span class="debug-pill debug-warn">AGUARDANDO</span>
+                </div>
+                <p class="debug-detail">Aguardando execução do script de diagnóstico...</p>
+            </div>
+        </section>
+    </div>
+
+    <script>
+    (function () {
+      function byId(id) {
+        return document.getElementById(id);
+      }
+
+      function text(id, value) {
+        var element = byId(id);
+        if (element) element.textContent = value;
+      }
+
+      function safe(fn, fallback) {
+        try {
+          return fn();
+        } catch (e) {
+          return fallback;
+        }
+      }
+
+      function canUseLocalStorage() {
+        return safe(function () {
+          var key = '__xstream_debug__';
+          window.localStorage.setItem(key, '1');
+          window.localStorage.removeItem(key);
+          return true;
+        }, false);
+      }
+
+      function localStorageValue(key) {
+        return safe(function () {
+          return window.localStorage.getItem(key);
+        }, null);
+      }
+
+      function chromeVersion() {
+        var match = String(navigator.userAgent || '').match(/(?:chrome|chromium)\/(\d+)/i);
+        return match ? match[1] : 'não identificado';
+      }
+
+      function statusClass(status) {
+        if (status === 'fail') return 'debug-pill debug-fail';
+        if (status === 'warn') return 'debug-pill debug-warn';
+        return 'debug-pill debug-ok';
+      }
+
+      function addInfo(label, value) {
+        var container = byId('browser-info');
+        if (!container) return;
+
+        var item = document.createElement('p');
+        var strong = document.createElement('strong');
+        strong.textContent = label + ': ';
+        item.appendChild(strong);
+        item.appendChild(document.createTextNode(value || 'indisponível'));
+        container.appendChild(item);
+      }
+
+      function addCheck(name, status, detail) {
+        var container = byId('checks');
+        if (!container) return;
+
+        var card = document.createElement('div');
+        card.className = 'debug-card';
+
+        var header = document.createElement('div');
+        header.className = 'debug-card-header';
+
+        var title = document.createElement('h3');
+        title.textContent = name;
+
+        var pill = document.createElement('span');
+        pill.className = statusClass(status);
+        pill.textContent = status === 'fail' ? 'FALHA' : status === 'warn' ? 'ATENÇÃO' : 'OK';
+
+        var description = document.createElement('p');
+        description.className = 'debug-detail';
+        description.textContent = detail;
+
+        header.appendChild(title);
+        header.appendChild(pill);
+        card.appendChild(header);
+        card.appendChild(description);
+        container.appendChild(card);
+      }
+
+      function buildChecks() {
+        var video = document.createElement('video');
+        var canPlay = !!(video && typeof video.canPlayType === 'function');
+        var nativeHls = canPlay && (
+          video.canPlayType('application/vnd.apple.mpegurl') !== '' ||
+          video.canPlayType('application/x-mpegURL') !== ''
+        );
+        var mp4H264 = canPlay && video.canPlayType('video/mp4; codecs="avc1.42E01E, mp4a.40.2"') !== '';
+        var mediaSource = 'MediaSource' in window;
+        var sourceBuffer = 'SourceBuffer' in window;
+        var blobUrl = 'Blob' in window && 'URL' in window && typeof URL.createObjectURL === 'function';
+        var localStorageOk = canUseLocalStorage();
+        var hasAuth = !!localStorageValue('xstream_auth');
+
+        return [
+          ['Script de debug', 'ok', 'Este script simples executou no navegador.'],
+          ['JavaScript moderno', typeof Promise !== 'undefined' && typeof Object.assign === 'function' ? 'ok' : 'fail', typeof Promise !== 'undefined' ? 'Promise disponível' : 'Promise ausente'],
+          ['Promise.finally', typeof Promise !== 'undefined' && Promise.prototype && typeof Promise.prototype.finally === 'function' ? 'ok' : 'warn', typeof Promise !== 'undefined' && Promise.prototype && typeof Promise.prototype.finally === 'function' ? 'Nativo ou polyfill ativo' : 'Polyfill pode ser necessário'],
+          ['Requisições HTTP', typeof fetch === 'function' || typeof XMLHttpRequest !== 'undefined' ? 'ok' : 'fail', typeof fetch === 'function' ? 'fetch disponível' : typeof XMLHttpRequest !== 'undefined' ? 'XHR disponível' : 'fetch/XHR ausentes'],
+          ['Sincronização de lista', typeof XMLHttpRequest !== 'undefined' ? 'ok' : 'fail', typeof XMLHttpRequest !== 'undefined' ? 'XHR suportado para sincronização' : 'XHR ausente'],
+          ['Banco local', 'indexedDB' in window ? 'ok' : 'fail', 'indexedDB' in window ? 'IndexedDB disponível' : 'IndexedDB ausente'],
+          ['Sessão local', localStorageOk ? 'ok' : 'fail', localStorageOk ? 'localStorage gravável' : 'localStorage bloqueado'],
+          ['Login salvo', hasAuth ? 'ok' : 'warn', hasAuth ? 'xstream_auth encontrado no localStorage' : 'xstream_auth não encontrado'],
+          ['Cookies', navigator.cookieEnabled ? 'ok' : 'warn', navigator.cookieEnabled ? 'Cookies habilitados' : 'Cookies desabilitados'],
+          ['Blob/Object URL', blobUrl ? 'ok' : 'warn', blobUrl ? 'Necessário para legendas salvas' : 'Legendas locais podem falhar'],
+          ['AbortController', typeof AbortController !== 'undefined' ? 'ok' : 'warn', typeof AbortController !== 'undefined' ? 'Cancelamento de requests disponível' : 'Usando fallback/timeout simples'],
+          ['Elemento de vídeo', canPlay ? 'ok' : 'fail', canPlay ? 'HTMLVideoElement OK' : 'Vídeo HTML não suportado'],
+          ['HLS para canais ao vivo', nativeHls || mediaSource ? 'ok' : 'fail', nativeHls ? 'HLS nativo suportado' : mediaSource ? 'MediaSource disponível para HLS.js' : 'Sem HLS nativo e sem MediaSource'],
+          ['MediaSource/HLS.js', mediaSource && sourceBuffer ? 'ok' : nativeHls ? 'warn' : 'fail', mediaSource && sourceBuffer ? 'MSE e SourceBuffer disponíveis' : nativeHls ? 'Sem MSE, mas HLS nativo pode tocar' : 'MSE indisponível'],
+          ['MP4 H.264/AAC', mp4H264 ? 'ok' : 'warn', mp4H264 ? 'MP4 H.264/AAC suportado' : 'Codec MP4 não confirmado pelo navegador'],
+          ['Fullscreen', document.fullscreenEnabled || 'webkitFullscreenEnabled' in document ? 'ok' : 'warn', document.fullscreenEnabled ? 'Fullscreen padrão disponível' : 'Pode depender de fullscreen nativo da TV'],
+          ['Legendas HTML5', 'textTracks' in video ? 'ok' : 'warn', 'textTracks' in video ? 'TextTracks disponível' : 'TextTracks não identificado']
+        ];
+      }
+
+      window.onerror = function (message, source, lineno, colno) {
+        text('last-error', String(message || 'Erro desconhecido') + ' em ' + String(source || '-') + ':' + String(lineno || '-'));
+      };
+
+      function runDebug() {
+        var info = byId('browser-info');
+        var checksContainer = byId('checks');
+        if (info) info.innerHTML = '';
+        if (checksContainer) checksContainer.innerHTML = '';
+
+        addInfo('Chrome/Chromium', chromeVersion());
+        addInfo('Plataforma', navigator.platform || 'não informado');
+        addInfo('Idioma', navigator.language || 'não informado');
+        addInfo('Online', navigator.onLine ? 'sim' : 'não');
+        addInfo('Cookies', navigator.cookieEnabled ? 'sim' : 'não');
+        addInfo('Tela', String(window.screen.width) + 'x' + String(window.screen.height));
+        addInfo('Viewport', String(window.innerWidth) + 'x' + String(window.innerHeight));
+        addInfo('Memória', navigator.deviceMemory ? String(navigator.deviceMemory) + ' GB' : 'indisponível');
+        addInfo('CPU', navigator.hardwareConcurrency ? String(navigator.hardwareConcurrency) : 'indisponível');
+        addInfo('User-Agent', navigator.userAgent || 'indisponível');
+        text('last-error', 'Nenhum erro capturado nesta página.');
+
+        var checks = buildChecks();
+        var failures = 0;
+        var warnings = 0;
+        for (var i = 0; i < checks.length; i++) {
+          if (checks[i][1] === 'fail') failures++;
+          if (checks[i][1] === 'warn') warnings++;
+          addCheck(checks[i][0], checks[i][1], checks[i][2]);
+        }
+
+        var summary = failures > 0 ? 'Há falhas de compatibilidade' : warnings > 0 ? 'Há avisos de compatibilidade' : 'Compatibilidade principal OK';
+        text('summary-title', summary);
+        text('summary-detail', 'Checks executados: ' + checks.length + '. Falhas: ' + failures + '. Avisos: ' + warnings + '.');
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', runDebug);
+      } else {
+        runDebug();
+      }
+    })();
+    </script>
+</body>
+</html>

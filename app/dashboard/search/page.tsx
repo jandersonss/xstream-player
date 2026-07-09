@@ -42,73 +42,36 @@ export default function SearchPage() {
             try {
                 setInitialLoading(true);
 
-                // Try cache first
                 const [cachedLive, cachedMovies, cachedSeries] = await Promise.all([
                     getAllCachedStreams('live'),
                     getAllCachedStreams('movie'),
                     getAllCachedStreams('series')
                 ]);
 
-                if (cachedLive.length > 0 || cachedMovies.length > 0 || cachedSeries.length > 0) {
-                    setData({
-                        live: cachedLive.map(s => ({
-                            stream_id: s.id,
-                            name: s.name,
-                            stream_icon: s.icon,
-                            rating: s.rating,
-                        })),
-                        movies: cachedMovies.map(s => ({
-                            stream_id: s.id,
-                            name: s.name,
-                            stream_icon: s.icon,
-                            rating: s.rating,
-                        })),
-                        series: cachedSeries.map(s => ({
-                            series_id: s.id,
-                            name: s.name,
-                            cover: s.cover || s.icon,
-                            rating: s.rating,
-                        }))
-                    });
-                    setInitialLoading(false);
-                    return;
-                }
-
-                // Fallback to API if cache empty
-                const { username, password, hostUrl } = credentials;
-                const requestBody = { username, password, hostUrl };
-
-                const [liveRes, moviesRes, seriesRes] = await Promise.all([
-                    fetch('/api/proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...requestBody, action: 'get_live_streams' })
-                    }),
-                    fetch('/api/proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...requestBody, action: 'get_vod_streams' })
-                    }),
-                    fetch('/api/proxy', {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ ...requestBody, action: 'get_series' })
-                    })
-                ]);
-
-                const liveData = await liveRes.json();
-                const moviesData = await moviesRes.json();
-                const seriesData = await seriesRes.json();
-
                 setData({
-                    live: Array.isArray(liveData) ? liveData : [],
-                    movies: Array.isArray(moviesData) ? moviesData : [],
-                    series: Array.isArray(seriesData) ? seriesData : []
+                    live: cachedLive.map(s => ({
+                        stream_id: s.id,
+                        name: s.name,
+                        stream_icon: s.icon,
+                        rating: s.rating,
+                    })),
+                    movies: cachedMovies.map(s => ({
+                        stream_id: s.id,
+                        name: s.name,
+                        stream_icon: s.icon,
+                        rating: s.rating,
+                    })),
+                    series: cachedSeries.map(s => ({
+                        series_id: s.id,
+                        name: s.name,
+                        cover: s.cover || s.icon,
+                        rating: s.rating,
+                    }))
                 });
 
             } catch (err) {
                 console.error("Failed to load catalog for search", err);
-                setError("Falha ao indexar conteúdo para busca. Por favor, verifique sua conexão.");
+                setError("Falha ao carregar conteúdo sincronizado para busca.");
             } finally {
                 setInitialLoading(false);
             }

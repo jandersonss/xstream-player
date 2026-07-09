@@ -4,21 +4,6 @@ import { useState, useEffect, useCallback, useRef, KeyboardEvent, TouchEvent } f
 import { useRouter } from 'next/navigation';
 import { Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
-import { useData } from '../app/context/DataContext';
-import { useTMDb } from '../app/context/TMDbContext';
-import {
-    getDailySeed,
-    shuffleWithSeed,
-    findBestMatch,
-    getTMDbImageUrl,
-    TMDbMovie,
-    TMDbTVShow
-} from '../app/lib/tmdb';
-import {
-    CachedStream,
-    saveCarouselCache,
-    getCarouselCache
-} from '../app/lib/db';
 
 interface HeroItem {
     id: string;
@@ -31,6 +16,7 @@ interface HeroItem {
     rating: number;
     year: number;
     logo?: string;
+    videoKey?: string | null;
 }
 
 interface HeroSectionProps {
@@ -39,17 +25,8 @@ interface HeroSectionProps {
 
 const NEXT_DELAY = 30000;
 
-function firstStreamBackdropPath(stream: CachedStream): string | null {
-    const paths = stream.backdrop_path;
-    if (!paths?.length) return null;
-    const first = paths[0]?.trim();
-    return first || null;
-}
-
 export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const { user } = useAuth();
-    const { getAllCachedStreams } = useData();
-    const { fetchTrending, isConfigured, fetchVideos } = useTMDb();
     const router = useRouter();
 
     const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
@@ -129,191 +106,48 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
         return () => clearInterval(interval);
     }, [heroItems.length]);
 
-    // Animate logo/text entrance on slide change & Fetch Video
+    // Animate logo/text entrance on slide change & play trailer if videoKey is present
     useEffect(() => {
         setShowLogo(false);
         setShowVideo(false);
         setVideoKey(null);
 
+        let videoTimer: NodeJS.Timeout | null = null;
         if (heroItems.length > 0) {
             const currentItem = heroItems[currentIndex];
-
-            // Fetch video for current item using TMDB ID if available
-            const loadVideo = async () => {
-                if (!isConfigured || !currentItem.tmdbId) return;
-
-                try {
-                    const videos = await fetchVideos(currentItem.type, currentItem.tmdbId); // Use tmdbId here
-                    console.log('HeroSection: Fetched videos', videos);
-                    // Prioritize Official Trailer -> Trailer -> Teaser
-                    const trailer = videos.find(v => v.site === 'YouTube' && v.type === 'Trailer' && v.official)
-                        || videos.find(v => v.site === 'YouTube' && v.type === 'Trailer')
-                        || videos.find(v => v.site === 'YouTube' && v.type === 'Teaser');
-
-                    if (trailer) {
-                        setVideoKey(trailer.key);
-                        // Delay showing video to allow buffering behind backdrop
-                        setTimeout(() => {
-                            if (!isTV) {
-                                setShowVideo(true);
-                            }
-                        }, 2000);
+            if (currentItem.videoKey) {
+                setVideoKey(currentItem.videoKey);
+                videoTimer = setTimeout(() => {
+                    if (!isTV) {
+                        setShowVideo(true);
                     }
-                } catch (error) {
-                    console.error('Failed to load video', error);
-                }
-            };
-
-            loadVideo();
+                }, 2000);
+            }
         }
 
-        const timer = setTimeout(() => setShowLogo(true), 500);
-        return () => clearTimeout(timer);
-    }, [currentIndex, heroItems, isConfigured, fetchVideos]);
+        const logoTimer = setTimeout(() => setShowLogo(true), 500);
+
+        return () => {
+            if (videoTimer) clearTimeout(videoTimer);
+            clearTimeout(logoTimer);
+        };
+    }, [currentIndex, heroItems, isTV]);
 
     const fetchHeroContent = useCallback(async () => {
-        const today = new Date();
-        const dateKey = `hero-${type}-${today.toISOString().split('T')[0]}`;
-
-        // 1. Check Cache
-        try {
-            const cached = await getCarouselCache(dateKey);
-            if (cached && cached.length > 0) {
-                console.log('HeroSection: Using cached items', cached.length);
-                setHeroItems(cached);
-                setIsLoading(false);
-                return;
-            }
-        } catch (e) {
-            console.warn('Hero cache miss');
-        }
-
         if (!user) return;
 
         try {
-            // 2. Fetch Sources based on type
-            let movies: CachedStream[] = [];
-            let series: CachedStream[] = [];
-
-            if (type === 'all' || type === 'movie') {
-                movies = await getAllCachedStreams('movie');
-            }
-            if (type === 'all' || type === 'series') {
-                series = await getAllCachedStreams('series');
-            }
-
-            console.log(`HeroSection: Fetched ${movies.length} movies and ${series.length} series`);
-
-
-
-            let potentialItems: HeroItem[] = [];
-
-            // B. Get TMDB Trending and match
-            if (isConfigured) {
-                try {
-                    console.log('HeroSection: Fetching TMDB Trending...');
-                    const trending = await fetchTrending();
-                    console.log(`HeroSection: Found ${trending.length} trending items. Matching...`);
-
-                    for (const item of trending) {
-                        const isMovie = 'title' in item;
-
-                        // Filter by requested type
-                        if (type === 'movie' && !isMovie) continue;
-                        if (type === 'series' && isMovie) continue;
-
-                        const title = isMovie ? (item as TMDbMovie).title : (item as TMDbTVShow).name;
-                        const targetDb = isMovie ? movies : series;
-
-                        const match = findBestMatch<CachedStream>(title, targetDb as any, 0.85);
-                        const stream = match?.item;
-                        const hasStreamDetail = !!(
-                            stream &&
-                            (stream.plot ||
-                                stream.cover ||
-                                stream.icon ||
-                                firstStreamBackdropPath(stream))
-                        );
-
-                        if (match && hasStreamDetail && item.backdrop_path) {
-                            potentialItems.push({
-                                id: match.item.id as string,
-                                tmdbId: item.id, // Store the TMDB ID
-                                title: title,
-                                description: item.overview,
-                                backdrop: getTMDbImageUrl(item.backdrop_path), // Original, high res
-                                poster: getTMDbImageUrl(item.poster_path),
-                                type: isMovie ? 'movie' : 'series',
-                                rating: item.vote_average,
-                                year: new Date(isMovie ? (item as TMDbMovie).release_date : (item as TMDbTVShow).first_air_date).getFullYear()
-                            });
-                        }
-                    }
-                    console.log(`HeroSection: Matched ${potentialItems.length} items from TMDB.`);
-                } catch (err) {
-                    console.error('HeroSection: Error matching TMDB', err);
-                }
-            } else {
-                console.log('HeroSection: TMDB not configured.');
-            }
-
-            // C. Fallback: If not enough items, fill with random local high-rated/recent content
-            if (potentialItems.length < 5) {
-                console.log('HeroSection: detailed matches < 5, filling with random local content...');
-
-                const allContent = [...movies, ...series];
-                const seed = getDailySeed() + (type === 'movie' ? 1 : type === 'series' ? 2 : 0); // Varry seed by type
-                const shuffledLocal = shuffleWithSeed(allContent, seed);
-
-                for (const item of shuffledLocal) {
-                    if (potentialItems.length >= 5) break;
-
-                    // Skip if already added
-                    if (potentialItems.some(pi => pi.id === String(item.id))) continue;
-
-                    // Construct a fallback item
-                    // Use icon as backdrop (will be blurred/streched but better than nothing)
-                    const streamBackdrop = firstStreamBackdropPath(item);
-                    let backdrop = streamBackdrop ? getTMDbImageUrl(streamBackdrop) : (item.icon || '');
-                    // Verify URL valid
-                    if (!backdrop || backdrop.includes('placeholder')) backdrop = item.icon || '';
-                    if (!backdrop) continue; // Skip if no image at all
-
-                    potentialItems.push({
-                        id: String(item.id),
-                        title: item.name,
-                        description: item.plot || 'Sinopse indisponível.',
-                        backdrop: backdrop,
-                        poster: item.icon || '',
-                        type: item.type === 'series' ? 'series' : 'movie',
-                        rating: item.rating ? Number(item.rating) : 0,
-                        year: new Date().getFullYear() // Fallback unknown
-                    });
-                }
-            }
-
-            // Deduplicate by ID
-            const uniqueItems = Array.from(new Map(potentialItems.map(item => [item.id, item])).values());
-            console.log(`HeroSection: Total unique items available: ${uniqueItems.length}`);
-
-            // D. Shuffle and Pick 5
-            const seed = getDailySeed() + (type === 'movie' ? 10 : type === 'series' ? 20 : 0); // Varry seed by type
-            const shuffled = shuffleWithSeed(uniqueItems, seed);
-            const selected = shuffled.slice(0, 5);
-
-            if (selected.length > 0) {
-                setHeroItems(selected);
-                saveCarouselCache(dateKey, selected);
-            } else {
-                console.warn('HeroSection: No items could be selected even after fallback.');
-            }
-
+            setIsLoading(true);
+            const response = await fetch(`/api/catalog/hero?type=${type}`);
+            if (!response.ok) throw new Error('Failed to fetch hero highlights');
+            const result = await response.json();
+            setHeroItems(result.data || []);
         } catch (error) {
-            console.error('Failed to load hero content', error);
+            console.error('[HeroSection] Failed to load hero content', error);
         } finally {
             setIsLoading(false);
         }
-    }, [user, isConfigured, getAllCachedStreams, fetchTrending, fetchVideos, type]);
+    }, [user, type]);
 
     useEffect(() => {
         fetchHeroContent();

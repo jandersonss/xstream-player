@@ -105,7 +105,7 @@ const debugScript = `
       ['Promise.finally', typeof Promise !== 'undefined' && Promise.prototype && typeof Promise.prototype.finally === 'function' ? 'ok' : 'warn', typeof Promise !== 'undefined' && Promise.prototype && typeof Promise.prototype.finally === 'function' ? 'Nativo ou polyfill ativo' : 'Polyfill pode ser necessario'],
       ['Requisicoes HTTP', typeof fetch === 'function' || typeof XMLHttpRequest !== 'undefined' ? 'ok' : 'fail', typeof fetch === 'function' ? 'fetch disponivel' : typeof XMLHttpRequest !== 'undefined' ? 'XHR disponivel' : 'fetch/XHR ausentes'],
       ['Sincronizacao de lista', typeof XMLHttpRequest !== 'undefined' ? 'ok' : 'fail', typeof XMLHttpRequest !== 'undefined' ? 'XHR suportado para sincronizacao' : 'XHR ausente'],
-      ['Banco local', 'indexedDB' in window ? 'ok' : 'fail', 'indexedDB' in window ? 'IndexedDB disponivel' : 'IndexedDB ausente'],
+      ['Cache de dados', 'ok', 'SQLite server-side via API'],
       ['Sessao local', localStorageOk ? 'ok' : 'fail', localStorageOk ? 'localStorage gravavel' : 'localStorage bloqueado'],
       ['Login salvo', hasAuth ? 'ok' : 'warn', hasAuth ? 'xstream_auth encontrado no localStorage' : 'xstream_auth nao encontrado'],
       ['Cookies', navigator.cookieEnabled ? 'ok' : 'warn', navigator.cookieEnabled ? 'Cookies habilitados' : 'Cookies desabilitados'],
