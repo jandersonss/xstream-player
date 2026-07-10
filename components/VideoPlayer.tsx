@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react';
 import Hls from 'hls.js';
-import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft, Loader2, Subtitles } from 'lucide-react';
+import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft, Loader2, Subtitles, SkipForward } from 'lucide-react';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
 import { getDeviceProfile } from '@/app/lib/deviceProfile';
 
@@ -51,6 +51,12 @@ interface WebKitFullscreenContainer extends HTMLDivElement {
 }
 
 const DEBUG_PATH = '/debug';
+/** Quanto tempo antes do fim do episódio o aviso de próximo episódio aparece. */
+const NEXT_EPISODE_PROMPT_LEAD_SEC = 60;
+/** Contagem regressiva, em tempo de vídeo, até o pulo automático. */
+const NEXT_EPISODE_AUTO_SKIP_SEC = 10;
+/** Quanto "Adiar" empurra o aviso para frente (créditos curtos). */
+const NEXT_EPISODE_POSTPONE_SEC = 60;
 
 function getPlaybackProfile(): PlaybackProfile {
     if (typeof window === 'undefined') {
@@ -160,9 +166,16 @@ export default function VideoPlayer({
     const [showBufferingHelp, setShowBufferingHelp] = useState(false);
     const subtitlesEnabled = !subtitleUrl || disabledSubtitleUrl !== subtitleUrl;
 
+    /** Adiamento do aviso, preso ao `src` que o originou — troca de episódio o descarta sozinho. */
+    const [postponement, setPostponement] = useState<{ src: string; until: number } | null>(null);
+
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const skipIndicatorTimeoutRef = useRef<NodeJS.Timeout | null>(null);
     const centerIconTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+    const nextEpisodePromptRef = useRef<HTMLDivElement>(null);
+    const nextEpisodeButtonRef = useRef<HTMLButtonElement>(null);
+    const postponeButtonRef = useRef<HTMLButtonElement>(null);
+    const autoSkipFiredRef = useRef(false);
 
     const saveFontSize = useCallback((size: number) => {
         setSubtitleFontSize(size);
@@ -343,6 +356,50 @@ export default function VideoPlayer({
         isSeekingRef.current = isSeeking;
     }, [isSeeking]);
 
+    // Aviso de próximo episódio: só em séries (onNext + hasNext), nunca em live/duração desconhecida.
+    // Tudo é ancorado no tempo do vídeo, então a contagem congela no pause e volta atrás no seek.
+    const postponedUntil = postponement?.src === src ? postponement.until : 0;
+    const nextEpisodePromptAt = Math.max(duration - NEXT_EPISODE_PROMPT_LEAD_SEC, postponedUntil);
+    const autoSkipAt = nextEpisodePromptAt + NEXT_EPISODE_AUTO_SKIP_SEC;
+    const showNextEpisodePrompt = Boolean(onNext)
+        && hasNext
+        && Number.isFinite(duration)
+        && duration > NEXT_EPISODE_PROMPT_LEAD_SEC
+        && currentTime >= nextEpisodePromptAt
+        && currentTime < duration;
+    const autoSkipSecondsLeft = Math.max(0, Math.ceil(autoSkipAt - currentTime));
+
+    // O aviso segue visível até o `src` trocar, então trava contra disparar `onNext` duas vezes.
+    useEffect(() => {
+        if (!showNextEpisodePrompt) {
+            autoSkipFiredRef.current = false;
+            return;
+        }
+        if (currentTime < autoSkipAt || autoSkipFiredRef.current) return;
+        autoSkipFiredRef.current = true;
+        onNextRef.current?.();
+    }, [showNextEpisodePrompt, currentTime, autoSkipAt]);
+
+    useEffect(() => {
+        if (showNextEpisodePrompt) {
+            nextEpisodeButtonRef.current?.focus();
+        }
+    }, [showNextEpisodePrompt]);
+
+    const handlePostponeNextEpisode = useCallback(() => {
+        const videoTime = videoRef.current?.currentTime ?? 0;
+        setPostponement({ src, until: videoTime + NEXT_EPISODE_POSTPONE_SEC });
+    }, [src]);
+
+    /** Setas navegam entre os dois botões enquanto o foco está no aviso; fora dele continuam avançando/voltando o vídeo. */
+    const moveNextEpisodePromptFocus = useCallback((direction: 'left' | 'right') => {
+        const prompt = nextEpisodePromptRef.current;
+        if (!prompt || !prompt.contains(document.activeElement)) return false;
+        const target = direction === 'right' ? postponeButtonRef.current : nextEpisodeButtonRef.current;
+        target?.focus();
+        return true;
+    }, []);
+
     // Show skip indicator
     const showSkipFeedback = useCallback((seconds: number) => {
         const text = seconds > 0 ? `+${seconds}s` : `${seconds}s`;
@@ -455,11 +512,15 @@ export default function VideoPlayer({
                     break;
                 case 'arrowleft':
                     e.preventDefault();
-                    skip(e.ctrlKey || e.metaKey ? -10 : -5);
+                    if (!moveNextEpisodePromptFocus('left')) {
+                        skip(e.ctrlKey || e.metaKey ? -10 : -5);
+                    }
                     break;
                 case 'arrowright':
                     e.preventDefault();
-                    skip(e.ctrlKey || e.metaKey ? 10 : 5);
+                    if (!moveNextEpisodePromptFocus('right')) {
+                        skip(e.ctrlKey || e.metaKey ? 10 : 5);
+                    }
                     break;
                 case 'arrowup':
                     e.preventDefault();
@@ -507,7 +568,7 @@ export default function VideoPlayer({
 
         window.addEventListener('keydown', handleKeyDown);
         return () => window.removeEventListener('keydown', handleKeyDown);
-    }, [togglePlay, skip, adjustVolume, toggleFullscreen, toggleMute, jumpToPercent, changeFontSize, toggleSubtitles]);
+    }, [togglePlay, skip, adjustVolume, toggleFullscreen, toggleMute, jumpToPercent, changeFontSize, toggleSubtitles, moveNextEpisodePromptFocus]);
 
     // Video setup and HLS — deps só [src, autoPlay]: initialTime entra só como snapshot (seekTarget) ao trocar fonte; callbacks via refs (evita loop de checkpoint).
     useEffect(() => {
@@ -808,9 +869,16 @@ export default function VideoPlayer({
             setIsBuffering(false);
         };
 
+        // Streams progressivos entregam uma duração estimada no `loadedmetadata` e a corrigem depois.
+        const handleDurationChange = () => {
+            if (Number.isNaN(video.duration)) return;
+            setDuration(video.duration);
+        };
+
         video.addEventListener('play', updatePlayState);
         video.addEventListener('pause', updatePlayState);
         video.addEventListener('loadedmetadata', handleLoadedMetadata);
+        video.addEventListener('durationchange', handleDurationChange);
         video.addEventListener('canplay', handleCanPlay);
         video.addEventListener('timeupdate', handleTimeUpdate);
         video.addEventListener('progress', handleProgress);
@@ -833,6 +901,7 @@ export default function VideoPlayer({
             video.removeEventListener('play', updatePlayState);
             video.removeEventListener('pause', updatePlayState);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);
+            video.removeEventListener('durationchange', handleDurationChange);
             video.removeEventListener('canplay', handleCanPlay);
             video.removeEventListener('timeupdate', handleTimeUpdate);
             video.removeEventListener('progress', handleProgress);
@@ -871,6 +940,8 @@ export default function VideoPlayer({
 
     const isLive = duration === Infinity || duration === 0;
     const volumePercent = Math.round(volume * 100);
+    const autoSkipProgress = ((NEXT_EPISODE_AUTO_SKIP_SEC - autoSkipSecondsLeft) / NEXT_EPISODE_AUTO_SKIP_SEC) * 100;
+
     const containerStyle: CSSProperties & Record<'--subtitle-font-size', string> = {
         '--subtitle-font-size': `${subtitleFontSize}rem`,
     };
@@ -947,6 +1018,41 @@ export default function VideoPlayer({
                     <div className="bg-black/80  rounded-2xl px-8 py-4 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
                         <p className="text-white text-3xl font-bold">{skipIndicator.text}</p>
                     </div>
+                </div>
+            )}
+
+            {/* Próximo episódio — último minuto, com pulo automático em 10s */}
+            {showNextEpisodePrompt && (
+                <div
+                    ref={nextEpisodePromptRef}
+                    className="absolute bottom-24 right-6 z-20 flex items-center gap-1 rounded-lg border border-white/10 bg-black/70 p-1.5 shadow-2xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300"
+                >
+                    <button
+                        ref={nextEpisodeButtonRef}
+                        type="button"
+                        onClick={onNext}
+                        data-focusable="true"
+                        className="relative flex items-center gap-2 overflow-hidden rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 focus:bg-red-600 focus:outline-none focus:ring-2 focus:ring-white"
+                        aria-label="Pular para o próximo episódio"
+                    >
+                        <SkipForward size={16} aria-hidden="true" />
+                        Próximo episódio
+                        <span className="text-xs tabular-nums text-white/70" aria-hidden="true">{autoSkipSecondsLeft}s</span>
+                        <span
+                            className="absolute bottom-0 left-0 h-0.5 bg-red-500 transition-[width] duration-300 ease-linear"
+                            style={{ width: `${autoSkipProgress}%` }}
+                            aria-hidden="true"
+                        />
+                    </button>
+                    <button
+                        ref={postponeButtonRef}
+                        type="button"
+                        onClick={handlePostponeNextEpisode}
+                        data-focusable="true"
+                        className="rounded-md px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/15 focus:text-white focus:outline-none focus:ring-2 focus:ring-white"
+                    >
+                        Adiar 1 min
+                    </button>
                 </div>
             )}
 
