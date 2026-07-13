@@ -11,9 +11,9 @@ interface LimitReachedModalProps {
 }
 
 /**
- * Exibido quando o usuário tenta assistir mas o limite de conexões da conta
- * está esgotado. Oferece entrar em uma transmissão já ativa (Modo TV), o que
- * não consome uma conexão nova.
+ * Shown when the user tries to watch but the account's connection limit is
+ * exhausted. Offers joining an already-active broadcast (TV Mode), which does
+ * not consume a new connection.
  */
 export default function LimitReachedModal({ open, onClose }: LimitReachedModalProps) {
     const router = useRouter();

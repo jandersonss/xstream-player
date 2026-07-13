@@ -5,8 +5,8 @@ import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 
 const SUBTITLES_DIR = path.join(process.cwd(), 'data', 'subtitles');
 
-// Lista os streamIds que já têm legenda salva, para marcar episódios de uma
-// vez só (sem uma requisição por episódio).
+// Lists the streamIds that already have a saved subtitle, so episodes can be
+// marked in a single pass (no request per episode).
 export async function GET(request: Request) {
     const remoteAccessResponse = await enforceRemoteAccessForApi(request);
     if (remoteAccessResponse) return remoteAccessResponse;

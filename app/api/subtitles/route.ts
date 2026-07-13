@@ -139,8 +139,8 @@ export async function POST(request: Request) {
                 let parsed: { remaining?: number; reset_time_utc?: string } = {};
                 try { parsed = JSON.parse(errorText); } catch { /* corpo não-JSON */ }
 
-                // Cota diária esgotada: a OpenSubtitles responde 406 (às vezes 407)
-                // com `remaining: 0`. Sinalizamos isso de forma consistente ao cliente.
+                // Daily quota exhausted: OpenSubtitles responds 406 (sometimes 407)
+                // with `remaining: 0`. Signal this consistently to the client.
                 const isQuota =
                     downloadResponse.status === 406 ||
                     downloadResponse.status === 407 ||

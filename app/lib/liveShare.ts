@@ -5,27 +5,27 @@ const DATA_DIR = path.join(process.cwd(), 'data');
 const SESSIONS_PATH = path.join(DATA_DIR, 'live-sessions.json');
 const CONFIG_PATH = path.join(DATA_DIR, 'config.json');
 
-/** Uma sessão é considerada morta se não recebe heartbeat há mais que isso. */
+/** A session is considered dead if it has not received a heartbeat for longer than this. */
 export const SESSION_TTL_MS = 45 * 1000;
-/** Intervalo sugerido de heartbeat para o cliente (menor que o TTL). */
+/** Suggested heartbeat interval for the client (shorter than the TTL). */
 export const HEARTBEAT_MS = 20 * 1000;
 
 export type ShareContentType = 'live' | 'movie' | 'series';
 
 export interface ShareSession {
-    /** Identidade estável do aparelho (também é a chave da sessão). */
+    /** Stable device identity (also the session key). */
     deviceId: string;
     deviceName: string;
     contentType: ShareContentType;
-    /** stream_id do Xtream (canal, filme ou episódio). */
+    /** Xtream stream_id (channel, movie or episode). */
     streamId: string;
     title: string;
     poster?: string;
-    /** Extensão do arquivo VOD (mp4/mkv…), para iniciar o relay do VOD. */
+    /** VOD file extension (mp4/mkv…), to start the VOD relay. */
     ext?: string;
-    /** Para séries: id da série (streamId é o id do episódio). */
+    /** For series: the series id (streamId is the episode id). */
     seriesId?: string;
-    /** IP de LAN do aparelho (best-effort), via WebRTC no cliente ou header no servidor. */
+    /** Device LAN IP (best-effort), via WebRTC on the client or a header on the server. */
     ip?: string;
     updatedAt: number;
 }
@@ -58,7 +58,7 @@ function isFresh(session: ShareSession, now: number): boolean {
     return now - session.updatedAt <= SESSION_TTL_MS;
 }
 
-/** Lista as transmissões ativas, descartando (e persistindo) as expiradas. */
+/** Lists the active broadcasts, discarding (and persisting) the expired ones. */
 export async function listActiveSessions(): Promise<ShareSession[]> {
     const now = Date.now();
     const sessions = await readSessions();
@@ -71,7 +71,7 @@ export async function listActiveSessions(): Promise<ShareSession[]> {
     return active;
 }
 
-/** Cria ou atualiza (heartbeat) a transmissão do aparelho. Um aparelho transmite um conteúdo por vez. */
+/** Creates or updates (heartbeat) the device broadcast. A device broadcasts one content at a time. */
 export async function upsertSession(
     input: Omit<ShareSession, 'updatedAt'>
 ): Promise<ShareSession> {
@@ -86,7 +86,7 @@ export async function upsertSession(
     return session;
 }
 
-/** Encerra a transmissão de um aparelho. */
+/** Ends a device broadcast. */
 export async function endSession(deviceId: string): Promise<void> {
     const now = Date.now();
     const sessions = await readSessions();
@@ -116,7 +116,7 @@ export async function buildUpstreamLiveUrl(streamId: string): Promise<string | n
     return `${base}/live/${creds.username}/${creds.password}/${streamId}.m3u8`;
 }
 
-/** URL upstream real de um VOD (filme ou episódio de série), a partir da conta salva no servidor. */
+/** Real upstream URL of a VOD (movie or series episode), from the account saved on the server. */
 export async function buildUpstreamVodUrl(
     type: 'movie' | 'series',
     streamId: string,

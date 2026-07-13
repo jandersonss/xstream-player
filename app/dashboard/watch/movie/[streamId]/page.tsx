@@ -60,14 +60,14 @@ export default function WatchMoviePage() {
     const [showLimitModal, setShowLimitModal] = useState(false);
     const checkConnectionLimit = useConnectionLimit();
     const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
-    // Parâmetros de "entrar" (Modo TV) — via useSearchParams para funcionar no cliente.
+    // "Join" (Modo TV) params — via useSearchParams to work on the client.
     const searchParams = useSearchParams();
     const isJoining = searchParams.get('join') === '1';
     const joinExt = searchParams.get('ext') || undefined;
     const joinPoster = searchParams.get('poster') || undefined;
     const joinTitle = searchParams.get('title') || undefined;
 
-    // Sincronização de tempo entre players (transmissor + espectadores do mesmo filme).
+    // Time sync between players (broadcaster + viewers of the same movie).
     const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
     const { canSync, sync } = useSyncPlayback({
         videoEl,
@@ -176,8 +176,8 @@ export default function WatchMoviePage() {
     }, [searchParams, movie, progressLoaded, isPlaying, router, streamId]);
 
     const handlePlay = async () => {
-        // Filme/série ainda não têm relay (VOD requer ffmpeg); ao esgotar, oferecemos
-        // entrar numa transmissão ao vivo em vez de falhar a reprodução.
+        // Movie/series have no relay yet (VOD requires ffmpeg); when exhausted, we offer
+        // joining a live broadcast instead of failing playback.
         if (await checkConnectionLimit()) {
             setShowLimitModal(true);
             return;
@@ -227,10 +227,10 @@ export default function WatchMoviePage() {
                 : null,
         [movie, streamId]
     );
-    // Registra a transmissão quando EU compartilho (não ao apenas entrar na de outro).
+    // Registers the broadcast when I share (not when just joining someone else's).
     useShareBroadcast(isSharing && !isJoining, broadcastInfo);
 
-    // Entrar na transmissão de outro aparelho (via relay VOD): não depende de carregar detalhes.
+    // Join another device broadcast (via VOD relay): does not depend on loading details.
     if (isJoining) {
         const src = relaySrc({ contentType: 'movie', streamId, ext: joinExt });
         return (

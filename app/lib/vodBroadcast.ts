@@ -6,18 +6,18 @@ import path from 'path';
 import { buildUpstreamVodUrl } from './liveShare';
 
 /**
- * Transforma um VOD (arquivo mp4/mkv) numa transmissão HLS "ao vivo" via ffmpeg.
+ * Turns a VOD (mp4/mkv file) into a "live" HLS broadcast via ffmpeg.
  *
- * Um único processo ffmpeg lê o arquivo do provedor (UMA conexão upstream) em
- * tempo real (`-re`) e o segmenta numa janela HLS deslizante. Vários espectadores
- * consomem esses segmentos pelo relay, entrando na borda ao vivo — igual a um
- * canal. Assim N pessoas assistindo o mesmo filme = ~1 conexão no provedor.
+ * A single ffmpeg process reads the provider file (ONE upstream connection) in
+ * real time (`-re`) and segments it into a sliding HLS window. Multiple viewers
+ * consume those segments through the relay, joining at the live edge — just like a
+ * channel. So N people watching the same movie = ~1 connection on the provider.
  *
- * Cuidados contra corridas de diretório:
- *  - Cada execução usa um diretório ÚNICO (inclui PID + timestamp + contador).
- *  - NUNCA apagamos a pasta raiz compartilhada (outro processo/instância — ex.:
- *    `next dev` recompilando — poderia estar transmitindo lá dentro).
- *  - A limpeza remove só diretórios OBSOLETOS (mtime antigo), nunca um ativo.
+ * Guards against directory races:
+ *  - Each run uses a UNIQUE directory (includes PID + timestamp + counter).
+ *  - We NEVER delete the shared root folder (another process/instance — e.g.
+ *    `next dev` recompiling — could be broadcasting inside it).
+ *  - Cleanup only removes STALE directories (old mtime), never an active one.
  */
 
 export type VodType = 'movie' | 'series';
@@ -27,7 +27,7 @@ const IDLE_TIMEOUT_MS = 45 * 1000;
 const MAX_BROADCASTS = 3;
 const REAP_INTERVAL_MS = 15 * 1000;
 const SEGMENT_DURATION = 4;
-/** Diretório sem escrita há mais que isso é considerado órfão e pode ser varrido. */
+/** A directory not written to for longer than this is treated as orphan and may be swept. */
 const STALE_DIR_MS = 3 * 60 * 1000;
 
 interface Broadcast {
@@ -42,7 +42,7 @@ interface Broadcast {
 type EnsureResult = { key: string; dir: string } | { error: string };
 
 const broadcasts = new Map<string, Broadcast>();
-/** Starts em andamento — evita que dois requests iniciem a mesma transmissão em paralelo. */
+/** In-flight starts — prevents two requests from starting the same broadcast in parallel. */
 const starting = new Map<string, Promise<EnsureResult>>();
 let runCounter = 0;
 
@@ -56,7 +56,7 @@ function isValidSegmentName(name: string): boolean {
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
-/** Para uma transmissão ESPECÍFICA (o objeto), sem afetar outra execução na mesma chave. */
+/** Stops a SPECIFIC broadcast (the object), without affecting another run on the same key. */
 function stopBroadcast(b: Broadcast) {
     b.alive = false;
     try {
@@ -71,15 +71,15 @@ function stopBroadcast(b: Broadcast) {
 }
 
 /**
- * Remove apenas diretórios órfãos (mtime antigo) da raiz — seguro entre processos,
- * pois um diretório em uso tem mtime recente (o ffmpeg escreve segmentos o tempo todo).
+ * Removes only orphan directories (old mtime) from the root — safe across processes,
+ * since a directory in use has a recent mtime (ffmpeg writes segments constantly).
  */
 async function sweepStaleDirs() {
     let entries: string[];
     try {
         entries = await fsp.readdir(ROOT_DIR);
     } catch {
-        return; // raiz ainda não existe
+        return; // root does not exist yet
     }
     const now = Date.now();
     await Promise.all(
@@ -123,8 +123,8 @@ function spawnFfmpeg(key: string, dir: string, upstreamUrl: string): Broadcast {
         '-hls_time', String(SEGMENT_DURATION),
         '-hls_list_size', '6',
         '-hls_flags', 'delete_segments+omit_endlist',
-        // fMP4 é consumido nativamente pelo MSE do navegador (TS exigiria transmux
-        // pelo hls.js, que falha em alguns players → DEMUXER_ERROR_COULD_NOT_PARSE).
+        // fMP4 is consumed natively by the browser MSE (TS would require transmux
+        // by hls.js, which fails on some players → DEMUXER_ERROR_COULD_NOT_PARSE).
         '-hls_segment_type', 'fmp4',
         '-hls_fmp4_init_filename', 'init.mp4',
         '-hls_segment_filename', path.join(dir, 'seg_%05d.m4s'),
@@ -154,8 +154,8 @@ function spawnFfmpeg(key: string, dir: string, upstreamUrl: string): Broadcast {
 }
 
 /**
- * Garante que existe uma transmissão HLS ativa para o VOD e devolve seu diretório.
- * Faz spawn do ffmpeg na primeira vez (lazy), com trava de concorrência por chave.
+ * Ensures an active HLS broadcast exists for the VOD and returns its directory.
+ * Spawns ffmpeg on the first call (lazy), with a per-key concurrency lock.
  */
 export async function ensureVodBroadcast(
     type: VodType,
@@ -190,7 +190,7 @@ export async function ensureVodBroadcast(
             return { error: 'Conta não configurada' };
         }
 
-        // Único por processo (PID) + timestamp + contador → nunca colide entre instâncias.
+        // Unique per process (PID) + timestamp + counter → never collides across instances.
         const dir = path.join(ROOT_DIR, `${key}-p${process.pid}-${Date.now().toString(36)}-${runCounter++}`);
         await fsp.mkdir(dir, { recursive: true });
 
@@ -207,7 +207,7 @@ export async function ensureVodBroadcast(
     }
 }
 
-/** Marca acesso (para o reaper não matar uma transmissão em uso). */
+/** Marks access (so the reaper does not kill a broadcast in use). */
 export function touchBroadcast(key: string): boolean {
     const b = broadcasts.get(key);
     if (!b || !b.alive) return false;
@@ -220,16 +220,16 @@ export function getBroadcastDir(key: string): string | null {
     return b && b.alive ? b.dir : null;
 }
 
-/** Existe uma transmissão viva para este VOD? (para o Modo TV / join). */
+/** Is there a live broadcast for this VOD? (for TV Mode / join). */
 export function hasBroadcast(key: string): boolean {
     const b = broadcasts.get(key);
     return Boolean(b && b.alive);
 }
 
 /**
- * Espera o index.m3u8 existir e conter ao menos um segmento (o ffmpeg leva ~1
- * duração de segmento em tempo real para produzir o primeiro). Aborta cedo se o
- * ffmpeg morrer (codec incompatível, provedor recusou, etc.).
+ * Waits for index.m3u8 to exist and contain at least one segment (ffmpeg takes ~1
+ * segment duration in real time to produce the first). Aborts early if
+ * ffmpeg dies (incompatible codec, provider refused, etc.).
  */
 export async function waitForPlaylist(key: string, dir: string, timeoutMs = 20000): Promise<string | null> {
     const playlistPath = path.join(dir, 'index.m3u8');
@@ -239,20 +239,20 @@ export async function waitForPlaylist(key: string, dir: string, timeoutMs = 2000
         try {
             const content = await fsp.readFile(playlistPath, 'utf-8');
             if (content.includes('#EXTINF')) {
-                return content; // já tem ao menos um segmento
+                return content; // already has at least one segment
             }
         } catch {
-            /* ainda não criado */
+            /* not created yet */
         }
         if (!hasBroadcast(key)) {
-            return null; // ffmpeg morreu — não adianta esperar.
+            return null; // ffmpeg died — no point waiting.
         }
         await sleep(300);
     }
     return null;
 }
 
-/** Lê um segmento .ts da transmissão (valida o nome para evitar path traversal). */
+/** Reads a .ts segment from the broadcast (validates the name to avoid path traversal). */
 export async function readSegment(key: string, name: string): Promise<Buffer | null> {
     if (!isValidSegmentName(name)) return null;
     const dir = getBroadcastDir(key);
@@ -265,8 +265,8 @@ export async function readSegment(key: string, name: string): Promise<Buffer | n
     }
 }
 
-// Varredura inicial de órfãos (uma vez por processo). NÃO apaga a raiz inteira —
-// só diretórios com mtime antigo, então nunca remove transmissão viva de outro processo.
+// Initial orphan sweep (once per process). Does NOT delete the whole root —
+// only directories with old mtime, so it never removes a live broadcast from another process.
 const cleanupFlag = globalThis as unknown as { __xstreamVodSwept?: boolean };
 if (!cleanupFlag.__xstreamVodSwept) {
     cleanupFlag.__xstreamVodSwept = true;

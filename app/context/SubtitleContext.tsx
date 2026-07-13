@@ -52,8 +52,8 @@ interface SubtitleContextType {
     }) => Promise<SubtitleResult[]>;
     downloadSubtitle: (fileId: number, streamId: string) => Promise<string | null>;
     /**
-     * Busca + baixa a melhor legenda de um único episódio, de forma silenciosa
-     * (sem alertas), para o carregamento sob demanda ao abrir o player.
+     * Searches + downloads the best subtitle for a single episode, silently
+     * (no alerts), for on-demand loading when opening the player.
      */
     autoDownloadEpisodeSubtitle: (
         streamId: string,
@@ -67,9 +67,9 @@ interface SubtitleContextType {
         },
     ) => Promise<{ url: string | null; quotaExceeded: boolean; notFound: boolean }>;
     /**
-     * Busca (sem baixar) a melhor legenda para cada episódio, informando o que
-     * está disponível, o que já foi baixado e o que não tem legenda. Só consome
-     * o rate limit de busca — nunca a cota diária de downloads.
+     * Searches (without downloading) the best subtitle for each episode, reporting what
+     * is available, what was already downloaded and what has no subtitle. Only consumes
+     * the search rate limit — never the daily download quota.
      */
     searchSeriesSubtitles: (
         episodes: Array<{ streamId: string; seasonNumber: number; episodeNumber: number }>,
@@ -78,9 +78,9 @@ interface SubtitleContextType {
         shouldCancel?: () => boolean,
     ) => Promise<EpisodeSubtitleStatus[]>;
     /**
-     * Baixa em sequência as legendas já encontradas pela busca (por file_id).
-     * Respeita o rate limit com uma pausa entre requisições e para de forma
-     * limpa ao atingir a cota diária (407).
+     * Downloads in sequence the subtitles already found by the search (by file_id).
+     * Respects the rate limit with a pause between requests and stops cleanly
+     * on reaching the daily quota (407).
      */
     downloadSeriesSubtitles: (
         items: Array<{ streamId: string; fileId: number }>,
@@ -235,9 +235,9 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
         }
     }, [ensureConfigLoaded]);
 
-    // Baixa e persiste a legenda de um único file_id, sem efeitos de UI.
-    // `quotaExceeded` sinaliza o 407 (cota diária) para que o chamador em lote
-    // possa parar em vez de continuar disparando requisições que vão falhar.
+    // Downloads and persists the subtitle for a single file_id, with no UI effects.
+    // `quotaExceeded` signals the 407 (daily quota) so the batch caller
+    // can stop instead of firing more requests that will fail.
     const performDownload = useCallback(async (
         fileId: number,
         streamId: string,
@@ -257,7 +257,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
                 }),
             });
 
-            // Cota diária esgotada (o servidor normaliza 406/407 para 406).
+            // Daily quota exhausted (the server normalizes 406/407 to 406).
             if (response.status === 406 || response.status === 407) {
                 setRemainingDownloads(0);
                 return { ok: false, quotaExceeded: true };
@@ -374,7 +374,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
             if (shouldCancel?.()) break;
             const ep = episodes[i];
 
-            // Já tem legenda salva → nada a buscar.
+                // Already has a saved subtitle → nothing to search.
             const existing = await getSavedSubtitle(ep.streamId);
             if (existing && existing.vtt) {
                 out.push({ streamId: ep.streamId, status: 'downloaded' });
@@ -446,7 +446,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
 
             const result = await performDownload(item.fileId, item.streamId, language);
             if (result.quotaExceeded) {
-                // Cota diária atingida: para aqui; o que já baixou fica salvo.
+                // Daily quota reached: stop here; what was already downloaded stays saved.
                 return { downloaded, failed, quotaHit: true, done: i, total };
             }
 

@@ -4,7 +4,7 @@ import type { NextRequest } from 'next/server';
 export function middleware(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
-  // Evita loops de redirecionamento e ignora requisições de arquivos estáticos ou APIs
+  // Avoid redirect loops and skip static file / API requests
   if (
     pathname.startsWith('/legacy') ||
     pathname.startsWith('/api') ||
@@ -15,7 +15,7 @@ export function middleware(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // Permite forçar o app moderno se a URL tiver o parâmetro forceModern=1
+  // Allow forcing the modern app when the URL has the forceModern=1 param
   if (request.nextUrl.searchParams.has('forceModern')) {
     return NextResponse.next();
   }
@@ -27,7 +27,7 @@ export function middleware(request: NextRequest) {
   const chromeMatch = ua.match(/chrome\/(\d+)/);
   const chromeVersion = chromeMatch ? parseInt(chromeMatch[1], 10) : 0;
 
-  // Redireciona WebOS antigo (Chrome < 72) para a versão legacy
+  // Redirect old WebOS (Chrome < 72) to the legacy version
   if (isWebOs && (!chromeVersion || chromeVersion < 72)) {
     const url = request.nextUrl.clone();
     url.pathname = '/legacy/index.html';

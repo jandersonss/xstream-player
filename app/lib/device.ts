@@ -11,7 +11,7 @@ function randomId(): string {
     return `dev-${Date.now()}-${Math.random().toString(36).slice(2, 10)}`;
 }
 
-/** Identidade estável do aparelho, criada na primeira vez e persistida no localStorage. */
+/** Stable device identity, created on first run and persisted in localStorage. */
 export function getDeviceId(): string {
     if (typeof window === 'undefined') return '';
     let id = localStorage.getItem(DEVICE_ID_KEY);
@@ -22,7 +22,7 @@ export function getDeviceId(): string {
     return id;
 }
 
-/** Rótulo amigável derivado do userAgent (ex.: "Smart TV (LG)", "iPhone", "PC (Windows)"). */
+/** Friendly label derived from the userAgent (e.g. "Smart TV (LG)", "iPhone", "PC (Windows)"). */
 function detectDeviceLabel(): string {
     if (typeof navigator === 'undefined') return 'Aparelho';
     const ua = navigator.userAgent.toLowerCase();
@@ -39,7 +39,7 @@ function detectDeviceLabel(): string {
     return 'Aparelho';
 }
 
-/** Nome do aparelho (editável). Se o usuário não definiu, deriva do userAgent. */
+/** Device name (editable). Falls back to the userAgent-derived label if unset. */
 export function getDeviceName(): string {
     if (typeof window === 'undefined') return '';
     const name = localStorage.getItem(DEVICE_NAME_KEY);
@@ -53,8 +53,8 @@ export function setDeviceName(name: string): void {
 }
 
 /**
- * Preferência (por aparelho) de "transmitir tudo": quando ligada, qualquer conteúdo
- * já começa a tocar via relay/Modo TV sem precisar clicar em "Transmitir" a cada vez.
+ * Per-device "broadcast everything" preference: when on, any content starts
+ * playing through the relay/TV Mode without clicking "Transmitir" each time.
  */
 export function getAutoBroadcast(): boolean {
     if (typeof window === 'undefined') return false;
@@ -73,9 +73,9 @@ function isPrivateIpv4(ip: string): boolean {
 }
 
 /**
- * Tenta descobrir o IP de LAN do aparelho via WebRTC (best-effort).
- * Funciona em Chromium antigo (TVs WebOS < 74); em navegadores modernos o
- * candidato vem ofuscado como mDNS (.local) e retornamos null.
+ * Tries to discover the device's LAN IP via WebRTC (best-effort).
+ * Works on old Chromium (WebOS TVs < 74); on modern browsers the candidate
+ * comes obfuscated as mDNS (.local), so we return null.
  */
 export function detectLocalIp(timeoutMs = 1500): Promise<string | null> {
     if (typeof window === 'undefined' || typeof RTCPeerConnection === 'undefined') {

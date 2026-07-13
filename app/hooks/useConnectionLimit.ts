@@ -4,9 +4,9 @@ import { useCallback } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
 
 /**
- * Consulta o Xtream (user_info) para saber se o limite de conexões simultâneas
- * foi atingido. Retorna true quando `active_cons >= max_connections`.
- * max_connections == 0 é tratado como ilimitado.
+ * Queries Xtream (user_info) to check whether the simultaneous-connection limit
+ * has been reached. Returns true when `active_cons >= max_connections`.
+ * max_connections == 0 is treated as unlimited.
  */
 export function useConnectionLimit() {
     const { credentials } = useAuth();

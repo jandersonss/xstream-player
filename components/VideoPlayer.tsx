@@ -51,17 +51,17 @@ interface WebKitFullscreenContainer extends HTMLDivElement {
 }
 
 const DEBUG_PATH = '/debug';
-/** Quanto tempo antes do fim do episódio o aviso de próximo episódio aparece. */
+/** How long before the end of the episode the next-episode prompt appears. */
 const NEXT_EPISODE_PROMPT_LEAD_SEC = 60;
-/** Contagem regressiva, em tempo de vídeo, até o pulo automático. */
+/** Countdown, in video time, until the automatic skip. */
 const NEXT_EPISODE_AUTO_SKIP_SEC = 10;
-/** Quanto "Adiar" empurra o aviso para frente (créditos curtos). */
+/** How much "Adiar" (snooze) pushes the prompt forward (short credits). */
 const NEXT_EPISODE_POSTPONE_SEC = 60;
 /**
- * A duração de streams progressivos vai sendo reestimada (crescendo) conforme o
- * conteúdo é pré-carregado. Só confiamos nela — e habilitamos o aviso/pulo de
- * próximo episódio — depois que o vídeo avançou este tanto SEM a duração mudar.
- * Assim uma estimativa parcial no meio do vídeo nunca dispara o pulo automático.
+ * The duration of progressive streams keeps being re-estimated (growing) as the
+ * content is preloaded. We only trust it — and enable the next-episode
+ * prompt/skip — after the video advanced this much WITHOUT the duration changing.
+ * This way a partial estimate mid-video never triggers the automatic skip.
  */
 const DURATION_STABLE_SEC = 6;
 
@@ -129,9 +129,9 @@ interface VideoPlayerProps {
     onBack?: () => void;
     subtitleUrl?: string;
     topRightSlot?: React.ReactNode;
-    /** Título exibido no topo do player (ex.: nome do filme/série/canal). Some com os controles. */
+    /** Title shown at the top of the player (e.g. movie/series/channel name). Hides with the controls. */
     title?: string;
-    /** Subtítulo no topo (ex.: "T1 · Ep 3 - Piloto"). */
+    /** Subtitle at the top (e.g. "T1 · Ep 3 - Piloto"). */
     subtitle?: string;
     /** Recebe o elemento <video> (ou null ao desmontar) — usado para sincronizar players. */
     onVideoElement?: (el: HTMLVideoElement | null) => void;
@@ -166,7 +166,7 @@ export default function VideoPlayer({
     const [showControls, setShowControls] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
-    /** `duration` já parou de ser reestimada (progressivo termina de pré-carregar)? */
+    /** Has `duration` stopped being re-estimated (progressive finished preloading)? */
     const [durationStable, setDurationStable] = useState(false);
     const [isSeeking, setIsSeeking] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
@@ -186,7 +186,7 @@ export default function VideoPlayer({
     const [showBufferingHelp, setShowBufferingHelp] = useState(false);
     const subtitlesEnabled = !subtitleUrl || disabledSubtitleUrl !== subtitleUrl;
 
-    /** Adiamento do aviso, preso ao `src` que o originou — troca de episódio o descarta sozinho. */
+    /** Prompt snooze, tied to the `src` that originated it — an episode change discards it by itself. */
     const [postponement, setPostponement] = useState<{ src: string; until: number } | null>(null);
 
     const controlsTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -196,7 +196,7 @@ export default function VideoPlayer({
     const nextEpisodeButtonRef = useRef<HTMLButtonElement>(null);
     const postponeButtonRef = useRef<HTMLButtonElement>(null);
     const autoSkipFiredRef = useRef(false);
-    /** Tempo do vídeo (s) em que `duration` mudou pela última vez — para saber quando estabilizou. */
+    /** Video time (s) at which `duration` last changed — to know when it stabilized. */
     const durationChangedAtTimeRef = useRef(0);
 
     const saveFontSize = useCallback((size: number) => {
@@ -361,7 +361,7 @@ export default function VideoPlayer({
     };
 
     const hasAppliedInitialTime = useRef(false);
-    /** Snapshot de `initialTime` no momento em que `src` muda — evita recriar HLS quando o checkpoint atualiza. */
+    /** Snapshot of `initialTime` at the moment `src` changes — avoids recreating HLS when the checkpoint updates. */
     const initialSeekForActiveSrcRef = useRef(0);
     const onProgressRef = useRef(onProgress);
     const onMetadataRef = useRef(onMetadata);
@@ -378,7 +378,7 @@ export default function VideoPlayer({
         isSeekingRef.current = isSeeking;
     }, [isSeeking]);
 
-    // Entrega o elemento <video> ao pai (sincronização de players) — estável no ciclo de vida.
+    // Hands the <video> element to the parent (player sync) — stable across the lifecycle.
     const onVideoElementRef = useRef(onVideoElement);
     useEffect(() => { onVideoElementRef.current = onVideoElement; }, [onVideoElement]);
     useEffect(() => {
@@ -386,13 +386,13 @@ export default function VideoPlayer({
         return () => onVideoElementRef.current?.(null);
     }, []);
 
-    // Marca em que ponto do vídeo `duration` mudou (só re-executa quando o valor muda de fato).
+    // Marks at which video point `duration` changed (only re-runs when the value actually changes).
     useEffect(() => {
         durationChangedAtTimeRef.current = videoRef.current?.currentTime ?? 0;
     }, [duration]);
 
-    // Aviso de próximo episódio: só em séries (onNext + hasNext), nunca em live/duração desconhecida.
-    // Tudo é ancorado no tempo do vídeo, então a contagem congela no pause e volta atrás no seek.
+    // Next-episode prompt: series only (onNext + hasNext), never on live/unknown duration.
+    // Everything is anchored to video time, so the countdown freezes on pause and rewinds on seek.
     const postponedUntil = postponement?.src === src ? postponement.until : 0;
     const nextEpisodePromptAt = Math.max(duration - NEXT_EPISODE_PROMPT_LEAD_SEC, postponedUntil);
     const autoSkipAt = nextEpisodePromptAt + NEXT_EPISODE_AUTO_SKIP_SEC;
@@ -405,7 +405,7 @@ export default function VideoPlayer({
         && currentTime < duration;
     const autoSkipSecondsLeft = Math.max(0, Math.ceil(autoSkipAt - currentTime));
 
-    // O aviso segue visível até o `src` trocar, então trava contra disparar `onNext` duas vezes.
+    // The prompt stays visible until `src` changes, so it locks against firing `onNext` twice.
     useEffect(() => {
         if (!showNextEpisodePrompt) {
             autoSkipFiredRef.current = false;
@@ -427,7 +427,7 @@ export default function VideoPlayer({
         setPostponement({ src, until: videoTime + NEXT_EPISODE_POSTPONE_SEC });
     }, [src]);
 
-    /** Setas navegam entre os dois botões enquanto o foco está no aviso; fora dele continuam avançando/voltando o vídeo. */
+    /** Arrows move between the two buttons while focus is on the prompt; outside it they keep seeking the video. */
     const moveNextEpisodePromptFocus = useCallback((direction: 'left' | 'right') => {
         const prompt = nextEpisodePromptRef.current;
         if (!prompt || !prompt.contains(document.activeElement)) return false;
@@ -606,7 +606,7 @@ export default function VideoPlayer({
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [togglePlay, skip, adjustVolume, toggleFullscreen, toggleMute, jumpToPercent, changeFontSize, toggleSubtitles, moveNextEpisodePromptFocus]);
 
-    // Video setup and HLS — deps só [src, autoPlay]: initialTime entra só como snapshot (seekTarget) ao trocar fonte; callbacks via refs (evita loop de checkpoint).
+    // Video setup and HLS — deps only [src, autoPlay]: initialTime enters only as a snapshot (seekTarget) on source change; callbacks via refs (avoids checkpoint loop).
     useEffect(() => {
         const video = videoRef.current;
         if (!video) return;
@@ -638,10 +638,10 @@ export default function VideoPlayer({
             video.canPlayType('application/vnd.apple.mpegurl') !== '' ||
             video.canPlayType('application/x-mpegURL') !== ''
         );
-        // O relay de VOD entrega fMP4 gerado por ffmpeg, que o HLS NATIVO de vários
-        // dispositivos recusa (DEMUXER_ERROR_COULD_NOT_PARSE). O hls.js (MSE) consome
-        // de forma confiável. (O relay de live serve os segmentos originais do
-        // provedor, que o nativo aceita — por isso só forçamos hls.js no VOD.)
+        // The VOD relay delivers ffmpeg-generated fMP4, which NATIVE HLS on several
+        // devices refuses (DEMUXER_ERROR_COULD_NOT_PARSE). hls.js (MSE) consumes it
+        // reliably. (The live relay serves the provider original segments,
+        // which native accepts — so we only force hls.js for VOD.)
         const isVodRelay = /\/api\/relay\/vod\//i.test(src);
         const preferHlsJs = isVodRelay && Hls.isSupported();
         const useNativeHls = isHLS && !preferHlsJs && (supportsNativeHls || isLegacyWebOs);
@@ -651,7 +651,7 @@ export default function VideoPlayer({
         const playSettleTimers: number[] = [];
         /** Cancela espera por buffer antes do autoplay (progress/canplay + timeout). */
         let cancelBufferedAutoplayWait: (() => void) | undefined;
-        /** Enquanto true, `canplay` não zera o spinner (autoplay aguardando buffer mínimo). */
+        /** While true, `canplay` does not clear the spinner (autoplay waiting for minimum buffer). */
         let autoplayAwaitBuffer = false;
 
         const bufferedAheadSeconds = (v: HTMLVideoElement): number => {
@@ -748,7 +748,7 @@ export default function VideoPlayer({
 
         if (useHlsJs) {
             console.log('[VideoPlayer] Initializing HLS.js for:', src, playbackProfile);
-            // Ajusta CPU/RAM/buffer para TVs e conexões lentas.
+            // Tune CPU/RAM/buffer for TVs and slow connections.
             hls = new Hls({
                 enableWorker: playbackProfile.hls.enableWorker,
                 lowLatencyMode: false,
@@ -832,11 +832,11 @@ export default function VideoPlayer({
             }
         };
 
-        // A duração só cresce dentro de um mesmo episódio: streams progressivos (MKV/MP4)
-        // emitem `durationchange` com valores estimados/incorretos menores no meio da
-        // reprodução. Aceitá-los encolhia `duration - 60`, fazendo o aviso de "próximo
-        // episódio" (e o pulo automático) disparar no meio do vídeo. Guardamos o maior
-        // valor finito já visto; o reset em cada troca de `src` volta a base para 0.
+        // Duration only grows within the same episode: progressive streams (MKV/MP4)
+        // emit `durationchange` with smaller estimated/incorrect values mid-
+        // playback. Accepting them shrank `duration - 60`, making the "next
+        // episode" prompt (and the auto skip) fire mid-video. We keep the largest
+        // finite value seen so far; the reset on each `src` change brings the base back to 0.
         const commitDuration = (value: number) => {
             if (Number.isNaN(value)) return;
             if (!Number.isFinite(value)) {
@@ -851,7 +851,7 @@ export default function VideoPlayer({
                 setCurrentTime(video.currentTime);
             }
 
-            // Duração estável = o vídeo avançou DURATION_STABLE_SEC sem `duration` mudar.
+            // Stable duration = the video advanced DURATION_STABLE_SEC without `duration` changing.
             const stable = Number.isFinite(video.duration)
                 && video.duration > 0
                 && video.currentTime - durationChangedAtTimeRef.current >= DURATION_STABLE_SEC;
@@ -876,11 +876,11 @@ export default function VideoPlayer({
             setIsMetadataLoaded(true);
 
             if (useHlsJs) {
-                // HLS: seek + play vêm do MANIFEST_PARSED (setupVideoHls); aqui só metadata.
+                // HLS: seek + play come from MANIFEST_PARSED (setupVideoHls); here only metadata.
                 return;
             }
 
-            // VOD / progressive nativo: não dar play em loadedmetadata (buffer quase zero → waiting em loop).
+            // Native VOD / progressive: do not play on loadedmetadata (buffer near zero → waiting loop).
             cancelBufferedAutoplayWait?.();
             applyInitialSeek();
             if (isLiveHls) {
@@ -932,7 +932,7 @@ export default function VideoPlayer({
             setIsBuffering(false);
         };
 
-        // Streams progressivos entregam uma duração estimada no `loadedmetadata` e a corrigem depois.
+        // Progressive streams deliver an estimated duration on `loadedmetadata` and correct it later.
         const handleDurationChange = () => {
             commitDuration(video.duration);
         };

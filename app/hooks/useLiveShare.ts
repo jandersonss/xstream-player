@@ -15,11 +15,11 @@ export interface ShareSession {
     streamId: string;
     title: string;
     poster?: string;
-    /** Extensão do arquivo VOD (mp4/mkv…), necessária para iniciar o relay do VOD. */
+    /** VOD file extension (mp4/mkv…), needed to start the VOD relay. */
     ext?: string;
-    /** Para séries: id da série (streamId é o id do episódio) — usado para montar o link de entrar. */
+    /** For series: the series id (streamId is the episode id) — used to build the join link. */
     seriesId?: string;
-    /** IP de LAN do aparelho (best-effort), quando descoberto. */
+    /** Device LAN IP (best-effort), when discovered. */
     ip?: string;
     updatedAt: number;
 }
@@ -33,7 +33,7 @@ export interface BroadcastInfo {
     seriesId?: string;
 }
 
-/** URL de reprodução via relay (live ou VOD), na mesma origem do app. */
+/** Playback URL through the relay (live or VOD), on the same origin as the app. */
 export function relaySrc(info: {
     contentType: ShareContentType;
     streamId: string;
@@ -46,7 +46,7 @@ export function relaySrc(info: {
     return `/api/relay/vod/index.m3u8?type=${info.contentType}&streamId=${encodeURIComponent(info.streamId)}&ext=${encodeURIComponent(ext)}`;
 }
 
-/** Rota do app para ENTRAR numa transmissão (Modo TV / modal de limite). */
+/** App route to JOIN a broadcast (TV Mode / limit modal). */
 export function joinHref(session: ShareSession): string {
     const q = new URLSearchParams({ join: '1', title: session.title });
     if (session.poster) q.set('poster', session.poster);
@@ -58,20 +58,20 @@ export function joinHref(session: ShareSession): string {
     if (session.contentType === 'movie') {
         return `/dashboard/watch/movie/${session.streamId}?${q.toString()}`;
     }
-    // série: streamId é o episódio; precisa do seriesId na rota
+    // series: streamId is the episode; the route needs the seriesId
     q.set('episode', session.streamId);
     return `/dashboard/watch/series/${session.seriesId ?? ''}?${q.toString()}`;
 }
 
 /**
- * Enquanto `enabled` for true, mantém a transmissão do aparelho registrada no
- * servidor (heartbeat periódico) e a encerra ao sair.
+ * While `enabled` is true, keeps the device broadcast registered on the
+ * server (periodic heartbeat) and ends it on unmount.
  */
 export function useShareBroadcast(enabled: boolean, info: BroadcastInfo | null) {
     const streamKey = info ? `${info.contentType}:${info.streamId}` : '';
     const ipRef = useRef<string | null>(null);
 
-    // Descobre o IP de LAN uma única vez (best-effort) para enriquecer o registro.
+    // Discover the LAN IP once (best-effort) to enrich the registration.
     useEffect(() => {
         let active = true;
         detectLocalIp().then((ip) => {
@@ -95,7 +95,7 @@ export function useShareBroadcast(enabled: boolean, info: BroadcastInfo | null) 
                     body: JSON.stringify({ deviceId, deviceName, ip: ipRef.current ?? undefined, ...info }),
                 });
             } catch {
-                /* heartbeat é best-effort */
+                /* heartbeat is best-effort */
             }
         };
 
@@ -116,7 +116,7 @@ export function useShareBroadcast(enabled: boolean, info: BroadcastInfo | null) 
     }, [enabled, streamKey]);
 }
 
-/** Busca periodicamente as transmissões ativas (aparelhos compartilhando agora). */
+/** Periodically fetches the active broadcasts (devices sharing right now). */
 export function useLiveSessions(pollMs = 10 * 1000) {
     const [sessions, setSessions] = useState<ShareSession[]>([]);
     const [loading, setLoading] = useState(true);
@@ -127,7 +127,7 @@ export function useLiveSessions(pollMs = 10 * 1000) {
             const data = await res.json();
             setSessions(Array.isArray(data.sessions) ? data.sessions : []);
         } catch {
-            /* mantém a lista anterior */
+            /* keep the previous list */
         } finally {
             setLoading(false);
         }
@@ -142,26 +142,26 @@ export function useLiveSessions(pollMs = 10 * 1000) {
     return { sessions, loading, refresh };
 }
 
-/** Excludes minha própria transmissão da lista (não faz sentido "entrar" no que eu mesmo transmito). */
+/** Excludes my own broadcast from the list (no point "joining" what I broadcast myself). */
 export function excludeSelf(sessions: ShareSession[]): ShareSession[] {
     const myId = getDeviceId();
     return sessions.filter((s) => s.deviceId !== myId);
 }
 
 // ---------------------------------------------------------------------------
-// Sincronização de tempo entre players (transmissor + espectadores no Modo TV)
+// Time sync between players (broadcaster + viewers in TV Mode)
 // ---------------------------------------------------------------------------
 
 export type SyncRole = 'broadcaster' | 'viewer';
 
-/** Chave comum entre transmissor e espectadores do mesmo conteúdo. */
+/** Shared key between broadcaster and viewers of the same content. */
 export function syncKey(contentType: ShareContentType, streamId: string): string {
     return `${contentType}:${streamId}`;
 }
 
-/** Cadência de heartbeat/poll da sincronização (posições mudam devagar). */
+/** Heartbeat/poll cadence of the sync (positions change slowly). */
 const SYNC_TICK_MS = 4000;
-/** Diferença de latência (s) a partir da qual consideramos os players dessincronizados. */
+/** Latency difference (s) beyond which we consider the players out of sync. */
 const SYNC_THRESHOLD_S = 5;
 
 interface SyncParticipantDTO {
@@ -174,14 +174,14 @@ interface SyncStateDTO {
     command?: { epoch: number; targetLatency: number };
 }
 
-/** Latência ao vivo: distância (s) da posição atual até a borda ao vivo (seekable.end). */
+/** Live latency: distance (s) from the current position to the live edge (seekable.end). */
 function measureLatency(v: HTMLVideoElement | null): number | null {
     if (!v || v.seekable.length === 0) return null;
     const edge = v.seekable.end(v.seekable.length - 1);
     return Math.max(0, edge - v.currentTime);
 }
 
-/** Move o player para ficar `targetLatency` segundos atrás da borda ao vivo. */
+/** Moves the player to sit `targetLatency` seconds behind the live edge. */
 function seekToLatency(v: HTMLVideoElement, targetLatency: number) {
     if (v.seekable.length === 0) return;
     const edge = v.seekable.end(v.seekable.length - 1);
@@ -190,13 +190,13 @@ function seekToLatency(v: HTMLVideoElement, targetLatency: number) {
 }
 
 /**
- * Mantém a latência do player publicada no servidor, observa os demais players do
- * mesmo conteúdo e expõe se há dessincronização (`canSync`) e a ação de sincronizar.
+ * Keeps the player latency published to the server, watches the other players of
+ * the same content, and exposes whether they are out of sync (`canSync`) and the sync action.
  *
- * - Espectador: `sync()` pula para a latência do transmissor; e ao receber um comando
- *   novo do transmissor, ajusta-se automaticamente (só se estiver fora de sincronia).
- * - Transmissor: `sync()` emite um comando para os espectadores dessincronizados irem
- *   ao seu tempo; o botão só aparece quando algum espectador está fora de sincronia.
+ * - Viewer: `sync()` jumps to the broadcaster latency; and on receiving a new command
+ *   from the broadcaster, adjusts automatically (only if out of sync).
+ * - Broadcaster: `sync()` emits a command for the out-of-sync viewers to move
+ *   to its time; the button only appears when some viewer is out of sync.
  */
 export function useSyncPlayback(opts: {
     videoEl: HTMLVideoElement | null;
@@ -227,7 +227,7 @@ export function useSyncPlayback(opts: {
                     seekToLatency(video, state.command.targetLatency);
                 }
             } else if (state.command && state.command.epoch > lastAppliedEpochRef.current) {
-                lastAppliedEpochRef.current = state.command.epoch; // transmissor só acompanha
+                lastAppliedEpochRef.current = state.command.epoch; // broadcaster just tracks
             }
 
             let show = false;
@@ -272,7 +272,7 @@ export function useSyncPlayback(opts: {
         if (!video || !streamKey) return;
 
         if (role === 'viewer') {
-            // Puxa para a latência atual do transmissor (busca o estado mais fresco).
+            // Pull to the broadcaster current latency (fetch the freshest state).
             try {
                 const res = await fetch(`/api/live-sync?streamKey=${encodeURIComponent(streamKey)}`);
                 const state = (await res.json()) as SyncStateDTO;
@@ -282,7 +282,7 @@ export function useSyncPlayback(opts: {
                 /* ignore */
             }
         } else {
-            // Transmissor: publica um comando com a própria latência para os espectadores.
+            // Broadcaster: publish a command with its own latency for the viewers.
             const myLatency = measureLatency(video);
             if (myLatency === null) return;
             fetch('/api/live-sync', {

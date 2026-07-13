@@ -89,7 +89,7 @@ function SessionCard({ session, onJoin }: { session: ShareSession; onJoin: (s: S
 export default function ModoTvPage() {
     const router = useRouter();
     const { sessions, loading } = useLiveSessions(8000);
-    // excludeSelf usa localStorage (getDeviceId), avaliado a cada mudança da lista.
+    // excludeSelf uses localStorage (getDeviceId), evaluated on every list change.
     const visible = useMemo(() => excludeSelf(sessions), [sessions]);
 
     const handleJoin = (s: ShareSession) => {
