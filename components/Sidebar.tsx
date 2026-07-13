@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw, Subtitles } from 'lucide-react';
+import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw, Subtitles, Radio } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useData } from '../app/context/DataContext';
 import SubtitleSettingsModal from './SubtitleSettingsModal';
@@ -13,6 +13,7 @@ const menuItems = [
     { name: 'Pesquisar', icon: Search, path: '/dashboard/search' },
     { name: 'Favoritos', icon: Heart, path: '/dashboard/favorites' },
     { name: 'TV ao Vivo', icon: Tv, path: '/dashboard/live' },
+    { name: 'Modo TV', icon: Radio, path: '/dashboard/tv' },
     { name: 'Filmes', icon: Film, path: '/dashboard/movies' },
     { name: 'Séries', icon: Layers, path: '/dashboard/series' },
 ];
