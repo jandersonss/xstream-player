@@ -26,7 +26,7 @@ WORKDIR /app
 ENV NODE_ENV production
 ENV NEXT_TELEMETRY_DISABLED 1
 
-RUN apk add --no-cache libc6-compat libstdc++
+RUN apk add --no-cache libc6-compat libstdc++ ffmpeg
 
 COPY --from=builder /app/public ./public
 

@@ -121,6 +121,7 @@ interface VideoPlayerProps {
     enterFullscreen?: boolean;
     onBack?: () => void;
     subtitleUrl?: string;
+    topRightSlot?: React.ReactNode;
 }
 
 export default function VideoPlayer({
@@ -136,7 +137,8 @@ export default function VideoPlayer({
     hasPrevious = false,
     enterFullscreen = false,
     onBack,
-    subtitleUrl
+    subtitleUrl,
+    topRightSlot
 }: VideoPlayerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -601,7 +603,13 @@ export default function VideoPlayer({
             video.canPlayType('application/vnd.apple.mpegurl') !== '' ||
             video.canPlayType('application/x-mpegURL') !== ''
         );
-        const useNativeHls = isHLS && (supportsNativeHls || isLegacyWebOs);
+        // O relay de VOD entrega fMP4 gerado por ffmpeg, que o HLS NATIVO de vários
+        // dispositivos recusa (DEMUXER_ERROR_COULD_NOT_PARSE). O hls.js (MSE) consome
+        // de forma confiável. (O relay de live serve os segmentos originais do
+        // provedor, que o nativo aceita — por isso só forçamos hls.js no VOD.)
+        const isVodRelay = /\/api\/relay\/vod\//i.test(src);
+        const preferHlsJs = isVodRelay && Hls.isSupported();
+        const useNativeHls = isHLS && !preferHlsJs && (supportsNativeHls || isLegacyWebOs);
         const useHlsJs = isHLS && !useNativeHls && Hls.isSupported();
 
         let hls: Hls | undefined;
@@ -1080,16 +1088,19 @@ export default function VideoPlayer({
                 }}
             >
                 {/* Top Bar with Back Button */}
-                {onBack && (
-                    <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
-                        <button
-                            onClick={onBack}
-                            className="bg-black/60  hover:bg-white/20 p-2 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl"
-                            title="Voltar"
-                            aria-label="Voltar"
-                        >
-                            <ArrowLeft size={24} />
-                        </button>
+                {(onBack || topRightSlot) && (
+                    <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between gap-3">
+                        {onBack ? (
+                            <button
+                                onClick={onBack}
+                                className="bg-black/60  hover:bg-white/20 p-2 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl"
+                                title="Voltar"
+                                aria-label="Voltar"
+                            >
+                                <ArrowLeft size={24} />
+                            </button>
+                        ) : <span />}
+                        {topRightSlot}
                     </div>
                 )}
 

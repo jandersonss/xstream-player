@@ -6,9 +6,12 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import VideoPlayer from '@/components/VideoPlayer';
-import { ArrowLeft, Play, Calendar, Star, Clock, Heart, Subtitles } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, Heart, Subtitles, Radio } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
+import LimitReachedModal from '@/components/LimitReachedModal';
+import { useConnectionLimit } from '@/app/hooks/useConnectionLimit';
+import { useShareBroadcast, relaySrc } from '@/app/hooks/useLiveShare';
 
 // Types for Movie Info
 interface MovieInfo {
@@ -52,6 +55,14 @@ export default function WatchMoviePage() {
     const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
     const [showSubtitlePanel, setShowSubtitlePanel] = useState(false);
     const [tmdbId, setTmdbId] = useState<number | undefined>(undefined);
+    const [showLimitModal, setShowLimitModal] = useState(false);
+    const checkConnectionLimit = useConnectionLimit();
+    const [isSharing, setIsSharing] = useState(false);
+    // Parâmetros de "entrar" (Modo TV) — via useSearchParams para funcionar no cliente.
+    const searchParams = useSearchParams();
+    const isJoining = searchParams.get('join') === '1';
+    const joinExt = searchParams.get('ext') || undefined;
+    const joinPoster = searchParams.get('poster') || undefined;
 
     // Calculate resumeTime synchronously based on progressLoaded
     const resumeTime = useMemo(() => {
@@ -69,7 +80,7 @@ export default function WatchMoviePage() {
     }, [streamId, getProgress, progressLoaded]);
 
     useEffect(() => {
-        if (!credentials || !streamId) return;
+        if (!credentials || !streamId || isJoining) return;
 
         const loadMovieInfo = async () => {
             try {
@@ -108,7 +119,7 @@ export default function WatchMoviePage() {
         };
 
         loadMovieInfo();
-    }, [credentials, streamId, getCachedDetail, saveCachedDetail]);
+    }, [credentials, streamId, isJoining, getCachedDetail, saveCachedDetail]);
 
     // Resolve TMDB ID for better subtitle matching
     useEffect(() => {
@@ -144,7 +155,6 @@ export default function WatchMoviePage() {
     }, [streamId, getSavedSubtitle]);
 
     // Auto-play from continue watching
-    const searchParams = useSearchParams();
     useEffect(() => {
         if (searchParams.get('autoplay') === 'true' && movie && !isPlaying && progressLoaded) {
             setIsPlaying(true);
@@ -153,7 +163,13 @@ export default function WatchMoviePage() {
         }
     }, [searchParams, movie, progressLoaded, isPlaying, router, streamId]);
 
-    const handlePlay = () => {
+    const handlePlay = async () => {
+        // Filme/série ainda não têm relay (VOD requer ffmpeg); ao esgotar, oferecemos
+        // entrar numa transmissão ao vivo em vez de falhar a reprodução.
+        if (await checkConnectionLimit()) {
+            setShowLimitModal(true);
+            return;
+        }
         setIsPlaying(true);
     };
 
@@ -186,6 +202,45 @@ export default function WatchMoviePage() {
         });
     };
 
+    const broadcastInfo = useMemo(
+        () =>
+            movie
+                ? {
+                      contentType: 'movie' as const,
+                      streamId,
+                      title: movie.info.name,
+                      poster: movie.info.movie_image,
+                      ext: movie.movie_data.container_extension,
+                  }
+                : null,
+        [movie, streamId]
+    );
+    // Registra a transmissão quando EU compartilho (não ao apenas entrar na de outro).
+    useShareBroadcast(isSharing && !isJoining, broadcastInfo);
+
+    // Entrar na transmissão de outro aparelho (via relay VOD): não depende de carregar detalhes.
+    if (isJoining) {
+        const src = relaySrc({ contentType: 'movie', streamId, ext: joinExt });
+        return (
+            <div className="fixed inset-0 bg-black z-50 flex flex-col">
+                <div className="relative flex-1 flex items-center justify-center">
+                    <VideoPlayer
+                        src={src}
+                        poster={joinPoster}
+                        autoPlay={true}
+                        onBack={() => router.back()}
+                        enterFullscreen={true}
+                        topRightSlot={
+                            <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center gap-2">
+                                <Radio size={18} className="animate-pulse" /> Modo TV
+                            </span>
+                        }
+                    />
+                </div>
+            </div>
+        );
+    }
+
     if (loading || !progressLoaded || isDetailLoading) return <Loader />;
 
     if (error || !movie) {
@@ -202,7 +257,22 @@ export default function WatchMoviePage() {
     if (isPlaying) {
         const { hostUrl, username, password } = credentials!;
         const extension = movie.movie_data.container_extension;
-        const streamUrl = `${hostUrl}/movie/${username}/${password}/${streamId}.${extension}`;
+        const directUrl = `${hostUrl}/movie/${username}/${password}/${streamId}.${extension}`;
+        // Compartilhando → toca via relay (mesmo stream que outros aparelhos entram, estilo canal).
+        const streamUrl = isSharing
+            ? relaySrc({ contentType: 'movie', streamId, ext: extension })
+            : directUrl;
+
+        const shareToggle = (
+            <button
+                onClick={() => setIsSharing((v) => !v)}
+                className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
+                title={isSharing ? 'Transmitindo para o Modo TV (sem avançar/pausar)' : 'Transmitir este filme no Modo TV'}
+            >
+                <Radio size={18} className={isSharing ? 'animate-pulse' : ''} />
+                <span>{isSharing ? 'Transmitindo' : 'Transmitir'}</span>
+            </button>
+        );
 
         return (
             <div className="fixed inset-0 bg-black z-50 flex flex-col">
@@ -211,11 +281,12 @@ export default function WatchMoviePage() {
                         src={streamUrl}
                         poster={movie.info.movie_image}
                         autoPlay={true}
-                        initialTime={resumeTime}
-                        onProgress={handleProgress}
+                        initialTime={isSharing ? 0 : resumeTime}
+                        onProgress={isSharing ? undefined : handleProgress}
                         enterFullscreen={true}
                         onBack={() => setIsPlaying(false)}
                         subtitleUrl={subtitleUrl || undefined}
+                        topRightSlot={shareToggle}
                     />
                 </div>
             </div>
@@ -333,6 +404,8 @@ export default function WatchMoviePage() {
                     onClose={() => setShowSubtitlePanel(false)}
                 />
             )}
+
+            <LimitReachedModal open={showLimitModal} onClose={() => setShowLimitModal(false)} />
         </div>
     );
 }
