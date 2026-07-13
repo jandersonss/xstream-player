@@ -11,7 +11,9 @@ import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import LimitReachedModal from '@/components/LimitReachedModal';
 import { useConnectionLimit } from '@/app/hooks/useConnectionLimit';
-import { useShareBroadcast, relaySrc } from '@/app/hooks/useLiveShare';
+import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
+import { getAutoBroadcast } from '@/app/lib/device';
+import SyncButton from '@/components/SyncButton';
 
 // Types for Movie Info
 interface MovieInfo {
@@ -57,12 +59,22 @@ export default function WatchMoviePage() {
     const [tmdbId, setTmdbId] = useState<number | undefined>(undefined);
     const [showLimitModal, setShowLimitModal] = useState(false);
     const checkConnectionLimit = useConnectionLimit();
-    const [isSharing, setIsSharing] = useState(false);
+    const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
     // Parâmetros de "entrar" (Modo TV) — via useSearchParams para funcionar no cliente.
     const searchParams = useSearchParams();
     const isJoining = searchParams.get('join') === '1';
     const joinExt = searchParams.get('ext') || undefined;
     const joinPoster = searchParams.get('poster') || undefined;
+    const joinTitle = searchParams.get('title') || undefined;
+
+    // Sincronização de tempo entre players (transmissor + espectadores do mesmo filme).
+    const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+    const { canSync, sync } = useSyncPlayback({
+        videoEl,
+        streamKey: syncKey('movie', streamId),
+        role: isJoining ? 'viewer' : 'broadcaster',
+        active: isJoining || (isPlaying && isSharing),
+    });
 
     // Calculate resumeTime synchronously based on progressLoaded
     const resumeTime = useMemo(() => {
@@ -230,10 +242,15 @@ export default function WatchMoviePage() {
                         autoPlay={true}
                         onBack={() => router.back()}
                         enterFullscreen={true}
+                        title={joinTitle}
+                        onVideoElement={setVideoEl}
                         topRightSlot={
-                            <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center gap-2">
-                                <Radio size={18} className="animate-pulse" /> Modo TV
-                            </span>
+                            <div className="flex items-center gap-2">
+                                {canSync && <SyncButton role="viewer" onClick={sync} />}
+                                <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center gap-2">
+                                    <Radio size={18} className="animate-pulse" /> Modo TV
+                                </span>
+                            </div>
                         }
                     />
                 </div>
@@ -286,7 +303,14 @@ export default function WatchMoviePage() {
                         enterFullscreen={true}
                         onBack={() => setIsPlaying(false)}
                         subtitleUrl={subtitleUrl || undefined}
-                        topRightSlot={shareToggle}
+                        title={movie.info.name}
+                        onVideoElement={setVideoEl}
+                        topRightSlot={
+                            <div className="flex items-center gap-2">
+                                {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}
+                                {shareToggle}
+                            </div>
+                        }
                     />
                 </div>
             </div>

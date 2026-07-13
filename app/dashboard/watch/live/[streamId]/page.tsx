@@ -5,7 +5,9 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Radio } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import VideoPlayer from '@/components/VideoPlayer';
-import { useShareBroadcast } from '@/app/hooks/useLiveShare';
+import SyncButton from '@/components/SyncButton';
+import { useShareBroadcast, useSyncPlayback, syncKey } from '@/app/hooks/useLiveShare';
+import { getAutoBroadcast } from '@/app/lib/device';
 
 export default function WatchLivePage() {
     const { credentials } = useAuth();
@@ -19,9 +21,18 @@ export default function WatchLivePage() {
     const title = searchParams.get('title') || `Canal ${streamId}`;
     const poster = searchParams.get('poster') || undefined;
 
-    // Toggle de transmissão (só faz sentido quando NÃO estou entrando na de outro).
-    const [isSharing, setIsSharing] = useState(false);
+    // Toggle de transmissão (inicia ligado se o aparelho estiver em "transmitir tudo").
+    const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
     const useRelay = isJoining || isSharing;
+
+    // Sincronização de tempo entre players (só quando a reprodução passa pelo relay).
+    const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+    const { canSync, sync } = useSyncPlayback({
+        videoEl,
+        streamKey: syncKey('live', streamId),
+        role: isJoining ? 'viewer' : 'broadcaster',
+        active: useRelay,
+    });
 
     const streamUrl = useMemo(() => {
         if (!credentials || !streamId) return null;
@@ -75,7 +86,14 @@ export default function WatchLivePage() {
                     autoPlay={true}
                     onBack={() => router.back()}
                     enterFullscreen={true}
-                    topRightSlot={shareToggle}
+                    title={title}
+                    onVideoElement={setVideoEl}
+                    topRightSlot={
+                        <div className="flex items-center gap-2">
+                            {useRelay && canSync && <SyncButton role={isJoining ? 'viewer' : 'broadcaster'} onClick={sync} />}
+                            {shareToggle}
+                        </div>
+                    }
                 />
             </div>
         </div>
