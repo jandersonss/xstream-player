@@ -9,7 +9,9 @@ import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import { ArrowLeft, Play, Calendar, Star, Clock, List, Heart, Subtitles, Radio } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
-import { useShareBroadcast, relaySrc } from '@/app/hooks/useLiveShare';
+import SyncButton from '@/components/SyncButton';
+import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
+import { getAutoBroadcast } from '@/app/lib/device';
 
 // Types
 interface Episode {
@@ -65,13 +67,23 @@ export default function WatchSeriesPage() {
     const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
     const [showSubtitlePanel, setShowSubtitlePanel] = useState(false);
     const [parentTmdbId, setParentTmdbId] = useState<number | undefined>(undefined);
-    const [isSharing, setIsSharing] = useState(false);
+    const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
     // Parâmetros de "entrar" (Modo TV) — via useSearchParams para funcionar no cliente.
     const searchParams = useSearchParams();
     const isJoining = searchParams.get('join') === '1';
     const joinExt = searchParams.get('ext') || undefined;
     const joinPoster = searchParams.get('poster') || undefined;
     const joinEpisode = searchParams.get('episode') || undefined;
+    const joinTitle = searchParams.get('title') || undefined;
+
+    // Sincronização de tempo entre players (transmissor + espectadores do mesmo episódio).
+    const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+    const { canSync, sync } = useSyncPlayback({
+        videoEl,
+        streamKey: syncKey('series', isJoining ? (joinEpisode || '') : (selectedEpisode?.id || '')),
+        role: isJoining ? 'viewer' : 'broadcaster',
+        active: isJoining || (!!selectedEpisode && isSharing),
+    });
 
     // Calculate resumeTime synchronously based on selected episode
     const resumeTime = useMemo(() => {
@@ -277,10 +289,15 @@ export default function WatchSeriesPage() {
                         autoPlay={true}
                         onBack={() => router.back()}
                         enterFullscreen={true}
+                        title={joinTitle}
+                        onVideoElement={setVideoEl}
                         topRightSlot={
-                            <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center gap-2">
-                                <Radio size={18} className="animate-pulse" /> Modo TV
-                            </span>
+                            <div className="flex items-center gap-2">
+                                {canSync && <SyncButton role="viewer" onClick={sync} />}
+                                <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center gap-2">
+                                    <Radio size={18} className="animate-pulse" /> Modo TV
+                                </span>
+                            </div>
                         }
                     />
                 </div>
@@ -367,7 +384,15 @@ export default function WatchSeriesPage() {
                         enterFullscreen={true}
                         onBack={handleBackFromPlayer}
                         subtitleUrl={subtitleUrl || undefined}
-                        topRightSlot={shareToggle}
+                        title={series.info.name}
+                        subtitle={`T${selectedEpisode.season} · Ep ${selectedEpisode.episode_num}${selectedEpisode.title ? ` - ${selectedEpisode.title}` : ''}`}
+                        onVideoElement={setVideoEl}
+                        topRightSlot={
+                            <div className="flex items-center gap-2">
+                                {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}
+                                {shareToggle}
+                            </div>
+                        }
                     />
                 </div>
             </div>

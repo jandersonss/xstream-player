@@ -2,6 +2,7 @@
 
 const DEVICE_ID_KEY = 'xstream_device_id';
 const DEVICE_NAME_KEY = 'xstream_device_name';
+const AUTO_BROADCAST_KEY = 'xstream_auto_broadcast';
 
 function randomId(): string {
     if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
@@ -49,6 +50,20 @@ export function getDeviceName(): string {
 export function setDeviceName(name: string): void {
     if (typeof window === 'undefined') return;
     localStorage.setItem(DEVICE_NAME_KEY, name.trim());
+}
+
+/**
+ * Preferência (por aparelho) de "transmitir tudo": quando ligada, qualquer conteúdo
+ * já começa a tocar via relay/Modo TV sem precisar clicar em "Transmitir" a cada vez.
+ */
+export function getAutoBroadcast(): boolean {
+    if (typeof window === 'undefined') return false;
+    return localStorage.getItem(AUTO_BROADCAST_KEY) === '1';
+}
+
+export function setAutoBroadcast(on: boolean): void {
+    if (typeof window === 'undefined') return;
+    localStorage.setItem(AUTO_BROADCAST_KEY, on ? '1' : '0');
 }
 
 function isPrivateIpv4(ip: string): boolean {

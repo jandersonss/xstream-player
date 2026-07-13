@@ -57,6 +57,13 @@ const NEXT_EPISODE_PROMPT_LEAD_SEC = 60;
 const NEXT_EPISODE_AUTO_SKIP_SEC = 10;
 /** Quanto "Adiar" empurra o aviso para frente (créditos curtos). */
 const NEXT_EPISODE_POSTPONE_SEC = 60;
+/**
+ * A duração de streams progressivos vai sendo reestimada (crescendo) conforme o
+ * conteúdo é pré-carregado. Só confiamos nela — e habilitamos o aviso/pulo de
+ * próximo episódio — depois que o vídeo avançou este tanto SEM a duração mudar.
+ * Assim uma estimativa parcial no meio do vídeo nunca dispara o pulo automático.
+ */
+const DURATION_STABLE_SEC = 6;
 
 function getPlaybackProfile(): PlaybackProfile {
     if (typeof window === 'undefined') {
@@ -122,6 +129,12 @@ interface VideoPlayerProps {
     onBack?: () => void;
     subtitleUrl?: string;
     topRightSlot?: React.ReactNode;
+    /** Título exibido no topo do player (ex.: nome do filme/série/canal). Some com os controles. */
+    title?: string;
+    /** Subtítulo no topo (ex.: "T1 · Ep 3 - Piloto"). */
+    subtitle?: string;
+    /** Recebe o elemento <video> (ou null ao desmontar) — usado para sincronizar players. */
+    onVideoElement?: (el: HTMLVideoElement | null) => void;
 }
 
 export default function VideoPlayer({
@@ -138,7 +151,10 @@ export default function VideoPlayer({
     enterFullscreen = false,
     onBack,
     subtitleUrl,
-    topRightSlot
+    topRightSlot,
+    title,
+    subtitle,
+    onVideoElement
 }: VideoPlayerProps) {
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
@@ -150,6 +166,8 @@ export default function VideoPlayer({
     const [showControls, setShowControls] = useState(true);
     const [currentTime, setCurrentTime] = useState(0);
     const [duration, setDuration] = useState(0);
+    /** `duration` já parou de ser reestimada (progressivo termina de pré-carregar)? */
+    const [durationStable, setDurationStable] = useState(false);
     const [isSeeking, setIsSeeking] = useState(false);
     const [isBuffering, setIsBuffering] = useState(false);
     const [bufferedPercent, setBufferedPercent] = useState(0);
@@ -178,6 +196,8 @@ export default function VideoPlayer({
     const nextEpisodeButtonRef = useRef<HTMLButtonElement>(null);
     const postponeButtonRef = useRef<HTMLButtonElement>(null);
     const autoSkipFiredRef = useRef(false);
+    /** Tempo do vídeo (s) em que `duration` mudou pela última vez — para saber quando estabilizou. */
+    const durationChangedAtTimeRef = useRef(0);
 
     const saveFontSize = useCallback((size: number) => {
         setSubtitleFontSize(size);
@@ -358,6 +378,19 @@ export default function VideoPlayer({
         isSeekingRef.current = isSeeking;
     }, [isSeeking]);
 
+    // Entrega o elemento <video> ao pai (sincronização de players) — estável no ciclo de vida.
+    const onVideoElementRef = useRef(onVideoElement);
+    useEffect(() => { onVideoElementRef.current = onVideoElement; }, [onVideoElement]);
+    useEffect(() => {
+        onVideoElementRef.current?.(videoRef.current);
+        return () => onVideoElementRef.current?.(null);
+    }, []);
+
+    // Marca em que ponto do vídeo `duration` mudou (só re-executa quando o valor muda de fato).
+    useEffect(() => {
+        durationChangedAtTimeRef.current = videoRef.current?.currentTime ?? 0;
+    }, [duration]);
+
     // Aviso de próximo episódio: só em séries (onNext + hasNext), nunca em live/duração desconhecida.
     // Tudo é ancorado no tempo do vídeo, então a contagem congela no pause e volta atrás no seek.
     const postponedUntil = postponement?.src === src ? postponement.until : 0;
@@ -367,6 +400,7 @@ export default function VideoPlayer({
         && hasNext
         && Number.isFinite(duration)
         && duration > NEXT_EPISODE_PROMPT_LEAD_SEC
+        && durationStable
         && currentTime >= nextEpisodePromptAt
         && currentTime < duration;
     const autoSkipSecondsLeft = Math.max(0, Math.ceil(autoSkipAt - currentTime));
@@ -585,6 +619,7 @@ export default function VideoPlayer({
             setError('');
             setCurrentTime(0);
             setDuration(0);
+            setDurationStable(false);
             setIsBuffering(!hasPlayableData);
             setIsMetadataLoaded(false);
             setShowBufferingHelp(false);
@@ -797,10 +832,30 @@ export default function VideoPlayer({
             }
         };
 
+        // A duração só cresce dentro de um mesmo episódio: streams progressivos (MKV/MP4)
+        // emitem `durationchange` com valores estimados/incorretos menores no meio da
+        // reprodução. Aceitá-los encolhia `duration - 60`, fazendo o aviso de "próximo
+        // episódio" (e o pulo automático) disparar no meio do vídeo. Guardamos o maior
+        // valor finito já visto; o reset em cada troca de `src` volta a base para 0.
+        const commitDuration = (value: number) => {
+            if (Number.isNaN(value)) return;
+            if (!Number.isFinite(value)) {
+                setDuration(value); // live / duração desconhecida (Infinity)
+                return;
+            }
+            setDuration(prev => (Number.isFinite(prev) && prev > value ? prev : value));
+        };
+
         const handleTimeUpdate = () => {
             if (!isSeekingRef.current) {
                 setCurrentTime(video.currentTime);
             }
+
+            // Duração estável = o vídeo avançou DURATION_STABLE_SEC sem `duration` mudar.
+            const stable = Number.isFinite(video.duration)
+                && video.duration > 0
+                && video.currentTime - durationChangedAtTimeRef.current >= DURATION_STABLE_SEC;
+            setDurationStable((prev) => (prev === stable ? prev : stable));
 
             const isAtStart = video.currentTime === 0;
             const waitingForSeek = seekTarget > 0 && !hasAppliedInitialTime.current;
@@ -816,7 +871,7 @@ export default function VideoPlayer({
         };
         const handleLoadedMetadata = () => {
             console.log('[VideoPlayer] Metadata loaded. readyState:', video.readyState);
-            setDuration(video.duration);
+            commitDuration(video.duration);
             onMetadataRef.current?.(video.duration);
             setIsMetadataLoaded(true);
 
@@ -879,8 +934,7 @@ export default function VideoPlayer({
 
         // Streams progressivos entregam uma duração estimada no `loadedmetadata` e a corrigem depois.
         const handleDurationChange = () => {
-            if (Number.isNaN(video.duration)) return;
-            setDuration(video.duration);
+            commitDuration(video.duration);
         };
 
         video.addEventListener('play', updatePlayState);
@@ -1088,18 +1142,28 @@ export default function VideoPlayer({
                 }}
             >
                 {/* Top Bar with Back Button */}
-                {(onBack || topRightSlot) && (
+                {(onBack || topRightSlot || title) && (
                     <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between gap-3">
-                        {onBack ? (
-                            <button
-                                onClick={onBack}
-                                className="bg-black/60  hover:bg-white/20 p-2 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl"
-                                title="Voltar"
-                                aria-label="Voltar"
-                            >
-                                <ArrowLeft size={24} />
-                            </button>
-                        ) : <span />}
+                        <div className="flex items-center gap-3 min-w-0">
+                            {onBack && (
+                                <button
+                                    onClick={onBack}
+                                    className="bg-black/60  hover:bg-white/20 p-2 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl flex-shrink-0"
+                                    title="Voltar"
+                                    aria-label="Voltar"
+                                >
+                                    <ArrowLeft size={24} />
+                                </button>
+                            )}
+                            {title && (
+                                <div className="min-w-0">
+                                    <p className="text-white font-semibold text-base md:text-lg truncate drop-shadow-lg">{title}</p>
+                                    {subtitle && (
+                                        <p className="text-gray-300 text-xs md:text-sm truncate drop-shadow-lg">{subtitle}</p>
+                                    )}
+                                </div>
+                            )}
+                        </div>
                         {topRightSlot}
                     </div>
                 )}

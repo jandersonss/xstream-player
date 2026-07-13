@@ -147,3 +147,152 @@ export function excludeSelf(sessions: ShareSession[]): ShareSession[] {
     const myId = getDeviceId();
     return sessions.filter((s) => s.deviceId !== myId);
 }
+
+// ---------------------------------------------------------------------------
+// Sincronização de tempo entre players (transmissor + espectadores no Modo TV)
+// ---------------------------------------------------------------------------
+
+export type SyncRole = 'broadcaster' | 'viewer';
+
+/** Chave comum entre transmissor e espectadores do mesmo conteúdo. */
+export function syncKey(contentType: ShareContentType, streamId: string): string {
+    return `${contentType}:${streamId}`;
+}
+
+/** Cadência de heartbeat/poll da sincronização (posições mudam devagar). */
+const SYNC_TICK_MS = 4000;
+/** Diferença de latência (s) a partir da qual consideramos os players dessincronizados. */
+const SYNC_THRESHOLD_S = 5;
+
+interface SyncParticipantDTO {
+    deviceId: string;
+    role: SyncRole;
+    latency: number;
+}
+interface SyncStateDTO {
+    participants: SyncParticipantDTO[];
+    command?: { epoch: number; targetLatency: number };
+}
+
+/** Latência ao vivo: distância (s) da posição atual até a borda ao vivo (seekable.end). */
+function measureLatency(v: HTMLVideoElement | null): number | null {
+    if (!v || v.seekable.length === 0) return null;
+    const edge = v.seekable.end(v.seekable.length - 1);
+    return Math.max(0, edge - v.currentTime);
+}
+
+/** Move o player para ficar `targetLatency` segundos atrás da borda ao vivo. */
+function seekToLatency(v: HTMLVideoElement, targetLatency: number) {
+    if (v.seekable.length === 0) return;
+    const edge = v.seekable.end(v.seekable.length - 1);
+    const start = v.seekable.start(0);
+    v.currentTime = Math.min(edge, Math.max(start, edge - targetLatency));
+}
+
+/**
+ * Mantém a latência do player publicada no servidor, observa os demais players do
+ * mesmo conteúdo e expõe se há dessincronização (`canSync`) e a ação de sincronizar.
+ *
+ * - Espectador: `sync()` pula para a latência do transmissor; e ao receber um comando
+ *   novo do transmissor, ajusta-se automaticamente (só se estiver fora de sincronia).
+ * - Transmissor: `sync()` emite um comando para os espectadores dessincronizados irem
+ *   ao seu tempo; o botão só aparece quando algum espectador está fora de sincronia.
+ */
+export function useSyncPlayback(opts: {
+    videoEl: HTMLVideoElement | null;
+    streamKey: string | null;
+    role: SyncRole;
+    active: boolean;
+}) {
+    const { videoEl, streamKey, role, active } = opts;
+    const [canSync, setCanSync] = useState(false);
+    const videoRef = useRef(videoEl);
+    const lastAppliedEpochRef = useRef(0);
+
+    useEffect(() => { videoRef.current = videoEl; }, [videoEl]);
+
+    useEffect(() => {
+        if (!active || !streamKey) return;
+        const deviceId = getDeviceId();
+        let cancelled = false;
+
+        const applyState = (state: SyncStateDTO, myLatency: number | null) => {
+            const broadcaster = state.participants.find((p) => p.role === 'broadcaster');
+            const video = videoRef.current;
+
+            // Espectador: aplica o comando "sincronizar todos" (uma vez por epoch).
+            if (role === 'viewer' && state.command && state.command.epoch > lastAppliedEpochRef.current) {
+                lastAppliedEpochRef.current = state.command.epoch;
+                if (video && myLatency !== null && Math.abs(myLatency - state.command.targetLatency) > SYNC_THRESHOLD_S) {
+                    seekToLatency(video, state.command.targetLatency);
+                }
+            } else if (state.command && state.command.epoch > lastAppliedEpochRef.current) {
+                lastAppliedEpochRef.current = state.command.epoch; // transmissor só acompanha
+            }
+
+            let show = false;
+            if (myLatency !== null) {
+                if (role === 'viewer') {
+                    show = !!broadcaster && Math.abs(myLatency - broadcaster.latency) > SYNC_THRESHOLD_S;
+                } else {
+                    show = state.participants.some(
+                        (p) => p.role === 'viewer' && Math.abs(p.latency - myLatency) > SYNC_THRESHOLD_S
+                    );
+                }
+            }
+            if (!cancelled) setCanSync(show);
+        };
+
+        const tick = async () => {
+            const myLatency = measureLatency(videoRef.current);
+            try {
+                const res = await fetch('/api/live-sync', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ streamKey, deviceId, role, latency: myLatency ?? 0 }),
+                });
+                const state = (await res.json()) as SyncStateDTO;
+                if (!cancelled && Array.isArray(state.participants)) applyState(state, myLatency);
+            } catch {
+                /* best-effort */
+            }
+        };
+
+        tick();
+        const interval = setInterval(tick, SYNC_TICK_MS);
+        return () => {
+            cancelled = true;
+            clearInterval(interval);
+            setCanSync(false);
+        };
+    }, [active, streamKey, role]);
+
+    const sync = useCallback(async () => {
+        const video = videoRef.current;
+        if (!video || !streamKey) return;
+
+        if (role === 'viewer') {
+            // Puxa para a latência atual do transmissor (busca o estado mais fresco).
+            try {
+                const res = await fetch(`/api/live-sync?streamKey=${encodeURIComponent(streamKey)}`);
+                const state = (await res.json()) as SyncStateDTO;
+                const broadcaster = state.participants?.find((p) => p.role === 'broadcaster');
+                if (broadcaster) seekToLatency(video, broadcaster.latency);
+            } catch {
+                /* ignore */
+            }
+        } else {
+            // Transmissor: publica um comando com a própria latência para os espectadores.
+            const myLatency = measureLatency(video);
+            if (myLatency === null) return;
+            fetch('/api/live-sync', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ streamKey, command: true, targetLatency: myLatency }),
+            }).catch(() => {});
+        }
+        setCanSync(false);
+    }, [role, streamKey]);
+
+    return { canSync, sync };
+}
