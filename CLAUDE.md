@@ -35,6 +35,7 @@ Tudo em `data/` é **gitignored** (só `data/.keep` versionado) e persiste entre
 ## Gotchas
 
 - **Modo TV** (compartilhamento de conexão): relaya um único stream upstream para vários dispositivos. VOD (filmes/séries) é convertido em stream ao vivo com **ffmpeg** — dependência opcional só para esse recurso; já incluída na imagem Docker.
+- **Licença**: o projeto é AGPL-3.0 (ver `LICENSE`); contribuições exigem o CLA (`CLA.md`), que preserva o direito do autor de relicenciar. Ponto de atenção para uma eventual versão comercial fechada: o **ffmpeg embutido na imagem Docker é GPL/LGPL** — ele roda como binário externo (não linkado), então não contamina este código, mas redistribuir a imagem redistribui o ffmpeg junto e obriga a cumprir a GPL sobre ele. Sem impacto enquanto a distribuição for AGPL. Detalhes na seção de licença do README.
 - `next.config.ts` usa `output: "standalone"` (Docker) e permite imagens remotas de qualquer host.
 - TypeScript `strict: true`; alias `@/*` → raiz do projeto. Indentação de **4 espaços** nos módulos de `app/lib` e API routes.
 - Rotas de API que usam APIs de Node (ffmpeg, `fs`) precisam de `export const runtime = 'nodejs'`.
