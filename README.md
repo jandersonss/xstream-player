@@ -34,11 +34,25 @@ This project aims to solve these issues by providing a centralized, modern, and 
 *   Playback of live channels, movies, and series (VOD).
 *   TMDB integration for rich metadata (posters, overviews, ratings) and daily suggestions.
 *   "Continue Watching" functionality to resume content from where you left off.
+*   **TV Mode (connection sharing):** watch exactly what another device is broadcasting — like a live channel — sharing a **single upstream connection** (see the dedicated section below).
+*   **Player quality-of-life:** on-screen title (movie / series + episode / channel) that auto-hides with the controls, and an automatic "Next episode" prompt with countdown near the end of an episode.
 *   **Complete Subtitle Support:**
     *   Integration with OpenSubtitles API.
     *   **Persistence:** Automatically remembers and loads selected subtitles for each movie or episode.
     *   **Customization:** Adjust subtitle font size directly in the player (shortcuts `[` and `]`).
     *   **Accurate Matching:** Uses TMDb IDs to find the perfect subtitle for your content.
+
+## 📡 TV Mode (Connection Sharing)
+
+IPTV accounts have a limit of simultaneous connections. **TV Mode** lets several devices watch the same content while consuming **only one** upstream connection to your provider — the app relays a single stream to everyone, like a live TV channel.
+
+*   **Broadcast:** while watching, enable **Transmitir** (broadcast) in the player, or turn on the global **"Transmitir tudo"** toggle in the sidebar so every content you open starts broadcasting automatically.
+*   **Join:** the **Modo TV** menu lists which devices are broadcasting and what they are watching. Click one to join its stream — **without opening a new connection**. When you hit the account's connection limit, a modal also offers the active broadcasts to join.
+*   **Works for live channels, movies, and series.** Live channels are relayed directly; movies and episodes (VOD) are turned into a live-style stream with **ffmpeg**, so joiners tune into the current position (channel-style, no independent seek).
+*   **Time sync:** when the broadcaster and viewers drift apart, a **"Sincronizar"** button appears. A viewer jumps to the broadcaster's position; the broadcaster can pull everyone to its own time. The button only shows up when players are actually out of sync.
+*   **Auto device naming:** devices are labeled from their user agent (e.g. "Smart TV (LG)", "iPhone", "PC (Windows)") and can be renamed in the Modo TV screen.
+
+> **Requirements:** sharing movies/series (VOD) needs **ffmpeg** installed on the server. The provided Docker image already includes it. Shared state lives in the `data/` folder (`live-sessions.json`, `live-sync.json`), so it works even across multiple app instances that share that folder.
 
 ## 🚀 How to Install and Run
 
@@ -46,6 +60,7 @@ This project aims to solve these issues by providing a centralized, modern, and 
 
 *   Node.js (v18 or higher)
 *   npm or yarn
+*   **ffmpeg** (optional — only required to broadcast movies/series in TV Mode; already bundled in the Docker image)
 
 ### Local Installation
 
@@ -126,6 +141,7 @@ sudo chown -R 1001:1001 data/
 *   [React](https://reactjs.org/)
 *   [Tailwind CSS](https://tailwindcss.com/)
 *   [HLS.js](https://github.com/video-dev/hls.js/)
+*   [ffmpeg](https://ffmpeg.org/) (VOD connection sharing in TV Mode)
 *   [Framer Motion](https://www.framer.com/motion/)
 *   [Lucide React](https://lucide.dev/)
 
