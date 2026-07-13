@@ -51,8 +51,53 @@ interface SubtitleContextType {
         parent_tmdb_id?: number | string;
     }) => Promise<SubtitleResult[]>;
     downloadSubtitle: (fileId: number, streamId: string) => Promise<string | null>;
+    /**
+     * Busca + baixa a melhor legenda de um único episódio, de forma silenciosa
+     * (sem alertas), para o carregamento sob demanda ao abrir o player.
+     */
+    autoDownloadEpisodeSubtitle: (
+        streamId: string,
+        searchParams: {
+            languages: string;
+            season_number: number;
+            episode_number: number;
+            parent_tmdb_id?: number;
+            query?: string;
+            year?: number;
+        },
+    ) => Promise<{ url: string | null; quotaExceeded: boolean; notFound: boolean }>;
+    /**
+     * Busca (sem baixar) a melhor legenda para cada episódio, informando o que
+     * está disponível, o que já foi baixado e o que não tem legenda. Só consome
+     * o rate limit de busca — nunca a cota diária de downloads.
+     */
+    searchSeriesSubtitles: (
+        episodes: Array<{ streamId: string; seasonNumber: number; episodeNumber: number }>,
+        opts: { languages: string; parentTmdbId?: number; query?: string; year?: number },
+        onProgress?: (done: number, total: number, partial: EpisodeSubtitleStatus[]) => void,
+        shouldCancel?: () => boolean,
+    ) => Promise<EpisodeSubtitleStatus[]>;
+    /**
+     * Baixa em sequência as legendas já encontradas pela busca (por file_id).
+     * Respeita o rate limit com uma pausa entre requisições e para de forma
+     * limpa ao atingir a cota diária (407).
+     */
+    downloadSeriesSubtitles: (
+        items: Array<{ streamId: string; fileId: number }>,
+        language: string,
+        onProgress?: (done: number, total: number, last: { streamId: string; ok: boolean }) => void,
+        shouldCancel?: () => boolean,
+    ) => Promise<{ downloaded: number; failed: number; quotaHit: boolean; done: number; total: number }>;
     getSavedSubtitle: (streamId: string) => Promise<SavedSubtitle | undefined>;
     clearSavedSubtitle: (streamId: string) => Promise<void>;
+}
+
+interface EpisodeSubtitleStatus {
+    streamId: string;
+    status: 'available' | 'unavailable' | 'downloaded';
+    fileId?: number;
+    release?: string;
+    language?: string;
 }
 
 const SubtitleContext = createContext<SubtitleContextType | undefined>(undefined);
@@ -190,10 +235,16 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
         }
     }, [ensureConfigLoaded]);
 
-    const downloadSubtitle = useCallback(async (fileId: number, streamId: string): Promise<string | null> => {
-        await ensureConfigLoaded();
+    // Baixa e persiste a legenda de um único file_id, sem efeitos de UI.
+    // `quotaExceeded` sinaliza o 407 (cota diária) para que o chamador em lote
+    // possa parar em vez de continuar disparando requisições que vão falhar.
+    const performDownload = useCallback(async (
+        fileId: number,
+        streamId: string,
+        language: string,
+    ): Promise<{ ok: boolean; quotaExceeded?: boolean; vtt?: string }> => {
         const activeConfig = configRef.current;
-        if (!activeConfig) return null;
+        if (!activeConfig) return { ok: false };
 
         try {
             const response = await fetch('/api/subtitles', {
@@ -206,30 +257,26 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
                 }),
             });
 
-            // Handle download quota exceeded
-            if (response.status === 407) {
-                const data = await response.json();
-                alert(data.error || 'Limite diário de downloads atingido.');
-                return null;
+            // Cota diária esgotada (o servidor normaliza 406/407 para 406).
+            if (response.status === 406 || response.status === 407) {
+                setRemainingDownloads(0);
+                return { ok: false, quotaExceeded: true };
             }
 
             if (!response.ok) {
                 console.error('[SubtitleContext] Download failed:', response.status);
-                return null;
+                return { ok: false };
             }
 
-            // Track remaining downloads from response header
             const remaining = response.headers.get('X-Downloads-Remaining');
             if (remaining) {
                 setRemainingDownloads(parseInt(remaining));
             }
 
-            // Response is raw VTT content
             const vtt = await response.text();
-
             if (!vtt || !vtt.startsWith('WEBVTT')) {
                 console.error('[SubtitleContext] Invalid VTT content received');
-                return null;
+                return { ok: false };
             }
 
             // Save for persistence to server
@@ -237,23 +284,32 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
                 await fetch('/api/subtitles/user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        streamId: String(streamId),
-                        vtt,
-                        language: 'pt-BR'
-                    })
+                    body: JSON.stringify({ streamId: String(streamId), vtt, language })
                 });
             } catch (err) {
                 console.warn('[SubtitleContext] Failed to sync subtitle to server:', err);
             }
 
-            const blob = new Blob([vtt], { type: 'text/vtt' });
-            return URL.createObjectURL(blob);
+            return { ok: true, vtt };
         } catch (error) {
             console.error('[SubtitleContext] Download error:', error);
+            return { ok: false };
+        }
+    }, []);
+
+    const downloadSubtitle = useCallback(async (fileId: number, streamId: string): Promise<string | null> => {
+        await ensureConfigLoaded();
+        const result = await performDownload(fileId, streamId, 'pt-BR');
+
+        if (result.quotaExceeded) {
+            alert('Limite diário de downloads atingido. Tente novamente amanhã (reset à meia-noite UTC).');
             return null;
         }
-    }, [ensureConfigLoaded]);
+        if (!result.ok || !result.vtt) return null;
+
+        const blob = new Blob([result.vtt], { type: 'text/vtt' });
+        return URL.createObjectURL(blob);
+    }, [ensureConfigLoaded, performDownload]);
 
     const getSavedSubtitle = useCallback(async (streamId: string) => {
         try {
@@ -277,6 +333,136 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
         }
     }, []);
 
+    const autoDownloadEpisodeSubtitle = useCallback(async (
+        streamId: string,
+        searchParams: {
+            languages: string;
+            season_number: number;
+            episode_number: number;
+            parent_tmdb_id?: number;
+            query?: string;
+            year?: number;
+        },
+    ): Promise<{ url: string | null; quotaExceeded: boolean; notFound: boolean }> => {
+        await ensureConfigLoaded();
+        if (!configRef.current) return { url: null, quotaExceeded: false, notFound: false };
+
+        const results = await searchSubtitles(searchParams);
+        const fileId = results[0]?.attributes?.files?.[0]?.file_id;
+        if (!fileId) return { url: null, quotaExceeded: false, notFound: true };
+
+        const res = await performDownload(fileId, streamId, searchParams.languages);
+        if (res.quotaExceeded) return { url: null, quotaExceeded: true, notFound: false };
+        if (!res.ok || !res.vtt) return { url: null, quotaExceeded: false, notFound: false };
+
+        const blob = new Blob([res.vtt], { type: 'text/vtt' });
+        return { url: URL.createObjectURL(blob), quotaExceeded: false, notFound: false };
+    }, [ensureConfigLoaded, searchSubtitles, performDownload]);
+
+    const searchSeriesSubtitles = useCallback(async (
+        episodes: Array<{ streamId: string; seasonNumber: number; episodeNumber: number }>,
+        opts: { languages: string; parentTmdbId?: number; query?: string; year?: number },
+        onProgress?: (done: number, total: number, partial: EpisodeSubtitleStatus[]) => void,
+        shouldCancel?: () => boolean,
+    ): Promise<EpisodeSubtitleStatus[]> => {
+        await ensureConfigLoaded();
+
+        const out: EpisodeSubtitleStatus[] = [];
+        if (!configRef.current) return out;
+
+        for (let i = 0; i < episodes.length; i++) {
+            if (shouldCancel?.()) break;
+            const ep = episodes[i];
+
+            // Já tem legenda salva → nada a buscar.
+            const existing = await getSavedSubtitle(ep.streamId);
+            if (existing && existing.vtt) {
+                out.push({ streamId: ep.streamId, status: 'downloaded' });
+                onProgress?.(i + 1, episodes.length, out);
+                continue;
+            }
+
+            const searchParams: {
+                languages: string;
+                season_number: number;
+                episode_number: number;
+                parent_tmdb_id?: number;
+                query?: string;
+                year?: number;
+            } = {
+                languages: opts.languages,
+                season_number: ep.seasonNumber,
+                episode_number: ep.episodeNumber,
+            };
+            if (opts.parentTmdbId) {
+                searchParams.parent_tmdb_id = opts.parentTmdbId;
+            } else {
+                searchParams.query = opts.query;
+                if (opts.year) searchParams.year = opts.year;
+            }
+
+            const results = await searchSubtitles(searchParams);
+            const best = results[0];
+            const fileId = best?.attributes?.files?.[0]?.file_id;
+
+            if (fileId) {
+                out.push({
+                    streamId: ep.streamId,
+                    status: 'available',
+                    fileId,
+                    release: best.attributes.release,
+                    language: best.attributes.language,
+                });
+            } else {
+                out.push({ streamId: ep.streamId, status: 'unavailable' });
+            }
+            onProgress?.(i + 1, episodes.length, out);
+
+            // Pausa gentil entre buscas para respeitar o rate limit da API.
+            if (i < episodes.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        return out;
+    }, [ensureConfigLoaded, getSavedSubtitle, searchSubtitles]);
+
+    const downloadSeriesSubtitles = useCallback(async (
+        items: Array<{ streamId: string; fileId: number }>,
+        language: string,
+        onProgress?: (done: number, total: number, last: { streamId: string; ok: boolean }) => void,
+        shouldCancel?: () => boolean,
+    ): Promise<{ downloaded: number; failed: number; quotaHit: boolean; done: number; total: number }> => {
+        await ensureConfigLoaded();
+
+        let downloaded = 0;
+        let failed = 0;
+        const total = items.length;
+        if (!configRef.current) return { downloaded, failed, quotaHit: false, done: 0, total };
+
+        for (let i = 0; i < items.length; i++) {
+            if (shouldCancel?.()) return { downloaded, failed, quotaHit: false, done: i, total };
+            const item = items[i];
+
+            const result = await performDownload(item.fileId, item.streamId, language);
+            if (result.quotaExceeded) {
+                // Cota diária atingida: para aqui; o que já baixou fica salvo.
+                return { downloaded, failed, quotaHit: true, done: i, total };
+            }
+
+            if (result.ok) downloaded++;
+            else failed++;
+            onProgress?.(i + 1, total, { streamId: item.streamId, ok: result.ok });
+
+            // Pausa gentil entre downloads para respeitar o rate limit da API.
+            if (i < items.length - 1) {
+                await new Promise(resolve => setTimeout(resolve, 1000));
+            }
+        }
+
+        return { downloaded, failed, quotaHit: false, done: total, total };
+    }, [ensureConfigLoaded, performDownload]);
+
     return (
         <SubtitleContext.Provider
             value={{
@@ -290,6 +476,9 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
                 clearConfig: clearConfigHandler,
                 searchSubtitles,
                 downloadSubtitle,
+                autoDownloadEpisodeSubtitle,
+                searchSeriesSubtitles,
+                downloadSeriesSubtitles,
                 getSavedSubtitle,
                 clearSavedSubtitle,
             }}
@@ -307,4 +496,4 @@ export function useSubtitle() {
     return context;
 }
 
-export type { SubtitleResult };
+export type { SubtitleResult, EpisodeSubtitleStatus };

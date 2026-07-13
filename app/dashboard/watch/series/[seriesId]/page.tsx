@@ -1,12 +1,12 @@
 'use client';
 
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
-import { ArrowLeft, Play, Calendar, Star, Clock, List, Heart, Subtitles, Radio } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, List, Heart, Subtitles, Radio, Download, Loader2, X, Search, Check } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import SyncButton from '@/components/SyncButton';
@@ -45,7 +45,16 @@ interface SeriesInfo {
 
 import { useData } from '@/app/context/DataContext';
 import { useTMDb } from '@/app/context/TMDbContext';
-import { useSubtitle } from '@/app/context/SubtitleContext';
+import { useSubtitle, EpisodeSubtitleStatus } from '@/app/context/SubtitleContext';
+
+const BATCH_LANGUAGES = [
+    { code: 'pt-BR', label: 'Português BR' },
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
+    { code: 'fr', label: 'Français' },
+    { code: 'de', label: 'Deutsch' },
+    { code: 'it', label: 'Italiano' },
+];
 
 export default function WatchSeriesPage() {
     const { credentials } = useAuth();
@@ -53,7 +62,7 @@ export default function WatchSeriesPage() {
     const { updateProgress, getProgress, loadDetail, isLoaded: progressLoaded, loadingDetails } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
     const { searchTV, isConfigured: tmdbConfigured } = useTMDb();
-    const { getSavedSubtitle } = useSubtitle();
+    const { getSavedSubtitle, searchSeriesSubtitles, downloadSeriesSubtitles, autoDownloadEpisodeSubtitle, remainingDownloads } = useSubtitle();
     const params = useParams();
     const router = useRouter();
     const seriesId = params.seriesId as string;
@@ -67,6 +76,23 @@ export default function WatchSeriesPage() {
     const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
     const [showSubtitlePanel, setShowSubtitlePanel] = useState(false);
     const [parentTmdbId, setParentTmdbId] = useState<number | undefined>(undefined);
+    // Busca/baixa legendas de todos os episódios em lote.
+    const [batchLanguage, setBatchLanguage] = useState('pt-BR');
+    // Situação da legenda por episódio (chave = episode.id).
+    const [availability, setAvailability] = useState<Record<string, EpisodeSubtitleStatus>>({});
+    const [batch, setBatch] = useState<{
+        phase: 'searching' | 'searched' | 'downloading' | 'done';
+        done: number;
+        total: number;
+        downloadedNow: number;
+        failed: number;
+        quotaHit: boolean;
+    } | null>(null);
+    const batchCancelRef = useRef(false);
+    // A série tem ao menos uma legenda salva → ativa o download sob demanda por ep.
+    const [seriesHasSubs, setSeriesHasSubs] = useState(false);
+    // Buscando/baixando legenda automaticamente ao abrir um episódio.
+    const [autoSubLoading, setAutoSubLoading] = useState(false);
     const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
     // Parâmetros de "entrar" (Modo TV) — via useSearchParams para funcionar no cliente.
     const searchParams = useSearchParams();
@@ -172,20 +198,89 @@ export default function WatchSeriesPage() {
         resolveTmdbId();
     }, [series, tmdbConfigured, parentTmdbId, searchTV]);
 
-    // Load saved subtitle for selected episode
+    // Marca de uma vez os episódios que já têm legenda salva no servidor.
     useEffect(() => {
-        if (!selectedEpisode) return;
+        if (!series) return;
 
-        const loadSavedSub = async () => {
-            const saved = await getSavedSubtitle(selectedEpisode.id);
-            if (saved && saved.vtt) {
-                console.log('[WatchSeriesPage] loading saved subtitle for episode:', selectedEpisode.id);
-                const blob = new Blob([saved.vtt], { type: 'text/vtt' });
-                setSubtitleUrl(URL.createObjectURL(blob));
+        const markDownloaded = async () => {
+            try {
+                const res = await fetch('/api/subtitles/user/list');
+                if (!res.ok) return;
+                const { streamIds } = await res.json();
+                const saved = new Set<string>(streamIds || []);
+
+                const map: Record<string, EpisodeSubtitleStatus> = {};
+                Object.values(series.episodes).forEach(list => {
+                    list.forEach(ep => {
+                        if (saved.has(String(ep.id))) {
+                            map[String(ep.id)] = { streamId: String(ep.id), status: 'downloaded' };
+                        }
+                    });
+                });
+
+                if (Object.keys(map).length > 0) {
+                    setAvailability(prev => ({ ...map, ...prev }));
+                    setSeriesHasSubs(true);
+                }
+            } catch (err) {
+                console.warn('[WatchSeriesPage] Failed to list saved subtitles:', err);
             }
         };
-        loadSavedSub();
-    }, [selectedEpisode?.id, getSavedSubtitle]);
+        markDownloaded();
+    }, [series]);
+
+    // Ao abrir um episódio: carrega a legenda salva ou, se a série usa legendas,
+    // baixa a do episódio sob demanda (transparente, respeitando a cota diária).
+    useEffect(() => {
+        if (!selectedEpisode) return;
+        const ep = selectedEpisode;
+        let cancelled = false;
+
+        const loadSub = async () => {
+            const saved = await getSavedSubtitle(ep.id);
+            if (cancelled) return;
+            if (saved && saved.vtt) {
+                const blob = new Blob([saved.vtt], { type: 'text/vtt' });
+                setSubtitleUrl(URL.createObjectURL(blob));
+                return;
+            }
+
+            // Sem legenda salva: só busca automaticamente se a série já usa legendas.
+            if (!seriesHasSubs) return;
+
+            const yearMatch = series?.info.releaseDate?.match(/\d{4}/);
+            const searchParams: {
+                languages: string;
+                season_number: number;
+                episode_number: number;
+                parent_tmdb_id?: number;
+                query?: string;
+                year?: number;
+            } = {
+                languages: batchLanguage,
+                season_number: Number(ep.season || activeSeason),
+                episode_number: Number(ep.episode_num),
+            };
+            if (parentTmdbId) {
+                searchParams.parent_tmdb_id = parentTmdbId;
+            } else if (series) {
+                searchParams.query = series.info.name;
+                if (yearMatch) searchParams.year = parseInt(yearMatch[0]);
+            }
+
+            setAutoSubLoading(true);
+            const result = await autoDownloadEpisodeSubtitle(ep.id, searchParams);
+            if (cancelled) return;
+            setAutoSubLoading(false);
+            if (result.url) {
+                setSubtitleUrl(result.url);
+                setAvailability(prev => ({ ...prev, [ep.id]: { streamId: ep.id, status: 'downloaded' } }));
+            }
+        };
+
+        loadSub();
+        return () => { cancelled = true; };
+    }, [selectedEpisode?.id, seriesHasSubs, parentTmdbId, batchLanguage, activeSeason, series, getSavedSubtitle, autoDownloadEpisodeSubtitle]);
 
     // Load detailed progress for this series
     useEffect(() => {
@@ -259,6 +354,89 @@ export default function WatchSeriesPage() {
             seasonNum: Number(selectedEpisode.season),
             episodeNum: Number(selectedEpisode.episode_num)
         });
+    };
+
+    const isBatchBusy = batch?.phase === 'searching' || batch?.phase === 'downloading';
+
+    // Achata todos os episódios de todas as temporadas, em ordem.
+    const flattenEpisodes = () =>
+        Object.keys(series?.episodes || {})
+            .sort((a, b) => Number(a) - Number(b))
+            .flatMap(season =>
+                series!.episodes[season].map(ep => ({
+                    streamId: String(ep.id),
+                    seasonNumber: Number(ep.season || season),
+                    episodeNumber: Number(ep.episode_num),
+                }))
+            );
+
+    const handleBatchSearch = async () => {
+        if (!series || isBatchBusy) return;
+
+        const eps = flattenEpisodes();
+        const yearMatch = series.info.releaseDate?.match(/\d{4}/);
+
+        batchCancelRef.current = false;
+        setAvailability({});
+        setBatch({ phase: 'searching', done: 0, total: eps.length, downloadedNow: 0, failed: 0, quotaHit: false });
+
+        const results = await searchSeriesSubtitles(
+            eps,
+            {
+                languages: batchLanguage,
+                parentTmdbId,
+                query: series.info.name,
+                year: yearMatch ? parseInt(yearMatch[0]) : undefined,
+            },
+            (done, _total, partial) => {
+                const map: Record<string, EpisodeSubtitleStatus> = {};
+                partial.forEach(s => { map[s.streamId] = s; });
+                setAvailability(map);
+                setBatch(prev => (prev ? { ...prev, done } : prev));
+            },
+            () => batchCancelRef.current,
+        );
+
+        const finalMap: Record<string, EpisodeSubtitleStatus> = {};
+        results.forEach(s => { finalMap[s.streamId] = s; });
+        setAvailability(finalMap);
+        setBatch(prev => (prev ? { ...prev, phase: 'searched', done: results.length } : prev));
+    };
+
+    const handleBatchDownload = async () => {
+        if (!series || isBatchBusy) return;
+
+        const items = Object.values(availability)
+            .filter(s => s.status === 'available' && s.fileId)
+            .map(s => ({ streamId: s.streamId, fileId: s.fileId! }));
+        if (items.length === 0) return;
+
+        batchCancelRef.current = false;
+        setBatch(prev => (prev ? { ...prev, phase: 'downloading', done: 0, total: items.length, downloadedNow: 0, failed: 0, quotaHit: false } : prev));
+
+        const result = await downloadSeriesSubtitles(
+            items,
+            batchLanguage,
+            (done, _total, last) => {
+                if (last.ok) {
+                    setAvailability(prev => ({ ...prev, [last.streamId]: { ...prev[last.streamId], status: 'downloaded' } }));
+                }
+                setBatch(prev => (prev ? { ...prev, done } : prev));
+            },
+            () => batchCancelRef.current,
+        );
+
+        if (result.downloaded > 0) setSeriesHasSubs(true);
+
+        setBatch(prev => (prev ? {
+            ...prev,
+            phase: 'done',
+            downloadedNow: result.downloaded,
+            failed: result.failed,
+            quotaHit: result.quotaHit,
+            done: result.done,
+            total: result.total,
+        } : prev));
     };
 
     const broadcastInfo = useMemo(
@@ -389,6 +567,11 @@ export default function WatchSeriesPage() {
                         onVideoElement={setVideoEl}
                         topRightSlot={
                             <div className="flex items-center gap-2">
+                                {autoSubLoading && (
+                                    <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-emerald-300 flex items-center gap-2">
+                                        <Loader2 size={16} className="animate-spin" /> Legenda…
+                                    </span>
+                                )}
                                 {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}
                                 {shareToggle}
                             </div>
@@ -401,6 +584,11 @@ export default function WatchSeriesPage() {
 
     const seasons = Object.keys(series.episodes || {}).sort((a, b) => Number(a) - Number(b));
     const currentEpisodes = series.episodes[activeSeason] || [];
+
+    const availabilityList = Object.values(availability);
+    const availableCount = availabilityList.filter(s => s.status === 'available').length;
+    const downloadedCount = availabilityList.filter(s => s.status === 'downloaded').length;
+    const unavailableCount = availabilityList.filter(s => s.status === 'unavailable').length;
 
     return (
         <div className="min-h-screen bg-[#141414] text-white">
@@ -492,6 +680,84 @@ export default function WatchSeriesPage() {
 
                 {/* Episodes Section */}
                 <div className="space-y-6">
+                    {/* Buscar / baixar legendas de todos os episódios */}
+                    <div className="flex flex-wrap items-center gap-3 p-4 bg-[#1a1a1a] border border-[#333] rounded-xl">
+                        <div className="flex items-center gap-2 text-emerald-500">
+                            <Subtitles size={20} />
+                            <span className="text-sm font-semibold text-white">Legendas de toda a série</span>
+                        </div>
+
+                        {remainingDownloads !== null && (
+                            <span className={`text-xs px-2 py-1 rounded ${remainingDownloads <= 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                                {remainingDownloads} download{remainingDownloads === 1 ? '' : 's'} restante{remainingDownloads === 1 ? '' : 's'} hoje
+                            </span>
+                        )}
+
+                        <select
+                            value={batchLanguage}
+                            onChange={(e) => setBatchLanguage(e.target.value)}
+                            disabled={isBatchBusy}
+                            className="px-3 py-2 bg-[#0f0f0f] border border-[#333] rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:opacity-50"
+                        >
+                            {BATCH_LANGUAGES.map(lang => (
+                                <option key={lang.code} value={lang.code}>{lang.label}</option>
+                            ))}
+                        </select>
+
+                        {isBatchBusy ? (
+                            <button
+                                onClick={() => { batchCancelRef.current = true; }}
+                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                            >
+                                <X size={16} /> Cancelar
+                            </button>
+                        ) : (
+                            <>
+                                <button
+                                    onClick={handleBatchSearch}
+                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                >
+                                    <Search size={16} /> Buscar legendas
+                                </button>
+                                {availableCount > 0 && (
+                                    <button
+                                        onClick={handleBatchDownload}
+                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-emerald-500/40 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                    >
+                                        <Download size={16} /> Baixar {availableCount} legenda{availableCount > 1 ? 's' : ''}
+                                    </button>
+                                )}
+                            </>
+                        )}
+
+                        {batch && (
+                            <div className="flex items-center gap-2 text-xs text-gray-400 ml-auto">
+                                {isBatchBusy && <Loader2 size={14} className="animate-spin text-emerald-500" />}
+                                <span>
+                                    {batch.phase === 'searching' && `Buscando ${batch.done}/${batch.total}…`}
+                                    {batch.phase === 'downloading' && `Baixando ${batch.done}/${batch.total}…`}
+                                    {batch.phase === 'searched' && (
+                                        availableCount > 0
+                                            ? `${availableCount} disponível(is) · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
+                                            : `Nenhuma legenda nova encontrada · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
+                                    )}
+                                    {batch.phase === 'done' && (
+                                        batch.quotaHit
+                                            ? `Cota diária atingida. ${batch.downloadedNow} baixada(s) — o resto continua amanhã.`
+                                            : `Concluído: ${batch.downloadedNow} baixada(s)${batch.failed > 0 ? ` · ${batch.failed} falharam` : ''}.`
+                                    )}
+                                </span>
+                            </div>
+                        )}
+
+                        {seriesHasSubs && (
+                            <p className="w-full text-xs text-gray-500">
+                                Como a série já tem legendas, ao abrir um episódio sem legenda ela é baixada
+                                automaticamente antes de reproduzir (consome 1 do limite diário de 5).
+                            </p>
+                        )}
+                    </div>
+
                     <div className="flex items-center gap-4 overflow-x-auto pb-4 scrollbar-hide border-b border-white/10">
                         {seasons.map(season => (
                             <button
@@ -534,6 +800,23 @@ export default function WatchSeriesPage() {
                                         </h4>
                                         {ep.info && ep.info.releasedate && <p className="text-sm text-gray-500">{ep.info.releasedate}</p>}
                                     </div>
+                                    {/* Status da legenda (após buscar em lote) */}
+                                    {availability[ep.id]?.status === 'downloaded' && (
+                                        <span className="text-xs px-2 py-1 rounded bg-emerald-600/20 text-emerald-400 flex items-center gap-1 flex-shrink-0">
+                                            <Check size={12} /> Legenda
+                                        </span>
+                                    )}
+                                    {availability[ep.id]?.status === 'available' && (
+                                        <span className="text-xs px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 flex-shrink-0">
+                                            Disponível
+                                        </span>
+                                    )}
+                                    {availability[ep.id]?.status === 'unavailable' && (
+                                        <span className="text-xs px-2 py-1 rounded bg-white/5 text-gray-500 flex-shrink-0">
+                                            Sem legenda
+                                        </span>
+                                    )}
+
                                     <div className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded">
                                         {ep.container_extension}
                                     </div>
