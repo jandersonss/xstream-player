@@ -134,17 +134,30 @@ export async function POST(request: Request) {
                 body: JSON.stringify({ file_id }),
             });
 
-            // Handle download quota exceeded (407)
-            if (downloadResponse.status === 407) {
-                console.warn('[Subtitles] Download quota exceeded (407)');
-                return NextResponse.json(
-                    { error: 'Limite diário de downloads atingido. Tente novamente amanhã (reset à meia-noite UTC).' },
-                    { status: 407 }
-                );
-            }
-
             if (!downloadResponse.ok) {
                 const errorText = await downloadResponse.text();
+                let parsed: { remaining?: number; reset_time_utc?: string } = {};
+                try { parsed = JSON.parse(errorText); } catch { /* corpo não-JSON */ }
+
+                // Cota diária esgotada: a OpenSubtitles responde 406 (às vezes 407)
+                // com `remaining: 0`. Sinalizamos isso de forma consistente ao cliente.
+                const isQuota =
+                    downloadResponse.status === 406 ||
+                    downloadResponse.status === 407 ||
+                    parsed.remaining === 0;
+
+                if (isQuota) {
+                    console.warn('[Subtitles] Download quota exceeded:', parsed.reset_time_utc || errorText);
+                    return NextResponse.json(
+                        {
+                            error: 'Limite diário de downloads atingido. Tente novamente amanhã.',
+                            remaining: 0,
+                            resetTimeUtc: parsed.reset_time_utc,
+                        },
+                        { status: 406, headers: { 'X-Downloads-Remaining': '0' } }
+                    );
+                }
+
                 console.error(`[Subtitles] Download request error: ${downloadResponse.status}`, errorText);
                 return NextResponse.json(
                     { error: `Download request failed: ${downloadResponse.status}` },
