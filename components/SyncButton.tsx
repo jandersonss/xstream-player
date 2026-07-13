@@ -4,8 +4,8 @@ import { RefreshCw } from 'lucide-react';
 import type { SyncRole } from '@/app/hooks/useLiveShare';
 
 /**
- * Botão de sincronizar tempo entre players. Só deve ser renderizado quando os
- * players estão dessincronizados (o hook useSyncPlayback controla isso).
+ * Button to sync time between players. Should only be rendered when the players
+ * are out of sync (the useSyncPlayback hook controls that).
  */
 export default function SyncButton({ role, onClick }: { role: SyncRole; onClick: () => void }) {
     const label = role === 'broadcaster' ? 'Sincronizar todos' : 'Sincronizar';

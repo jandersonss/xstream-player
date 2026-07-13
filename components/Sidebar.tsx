@@ -24,7 +24,7 @@ export default function Sidebar() {
     const { logout } = useAuth();
     const { syncData, isSyncing, syncProgress, lastSync } = useData();
     const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
-    // Preferência (por aparelho) de "transmitir tudo" — init preguiçoso, sem setState em effect.
+    // Per-device "broadcast everything" preference — lazy init, no setState in effect.
     const [autoBroadcast, setAutoBroadcastOn] = useState(() => getAutoBroadcast());
 
     const toggleAutoBroadcast = () => {
@@ -53,7 +53,7 @@ export default function Sidebar() {
                 </div>
             </div>
 
-            {/* Toggle "Transmitir tudo" — fixado no topo, colapsa para só o ícone no modo estreito. */}
+            {/* "Transmitir tudo" toggle — pinned to the top, collapses to just the icon in narrow mode. */}
             <div className="px-2 lg:px-4 pt-3">
                 <button
                     onClick={toggleAutoBroadcast}

@@ -11,7 +11,7 @@ export const runtime = 'nodejs';
 
 const VALID_ROLES: SyncRole[] = ['broadcaster', 'viewer'];
 
-/** Latência ao vivo saneada (0..3600s); descarta valores absurdos/NaN. */
+/** Sanitized live latency (0..3600s); discards absurd/NaN values. */
 function sanitizeLatency(value: unknown): number {
     const n = Number(value);
     if (!Number.isFinite(n) || n < 0) return 0;
@@ -39,13 +39,13 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 });
     }
 
-    // Comando do transmissor: "sincronizar todos" para a latência-alvo.
+    // Broadcaster command: "sync everyone" to the target latency.
     if (body.command) {
         const state = await setSyncCommand(body.streamKey, sanitizeLatency(body.targetLatency));
         return NextResponse.json(state);
     }
 
-    // Heartbeat de latência de um participante.
+    // Latency heartbeat from a participant.
     if (typeof body.deviceId !== 'string' || !VALID_ROLES.includes(body.role)) {
         return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
     }

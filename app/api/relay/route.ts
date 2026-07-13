@@ -5,16 +5,16 @@ import { buildUpstreamLiveUrl, getAllowedOrigin } from '@/app/lib/liveShare';
 export const runtime = 'nodejs';
 
 /**
- * Relay HLS compartilhado para canais ao vivo.
+ * Shared HLS relay for live channels.
  *
- * Todos os espectadores puxam o stream por aqui; o servidor faz UMA leitura por
- * playlist/segmento (via cache curto que coalesce requisições simultâneas) e
- * distribui para todos. Assim N aparelhos assistindo o mesmo canal contam como
- * ~1 conexão no provedor Xtream.
+ * All viewers pull the stream through here; the server does ONE read per
+ * playlist/segment (via a short cache that coalesces concurrent requests) and
+ * fans it out to everyone. So N devices watching the same channel count as
+ * ~1 connection on the Xtream provider.
  *
- * Provedores Xtream costumam responder o .m3u8 com um 302 para um CDN em OUTRA
- * origem (tokenizada). Por isso: reescrevemos usando a URL final (pós-redirect)
- * e liberamos dinamicamente as origens para as quais o provedor nos redireciona.
+ * Xtream providers usually answer the .m3u8 with a 302 to a CDN on ANOTHER
+ * (tokenized) origin. Hence: we rewrite using the final (post-redirect) URL
+ * and dynamically allowlist the origins the provider redirects us to.
  */
 
 const PLAYLIST_TTL_MS = 2 * 1000;
@@ -25,7 +25,7 @@ const MAX_SEGMENT_CACHE_BYTES = 4 * 1024 * 1024;
 interface CacheEntry {
     body: ArrayBuffer;
     contentType: string;
-    /** URL efetiva após redirects — base correta para reescrever a playlist. */
+    /** Effective URL after redirects — the correct base for rewriting the playlist. */
     finalUrl: string;
     expiresAt: number;
 }
@@ -33,12 +33,12 @@ interface CacheEntry {
 const cache = new Map<string, CacheEntry>();
 const inFlight = new Map<string, Promise<CacheEntry>>();
 
-/** Origens liberadas: a da conta + aquelas para onde o provedor redireciona. */
+/** Allowlisted origins: the account's + the ones the provider redirects to. */
 const allowedOrigins = new Set<string>();
 
 function pruneSegmentCache() {
     if (cache.size <= MAX_CACHED_SEGMENTS) return;
-    // Remove as entradas mais antigas (Map preserva ordem de inserção).
+    // Remove the oldest entries (Map preserves insertion order).
     const excess = cache.size - MAX_CACHED_SEGMENTS;
     let removed = 0;
     for (const key of cache.keys()) {
@@ -64,7 +64,7 @@ async function fetchShared(targetUrl: string, ttl: number): Promise<CacheEntry> 
             throw new Error(`Upstream ${upstream.status}`);
         }
         const finalUrl = upstream.url || targetUrl;
-        // Libera a origem final (o CDN para onde o provedor redirecionou).
+        // Allow the final origin (the CDN the provider redirected to).
         try {
             allowedOrigins.add(new URL(finalUrl).origin);
         } catch {
@@ -97,7 +97,7 @@ function looksLikePlaylist(url: string, contentType: string): boolean {
     return url.includes('.m3u8') || contentType.includes('mpegurl');
 }
 
-/** Reescreve uma playlist HLS para que playlists/segmentos filhos também passem pelo relay. */
+/** Rewrites an HLS playlist so child playlists/segments also go through the relay. */
 function rewritePlaylist(text: string, baseUrl: string): string {
     const toRelay = (rawRef: string): string => {
         try {
@@ -138,7 +138,7 @@ async function resolveTarget(request: Request): Promise<{ url: string } | { erro
     allowedOrigins.add(accountOrigin);
 
     if (src) {
-        // Barra proxy aberto: só relaya a origem da conta ou os CDNs para onde ela redireciona.
+            // Open-proxy guard: only relay the account origin or the CDNs it redirects to.
         let origin: string;
         try {
             origin = new URL(src).origin;
@@ -177,7 +177,7 @@ export async function GET(request: Request) {
 
         if (looksLikePlaylist(entry.finalUrl, entry.contentType)) {
             const text = Buffer.from(entry.body).toString('utf-8');
-            // Base = URL final após redirects (onde os segmentos realmente moram).
+            // Base = final URL after redirects (where the segments actually live).
             const rewritten = rewritePlaylist(text, entry.finalUrl);
             return new NextResponse(rewritten, {
                 status: 200,

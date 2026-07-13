@@ -12,7 +12,7 @@ export const runtime = 'nodejs';
 
 const VALID_TYPES: ShareContentType[] = ['live', 'movie', 'series'];
 
-/** Aceita apenas um IPv4 válido (normaliza o formato IPv6-mapeado ::ffff:x). */
+/** Accepts only a valid IPv4 (normalizes the IPv6-mapped ::ffff:x form). */
 function sanitizeIp(value: unknown): string | undefined {
     if (typeof value !== 'string') return undefined;
     const cleaned = value.replace(/^::ffff:/i, '').trim();
@@ -45,7 +45,7 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
     }
 
-    // Preferimos o IP descoberto no cliente (WebRTC); senão, o header do proxy.
+    // Prefer the IP discovered on the client (WebRTC); otherwise the proxy header.
     const headerIp = request.headers.get('x-forwarded-for')?.split(',')[0].trim()
         || request.headers.get('x-real-ip')
         || undefined;

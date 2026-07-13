@@ -76,9 +76,9 @@ export default function WatchSeriesPage() {
     const [subtitleUrl, setSubtitleUrl] = useState<string | null>(null);
     const [showSubtitlePanel, setShowSubtitlePanel] = useState(false);
     const [parentTmdbId, setParentTmdbId] = useState<number | undefined>(undefined);
-    // Busca/baixa legendas de todos os episódios em lote.
+    // Searches/downloads subtitles for all episodes in batch.
     const [batchLanguage, setBatchLanguage] = useState('pt-BR');
-    // Situação da legenda por episódio (chave = episode.id).
+    // Subtitle status per episode (key = episode.id).
     const [availability, setAvailability] = useState<Record<string, EpisodeSubtitleStatus>>({});
     const [batch, setBatch] = useState<{
         phase: 'searching' | 'searched' | 'downloading' | 'done';
@@ -89,12 +89,12 @@ export default function WatchSeriesPage() {
         quotaHit: boolean;
     } | null>(null);
     const batchCancelRef = useRef(false);
-    // A série tem ao menos uma legenda salva → ativa o download sob demanda por ep.
+    // The series has at least one saved subtitle → enable on-demand download per ep.
     const [seriesHasSubs, setSeriesHasSubs] = useState(false);
-    // Buscando/baixando legenda automaticamente ao abrir um episódio.
+    // Searching/downloading a subtitle automatically when opening an episode.
     const [autoSubLoading, setAutoSubLoading] = useState(false);
     const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
-    // Parâmetros de "entrar" (Modo TV) — via useSearchParams para funcionar no cliente.
+    // "Join" (Modo TV) params — via useSearchParams to work on the client.
     const searchParams = useSearchParams();
     const isJoining = searchParams.get('join') === '1';
     const joinExt = searchParams.get('ext') || undefined;
@@ -102,7 +102,7 @@ export default function WatchSeriesPage() {
     const joinEpisode = searchParams.get('episode') || undefined;
     const joinTitle = searchParams.get('title') || undefined;
 
-    // Sincronização de tempo entre players (transmissor + espectadores do mesmo episódio).
+    // Time sync between players (broadcaster + viewers of the same episode).
     const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
     const { canSync, sync } = useSyncPlayback({
         videoEl,
@@ -198,7 +198,7 @@ export default function WatchSeriesPage() {
         resolveTmdbId();
     }, [series, tmdbConfigured, parentTmdbId, searchTV]);
 
-    // Marca de uma vez os episódios que já têm legenda salva no servidor.
+    // Marks in one pass the episodes that already have a saved subtitle on the server.
     useEffect(() => {
         if (!series) return;
 
@@ -229,8 +229,8 @@ export default function WatchSeriesPage() {
         markDownloaded();
     }, [series]);
 
-    // Ao abrir um episódio: carrega a legenda salva ou, se a série usa legendas,
-    // baixa a do episódio sob demanda (transparente, respeitando a cota diária).
+    // On opening an episode: loads the saved subtitle or, if the series uses subtitles,
+    // downloads the episode one on demand (transparent, respecting the daily quota).
     useEffect(() => {
         if (!selectedEpisode) return;
         const ep = selectedEpisode;
@@ -245,7 +245,7 @@ export default function WatchSeriesPage() {
                 return;
             }
 
-            // Sem legenda salva: só busca automaticamente se a série já usa legendas.
+            // No saved subtitle: only auto-searches if the series already uses subtitles.
             if (!seriesHasSubs) return;
 
             const yearMatch = series?.info.releaseDate?.match(/\d{4}/);
@@ -358,7 +358,7 @@ export default function WatchSeriesPage() {
 
     const isBatchBusy = batch?.phase === 'searching' || batch?.phase === 'downloading';
 
-    // Achata todos os episódios de todas as temporadas, em ordem.
+    // Flattens all episodes of all seasons, in order.
     const flattenEpisodes = () =>
         Object.keys(series?.episodes || {})
             .sort((a, b) => Number(a) - Number(b))
@@ -455,7 +455,7 @@ export default function WatchSeriesPage() {
     );
     useShareBroadcast(isSharing && !isJoining, broadcastInfo);
 
-    // Entrar na transmissão de um episódio de outro aparelho (via relay VOD).
+    // Join an episode broadcast from another device (via VOD relay).
     if (isJoining) {
         const src = relaySrc({ contentType: 'series', streamId: joinEpisode || '', ext: joinExt });
         return (
@@ -500,7 +500,7 @@ export default function WatchSeriesPage() {
         const { hostUrl, username, password } = credentials!;
         const extension = selectedEpisode.container_extension;
         const directUrl = `${hostUrl}/series/${username}/${password}/${selectedEpisode.id}.${extension}`;
-        // Compartilhando → toca o episódio via relay (estilo canal; outros entram no mesmo ponto).
+        // Sharing → plays the episode via relay (channel-style; others join at the same point).
         const streamUrl = isSharing
             ? relaySrc({ contentType: 'series', streamId: selectedEpisode.id, ext: extension })
             : directUrl;

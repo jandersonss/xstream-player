@@ -16,16 +16,16 @@ export default function WatchLivePage() {
     const searchParams = useSearchParams();
     const streamId = params.streamId as string;
 
-    // Vindo do "Modo TV": assisto a transmissão de outro aparelho (via relay, 0 conexão nova).
+    // Coming from "Modo TV": I watch another device broadcast (via relay, 0 new connection).
     const isJoining = searchParams.get('join') === '1';
     const title = searchParams.get('title') || `Canal ${streamId}`;
     const poster = searchParams.get('poster') || undefined;
 
-    // Toggle de transmissão (inicia ligado se o aparelho estiver em "transmitir tudo").
+    // Broadcast toggle (starts on if the device is in "broadcast everything").
     const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
     const useRelay = isJoining || isSharing;
 
-    // Sincronização de tempo entre players (só quando a reprodução passa pelo relay).
+    // Time sync between players (only when playback goes through the relay).
     const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
     const { canSync, sync } = useSyncPlayback({
         videoEl,
@@ -37,7 +37,7 @@ export default function WatchLivePage() {
     const streamUrl = useMemo(() => {
         if (!credentials || !streamId) return null;
         if (useRelay) {
-            // Relay compartilhado no servidor: uma conexão upstream para todos.
+            // Shared relay on the server: one upstream connection for everyone.
             return `/api/relay?type=live&streamId=${encodeURIComponent(streamId)}`;
         }
         const { hostUrl, username, password } = credentials;
@@ -48,7 +48,7 @@ export default function WatchLivePage() {
         () => ({ contentType: 'live' as const, streamId, title, poster }),
         [streamId, title, poster]
     );
-    // Registro/heartbeat só quando EU estou transmitindo (não ao apenas assistir a de outro).
+    // Register/heartbeat only when I am broadcasting (not when just watching someone else).
     useShareBroadcast(isSharing && !isJoining, broadcastInfo);
 
     if (!streamUrl) {

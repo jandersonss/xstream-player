@@ -2,26 +2,26 @@ import fs from 'fs/promises';
 import path from 'path';
 
 /**
- * Estado de sincronização de reprodução entre players que compartilham a MESMA
- * transmissão (um transmissor + N espectadores no Modo TV).
+ * Playback sync state across players sharing the SAME broadcast
+ * (one broadcaster + N viewers in TV Mode).
  *
- * A métrica comum é a "latência ao vivo": distância, em segundos, entre a posição
- * atual e a borda ao vivo (`seekable.end`). Como todos consomem a MESMA janela HLS
- * deslizante (servida pelo relay/ffmpeg), a borda ao vivo é o mesmo instante de
- * mídia para todos — então "8s atrás da borda" é o mesmo quadro em qualquer player.
- * Sincronizar A ao B = igualar a latência (ajustando o currentTime).
+ * The shared metric is "live latency": distance, in seconds, between the current
+ * position and the live edge (`seekable.end`). Since everyone consumes the SAME
+ * sliding HLS window (served by the relay/ffmpeg), the live edge is the same media
+ * instant for all — so "8s behind the edge" is the same frame on any player.
+ * Syncing A to B = matching the latency (by adjusting currentTime).
  *
- * Persistimos em `data/` (e não em memória) porque a app pode rodar em mais de uma
- * instância / com a pasta `data` compartilhada entre aparelhos: só o arquivo é
- * visível a todos os processos. Mesmo padrão das sessões do Modo TV.
+ * We persist to `data/` (not memory) because the app may run in more than one
+ * instance / with the `data` folder shared across devices: only the file is
+ * visible to all processes. Same pattern as TV Mode sessions.
  */
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const SYNC_PATH = path.join(DATA_DIR, 'live-sync.json');
 
-/** Participante sem heartbeat há mais que isso é descartado. */
+/** A participant without a heartbeat for longer than this is discarded. */
 const PARTICIPANT_TTL_MS = 15 * 1000;
-/** Comando de "sincronizar" mais antigo que isso é ignorado (evita re-seek eterno). */
+/** A "sync" command older than this is ignored (avoids endless re-seeking). */
 const COMMAND_TTL_MS = 30 * 1000;
 
 export type SyncRole = 'broadcaster' | 'viewer';
@@ -68,7 +68,7 @@ async function writeStore(store: Store): Promise<void> {
     await fs.writeFile(SYNC_PATH, JSON.stringify(store, null, 2));
 }
 
-/** Remove participantes/comandos vencidos e streams vazias. Devolve se algo mudou. */
+/** Removes expired participants/commands and empty streams. Returns whether anything changed. */
 function pruneStore(store: Store, now: number): boolean {
     let changed = false;
     for (const [key, stream] of Object.entries(store)) {
@@ -98,7 +98,7 @@ function snapshot(stream: StreamSync | undefined): SyncState {
     return { participants, command: stream.command };
 }
 
-/** Registra/atualiza a latência de um participante e devolve o estado atual da transmissão. */
+/** Records/updates a participant's latency and returns the broadcast's current state. */
 export async function reportParticipant(
     streamKey: string,
     deviceId: string,
@@ -117,7 +117,7 @@ export async function reportParticipant(
     return snapshot(stream);
 }
 
-/** O transmissor pede que os espectadores dessincronizados pulem para a latência-alvo. */
+/** The broadcaster asks out-of-sync viewers to jump to the target latency. */
 export async function setSyncCommand(streamKey: string, targetLatency: number): Promise<SyncState> {
     const now = Date.now();
     const store = await readStore();
@@ -131,7 +131,7 @@ export async function setSyncCommand(streamKey: string, targetLatency: number): 
     return snapshot(stream);
 }
 
-/** Lê o estado atual, descartando (e persistindo) participantes/comandos vencidos. */
+/** Reads the current state, discarding (and persisting) expired participants/commands. */
 export async function getSyncState(streamKey: string): Promise<SyncState> {
     const now = Date.now();
     const store = await readStore();
