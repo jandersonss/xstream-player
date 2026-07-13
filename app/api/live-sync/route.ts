@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     if (!streamKey) {
         return NextResponse.json({ error: 'streamKey ausente' }, { status: 400 });
     }
-    return NextResponse.json(getSyncState(streamKey));
+    return NextResponse.json(await getSyncState(streamKey));
 }
 
 export async function POST(request: Request) {
@@ -41,7 +41,7 @@ export async function POST(request: Request) {
 
     // Comando do transmissor: "sincronizar todos" para a latência-alvo.
     if (body.command) {
-        const state = setSyncCommand(body.streamKey, sanitizeLatency(body.targetLatency));
+        const state = await setSyncCommand(body.streamKey, sanitizeLatency(body.targetLatency));
         return NextResponse.json(state);
     }
 
@@ -49,7 +49,7 @@ export async function POST(request: Request) {
     if (typeof body.deviceId !== 'string' || !VALID_ROLES.includes(body.role)) {
         return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
     }
-    const state = reportParticipant(
+    const state = await reportParticipant(
         body.streamKey,
         body.deviceId,
         body.role,
