@@ -147,6 +147,41 @@ sudo chown -R 1001:1001 data/
 
 ---
 
+## 🤝 Contributing
+
+Contributions are welcome. Before opening a pull request, please read the
+[Contributor License Agreement](CLA.md) and include the acceptance statement described
+there in your PR description — this lets the project keep its licensing options open.
+
+## 📄 License
+
+Copyright (C) 2026 Janderson Lemos.
+
+Xstream Player is free software, licensed under the
+**[GNU Affero General Public License v3.0](LICENSE)**.
+
+You may use, study, share, and modify it. If you distribute it — or run a modified
+version as a network service — you must make the complete corresponding source code
+available to your users under the same license.
+
+### ⚠️ Third-party dependencies
+
+The npm dependencies are permissively licensed (MIT / Apache-2.0) and impose no
+restrictions beyond attribution.
+
+**ffmpeg is the exception.** It is licensed under the GPL/LGPL and is bundled into the
+Docker image to support VOD in TV Mode. It runs as an external binary (invoked as a
+subprocess, not linked), so it does not affect the license of this project's own code —
+but **anyone who redistributes the Docker image is also redistributing ffmpeg** and must
+comply with the GPL for that binary (provide its source, keep its license notices).
+
+This is a non-issue while the project is distributed under the AGPL. It only needs to be
+addressed if the image is ever shipped as part of a closed-source or commercial product —
+in that case, either comply with ffmpeg's GPL obligations for the bundled binary, or stop
+bundling it and require the user to install ffmpeg themselves.
+
+---
+
 ## Donations
 
 **In cryptocurrencies:**
