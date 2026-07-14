@@ -8,3 +8,8 @@ README.md
 .idea
 .vscode
 docs
+
+# Runtime state: holds the Xtream credentials in plaintext and the user
+# database. It is a mounted volume in production and must never be baked
+# into an image.
+data

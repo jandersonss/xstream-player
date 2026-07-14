@@ -34,6 +34,10 @@ COPY --from=builder /app/public ./public
 COPY --from=builder /app/.next/standalone ./
 COPY --from=builder /app/.next/static ./.next/static
 
+# Standalone tracing only bundles what the app imports, so the migration scripts
+# would never reach the image: they are run by hand via docker exec.
+COPY --from=builder /app/scripts ./scripts
+
 # Create data directory
 RUN mkdir -p /app/data
 
