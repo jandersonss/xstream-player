@@ -9,6 +9,7 @@ import {
     shuffleWithSeed,
     generateDailyCarousels,
     findBestMatch,
+    extractYear,
     TMDbMovie,
     TMDbTVShow,
     TMDbGenre,
@@ -21,7 +22,8 @@ const TMDB_API_BASE = 'https://api.themoviedb.org/3';
 const CACHE_TTL = 1000 * 60 * 60 * 24; // 24 hours
 // Bump when the cached carousel/hero item shape or image sizes change, so a
 // same-day cache written by an older build is not served to a newer client.
-const CACHE_VERSION = 'v2';
+// v3: stricter matching — v2 caches hold wrong-year/wrong-sequel matches.
+const CACHE_VERSION = 'v3';
 
 async function getApiKey(): Promise<string | null> {
     try {
@@ -262,16 +264,15 @@ export async function getTMDbCarousels(apiKey: string): Promise<any[]> {
 
                     const targetDatabase = isMovie ? allMovies : allSeries;
                     const tmdbTitle = isMovie ? (tmdbItem as TMDbMovie).title : (tmdbItem as TMDbTVShow).name;
+                    const yearStr = isMovie
+                        ? (tmdbItem as TMDbMovie).release_date
+                        : (tmdbItem as TMDbTVShow).first_air_date;
 
-                    const matchResult = findBestMatch<any>(tmdbTitle, targetDatabase, 0.85);
+                    const matchResult = findBestMatch<any>(tmdbTitle, targetDatabase, 0.85, extractYear(yearStr));
 
                     if (matchResult && !matchedStreamIds.has(matchResult.item.id)) {
                         const iptvMatch = matchResult.item;
                         matchedStreamIds.add(iptvMatch.id);
-
-                        const yearStr = isMovie
-                            ? (tmdbItem as TMDbMovie).release_date
-                            : (tmdbItem as TMDbTVShow).first_air_date;
 
                         const tmdbPoster = getTMDbImageUrl(tmdbItem.poster_path, 'w342');
                         const tmdbRating = tmdbItem.vote_average;
@@ -386,8 +387,9 @@ export async function getBackendHeroItems(type: 'all' | 'movie' | 'series' = 'al
 
                 const title = isMovie ? (item as TMDbMovie).title : (item as TMDbTVShow).name;
                 const targetDb = isMovie ? movies : series;
+                const yearStr = isMovie ? (item as TMDbMovie).release_date : (item as TMDbTVShow).first_air_date;
 
-                const match = findBestMatch<CachedStream>(title, targetDb, 0.85);
+                const match = findBestMatch<CachedStream>(title, targetDb, 0.85, extractYear(yearStr));
                 const stream = match?.item;
                 const hasStreamDetail = !!(
                     stream &&
@@ -398,8 +400,6 @@ export async function getBackendHeroItems(type: 'all' | 'movie' | 'series' = 'al
                 );
 
                 if (match && hasStreamDetail && item.backdrop_path) {
-                    const yearStr = isMovie ? (item as TMDbMovie).release_date : (item as TMDbTVShow).first_air_date;
-
                     // Fetch videos on the backend for trailer autoplay
                     let videoKey: string | null = null;
                     try {

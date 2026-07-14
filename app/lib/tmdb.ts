@@ -207,6 +207,91 @@ export const normalizeTitle = (title: string): string => {
 };
 
 /**
+ * Strip provider noise ("(2019)", "[L]", "[4K]", quality tags) from a title so it
+ * can be sent to TMDb's search endpoint. Unlike normalizeTitle this keeps case,
+ * accents and leading articles, which TMDb's own search relies on.
+ */
+export const cleanSearchQuery = (title: string): string => {
+    if (!title) return '';
+
+    // A trailing bare year is deliberately kept: in this catalog it belongs to the
+    // title ("Mr. Olympia 2025") rather than marking the release ("Obsessão - 2018").
+    const cleaned = title
+        .replace(/\s*\[.*?\]/g, '')
+        .replace(/\s*\(.*?\)/g, '')
+        .replace(/\s*-\s*(?:19|20)\d{2}\b/g, '')
+        .replace(/\s*\b(720p|1080p|2160p|4k|hd|bluray|brrip|webrip|web-dl|hdtv|dvdrip|cam)\b.*$/i, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+
+    if (cleaned) return cleaned;
+
+    // The title was entirely bracketed ("[REC] (2007)") — keep the bracket's text.
+    return title
+        .replace(/\s*\(.*?\)/g, '')
+        .replace(/[[\]]/g, '')
+        .replace(/\s+/g, ' ')
+        .trim();
+};
+
+const yearCache = new Map<string, number | null>();
+
+/**
+ * Extract a release year from a raw title such as "Obsessão (2019) [L]".
+ * A parenthesized year wins; otherwise the last plausible year-looking number
+ * is used, so titles that contain numbers ("Blade Runner 2049") are not read
+ * as their own release year.
+ */
+export const extractYear = (title: string): number | null => {
+    if (!title) return null;
+
+    const cached = yearCache.get(title);
+    if (cached !== undefined) return cached;
+
+    const maxYear = new Date().getFullYear() + 2;
+    const isPlausible = (year: number) => year >= 1900 && year <= maxYear;
+
+    let result: number | null = null;
+
+    const parenthesized = title.match(/\((\d{4})\)/);
+    if (parenthesized && isPlausible(Number(parenthesized[1]))) {
+        result = Number(parenthesized[1]);
+    } else {
+        const bare = title.match(/(?:19|20)\d{2}/g);
+        if (bare) {
+            const last = Number(bare[bare.length - 1]);
+            if (isPlausible(last)) result = last;
+        }
+    }
+
+    if (yearCache.size > 50000) {
+        yearCache.clear();
+    }
+    yearCache.set(title, result);
+
+    return result;
+};
+
+const ROMAN_NUMERALS: Record<string, number> = {
+    i: 1, ii: 2, iii: 3, iv: 4, v: 5, vi: 6, vii: 7, viii: 8, ix: 9, x: 10
+};
+
+/**
+ * Sequel number at the end of an already-normalized title
+ * ("todo mundo em pânico 2" -> 2). Sequels share the whole base title, so edit
+ * distance alone cannot separate them: "... pânico 2" vs "... pânico 6" scores
+ * ~0.95. Comparing this token rules them out explicitly.
+ */
+const extractSequelNumber = (normalizedTitle: string): number | null => {
+    const lastWord = normalizedTitle.split(' ').pop() || '';
+    if (/^\d{1,2}$/.test(lastWord)) return parseInt(lastWord, 10);
+    return ROMAN_NUMERALS[lastWord] ?? null;
+};
+
+// Regional releases make the provider's year drift from TMDb's by a year.
+const YEAR_TOLERANCE = 1;
+
+/**
  * Calculate Levenshtein distance between two strings.
  * Uses bounded computation — bails out early if distance exceeds maxDist.
  * This avoids wasted CPU on strings that clearly won't match.
@@ -310,16 +395,23 @@ export const titlesMatch = (title1: string, title2: string, threshold: number = 
 
 /**
  * Find the best match for a title in a list of items.
- * Optimized with:
- * 1. Exact match via Map lookup (O(1))
- * 2. Length-based pre-filtering
- * 3. Bounded Levenshtein that bails out early
- * 4. In-memory normalization cache
+ *
+ * Title similarity alone produces false positives, because normalization strips
+ * exactly the parts that disambiguate a title: a remake shares its name with the
+ * original ("Obsessão" 2026 vs "Obsessão (2019)") and a sequel shares its whole
+ * base title ("Todo Mundo em Pânico 6" vs "Todo Mundo em Pânico 2"). Year and
+ * sequel number are therefore hard filters, applied before the similarity score
+ * — including before the exact-title shortcut.
+ *
+ * @param targetYear - Release year of the title being looked up. When it and the
+ * candidate's year are both known, they must agree within YEAR_TOLERANCE. Pass
+ * null/undefined when unknown: the check is then skipped rather than guessed.
  */
 export const findBestMatch = <T extends { name: string; normalized_name?: string }>(
     targetTitle: string,
     items: T[],
-    threshold: number = 0.85
+    threshold: number = 0.85,
+    targetYear?: number | null
 ): { item: T; score: number } | null => {
     let bestMatch: T | null = null;
     let bestScore = 0;
@@ -327,14 +419,34 @@ export const findBestMatch = <T extends { name: string; normalized_name?: string
 
     if (!normalizedTarget) return null;
 
-    // Build a quick exact-match map on first call per items array
-    // (items reference stability means this is typically cached by the caller)
+    const targetSequel = extractSequelNumber(normalizedTarget);
+
+    // Exact title whose year only falls within the tolerance. Kept aside so an
+    // exact-year candidate later in the list still wins over it.
+    let driftedExact: T | null = null;
+
     for (const entry of items) {
         const normalizedItem = entry.normalized_name || normalizeTitle(entry.name);
 
-        // Exact match — return immediately
+        // A sequel is a different film, even when the base titles are identical.
+        if (extractSequelNumber(normalizedItem) !== targetSequel) {
+            continue;
+        }
+
+        const itemYear = targetYear ? extractYear(entry.name) : null;
+
+        // Same title, different year — a remake, not this film.
+        if (targetYear && itemYear && Math.abs(itemYear - targetYear) > YEAR_TOLERANCE) {
+            continue;
+        }
+
         if (normalizedTarget === normalizedItem) {
-            return { item: entry, score: 1.0 };
+            // Exact title and exact year (or no year to check) — nothing can beat it.
+            if (!targetYear || !itemYear || itemYear === targetYear) {
+                return { item: entry, score: 1.0 };
+            }
+            if (!driftedExact) driftedExact = entry;
+            continue;
         }
 
         // Aggressive length diff filter — skip if lengths differ too much
@@ -350,6 +462,12 @@ export const findBestMatch = <T extends { name: string; normalized_name?: string
             bestScore = similarity;
             bestMatch = entry;
         }
+    }
+
+    // No exact-year candidate showed up: an exact title within the year tolerance
+    // still beats any fuzzy match.
+    if (driftedExact) {
+        return { item: driftedExact, score: 1.0 };
     }
 
     if (bestScore >= threshold && bestMatch) {

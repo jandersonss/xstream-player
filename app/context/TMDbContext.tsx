@@ -1,7 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
-import { TMDbGenre, TMDbMovie, TMDbTVShow, generateCacheKey } from '../lib/tmdb';
+import { TMDbGenre, TMDbMovie, TMDbTVShow, generateCacheKey, cleanSearchQuery, extractYear } from '../lib/tmdb';
 import * as db from '../lib/db';
 
 interface TMDbConfig {
@@ -181,27 +181,53 @@ export const TMDbProvider = ({ children }: { children: ReactNode }) => {
         return data?.results || [];
     }, [fetchWithCache]);
 
+    // Provider titles carry the year and release tags ("Obsessão (2019) [L]"). Sending
+    // them raw to TMDb hurts the search and, worse, the top hit for a bare title is the
+    // newest remake — so the year is used to constrain the search when the title has one.
     const searchMovie = useCallback(async (query: string): Promise<TMDbMovie | null> => {
-        if (!query.trim()) return null;
+        const cleaned = cleanSearchQuery(query);
+        if (!cleaned) return null;
+
+        const year = extractYear(query);
+
+        if (year) {
+            const constrained = await fetchWithCache<{ results: TMDbMovie[] }>('/search/movie', {
+                query: cleaned,
+                primary_release_year: year,
+                page: 1
+            });
+            if (constrained?.results?.[0]) return constrained.results[0];
+            // Fall through: a missing year on TMDb's side should not cost us a match.
+        }
 
         const data = await fetchWithCache<{ results: TMDbMovie[] }>('/search/movie', {
-            query: query.trim(),
+            query: cleaned,
             page: 1
         });
 
-        // Return the first result (most relevant)
         return data?.results?.[0] || null;
     }, [fetchWithCache]);
 
     const searchTV = useCallback(async (query: string): Promise<TMDbTVShow | null> => {
-        if (!query.trim()) return null;
+        const cleaned = cleanSearchQuery(query);
+        if (!cleaned) return null;
+
+        const year = extractYear(query);
+
+        if (year) {
+            const constrained = await fetchWithCache<{ results: TMDbTVShow[] }>('/search/tv', {
+                query: cleaned,
+                first_air_date_year: year,
+                page: 1
+            });
+            if (constrained?.results?.[0]) return constrained.results[0];
+        }
 
         const data = await fetchWithCache<{ results: TMDbTVShow[] }>('/search/tv', {
-            query: query.trim(),
+            query: cleaned,
             page: 1
         });
 
-        // Return the first result (most relevant)
         return data?.results?.[0] || null;
     }, [fetchWithCache]);
 
