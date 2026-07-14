@@ -7,8 +7,9 @@ import { useTMDb } from '../context/TMDbContext';
 import { useSubtitle } from '../context/SubtitleContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, TrendingUp, Subtitles } from 'lucide-react';
+import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, TrendingUp, Subtitles, Wifi } from 'lucide-react';
 import { useEffect, useState, useMemo, useRef } from 'react';
+import { useAccountStatus } from '@/app/hooks/useAccountStatus';
 import ContentCarousel from '@/components/ContentCarousel';
 import HeroSection from '@/components/HeroSection';
 import TMDbSettingsModal from '@/components/TMDbSettingsModal';
@@ -34,6 +35,7 @@ export default function Dashboard() {
         ensureConfigLoaded: ensureSubtitleConfigLoaded,
     } = useSubtitle();
 
+    const account = useAccountStatus();
     const isAccountActive = user?.status === 'Active';
     const [showSettings, setShowSettings] = useState(false);
     const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
@@ -165,15 +167,16 @@ export default function Dashboard() {
                             {isSubtitleConfigResolved && isSubtitleConfigured && <span className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>}
                         </button>
 
-                        <div className={`bg-black/30 px-2.5 py-1 rounded-full border flex items-center gap-1.5 text-[10px] md:text-xs hidden sm:flex ${isAccountActive ? 'border-green-500/40 text-green-400' : 'border-white/5 text-gray-400'}`}>
+                        <div className={`bg-black/30 px-2.5 py-1 rounded-full border flex items-center gap-1.5 text-[10px] md:text-xs text-white hidden sm:flex ${isAccountActive ? 'border-green-500/40' : 'border-white/5'}`}>
                             <User size={12} />
                             <span>{user?.username}</span>
-                            <span className={`w-1.5 h-1.5 rounded-full ${isAccountActive ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'bg-gray-500'}`}></span>
-                        </div>
-
-                        <div className="bg-black/30  px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
+                            <span className="text-white/30">|</span>
                             <Calendar size={12} />
                             <span>{user?.exp_date ? formatDate(user.exp_date) : 'N/A'}</span>
+                            <span className="text-white/30">|</span>
+                            <Wifi size={12} />
+                            <span>{account ? `${account.activeConnections}/${account.maxConnections}` : '—'}</span>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isAccountActive ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'bg-gray-500'}`}></span>
                         </div>
                     </div>
                 </div>
