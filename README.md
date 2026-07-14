@@ -52,7 +52,7 @@ IPTV accounts have a limit of simultaneous connections. **TV Mode** lets several
 *   **Time sync:** when the broadcaster and viewers drift apart, a **"Sincronizar"** button appears. A viewer jumps to the broadcaster's position; the broadcaster can pull everyone to its own time. The button only shows up when players are actually out of sync.
 *   **Auto device naming:** devices are labeled from their user agent (e.g. "Smart TV (LG)", "iPhone", "PC (Windows)") and can be renamed in the Modo TV screen.
 
-> **Requirements:** sharing movies/series (VOD) needs **ffmpeg** installed on the server. The provided Docker image already includes it. Shared state lives in the `data/` folder (`live-sessions.json`, `live-sync.json`), so it works even across multiple app instances that share that folder.
+> **Requirements:** sharing movies/series (VOD) needs **ffmpeg** installed on the server. The provided Docker image already includes it. Shared state lives in the `data/` folder (`tv-mode.sqlite`), so it works even across multiple app instances that share that folder.
 
 ## 🚀 How to Install and Run
 

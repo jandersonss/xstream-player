@@ -6,7 +6,7 @@ import {
     upsertSession,
     HEARTBEAT_MS,
     type ShareContentType,
-} from '@/app/lib/liveShare';
+} from '@/app/lib/tvModeStore';
 
 export const runtime = 'nodejs';
 
@@ -26,7 +26,7 @@ export async function GET(request: Request) {
     const remoteAccessResponse = await enforceRemoteAccessForApi(request);
     if (remoteAccessResponse) return remoteAccessResponse;
 
-    const sessions = await listActiveSessions();
+    const sessions = listActiveSessions();
     return NextResponse.json({ sessions, heartbeatMs: HEARTBEAT_MS });
 }
 
@@ -51,7 +51,7 @@ export async function POST(request: Request) {
         || undefined;
     const resolvedIp = sanitizeIp(ip) || sanitizeIp(headerIp);
 
-    const session = await upsertSession({
+    const session = upsertSession({
         deviceId: String(deviceId),
         deviceName: String(deviceName),
         contentType,
@@ -76,6 +76,6 @@ export async function DELETE(request: Request) {
         return NextResponse.json({ error: 'deviceId ausente' }, { status: 400 });
     }
 
-    await endSession(deviceId);
+    endSession(deviceId);
     return NextResponse.json({ success: true });
 }
