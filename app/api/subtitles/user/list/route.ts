@@ -1,18 +1,27 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
-import path from 'path';
 import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { DEFAULT_SUBTITLE_LANGUAGE, subtitleLanguageDir } from '@/app/lib/subtitleStore';
 
-const SUBTITLES_DIR = path.join(process.cwd(), 'data', 'subtitles');
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
-// Lists the streamIds that already have a saved subtitle, so episodes can be
-// marked in a single pass (no request per episode).
+// Lists the streamIds that already have a saved subtitle in the requested
+// language, so episodes can be marked in a single pass (no request per episode).
 export async function GET(request: Request) {
     const remoteAccessResponse = await enforceRemoteAccessForApi(request);
     if (remoteAccessResponse) return remoteAccessResponse;
 
     try {
-        const files = await fs.readdir(SUBTITLES_DIR);
+        const { searchParams } = new URL(request.url);
+        const language = searchParams.get('language') || DEFAULT_SUBTITLE_LANGUAGE;
+
+        const dir = subtitleLanguageDir(language);
+        if (!dir) {
+            return NextResponse.json({ error: 'Invalid language' }, { status: 400 });
+        }
+
+        const files = await fs.readdir(dir);
         const streamIds = files
             .filter(f => f.startsWith('subtitle-') && f.endsWith('.json'))
             .map(f => f.slice('subtitle-'.length, -'.json'.length));

@@ -3,6 +3,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { Search, Download, Loader2, Subtitles, X, Globe } from 'lucide-react';
 import { useSubtitle, SubtitleResult } from '../app/context/SubtitleContext';
+import { useProfile } from '../app/context/ProfileContext';
 
 interface SubtitleSearchPanelProps {
     title: string;
@@ -42,15 +43,25 @@ export default function SubtitleSearchPanel({
     onClose,
 }: SubtitleSearchPanelProps) {
     const { searchSubtitles, downloadSubtitle, isConfigured, isConfigResolved, remainingDownloads, ensureConfigLoaded } = useSubtitle();
+    const { activeProfile, updatePrefs } = useProfile();
     const [results, setResults] = useState<SubtitleResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [isDownloading, setIsDownloading] = useState<number | null>(null);
-    const [selectedLanguage, setSelectedLanguage] = useState('pt-BR');
+    const [selectedLanguage, setSelectedLanguage] = useState(
+        () => activeProfile?.prefs.subtitleLanguage ?? 'pt-BR'
+    );
     const [hasSearched, setHasSearched] = useState(false);
 
     useEffect(() => {
         ensureConfigLoaded();
     }, [ensureConfigLoaded]);
+
+    // The language picked here becomes the profile's preference, so the next
+    // content already searches (and auto-downloads) in it.
+    const changeLanguage = useCallback((language: string) => {
+        setSelectedLanguage(language);
+        updatePrefs({ subtitleLanguage: language });
+    }, [updatePrefs]);
 
     const handleSearch = useCallback(async () => {
         setIsSearching(true);
@@ -169,7 +180,7 @@ export default function SubtitleSearchPanel({
                             <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                             <select
                                 value={selectedLanguage}
-                                onChange={(e) => setSelectedLanguage(e.target.value)}
+                                onChange={(e) => changeLanguage(e.target.value)}
                                 className="w-full pl-9 pr-4 py-2.5 bg-[#0f0f0f] border border-[#333] rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 appearance-none cursor-pointer"
                             >
                                 {LANGUAGES.map(lang => (

@@ -2,8 +2,10 @@ import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
 import path from 'path';
 import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { DEFAULT_SUBTITLE_LANGUAGE, resolveSubtitlePath } from '@/app/lib/subtitleStore';
 
-const SUBTITLES_DIR = path.join(process.cwd(), 'data', 'subtitles');
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
     const remoteAccessResponse = await enforceRemoteAccessForApi(request);
@@ -12,12 +14,16 @@ export async function GET(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const streamId = searchParams.get('streamId');
+        const language = searchParams.get('language') || DEFAULT_SUBTITLE_LANGUAGE;
 
         if (!streamId) {
             return NextResponse.json({ error: 'streamId is required' }, { status: 400 });
         }
 
-        const filePath = path.join(SUBTITLES_DIR, `subtitle-${streamId}.json`);
+        const filePath = resolveSubtitlePath(streamId, language);
+        if (!filePath) {
+            return NextResponse.json({ error: 'Invalid streamId or language' }, { status: 400 });
+        }
 
         try {
             const data = await fs.readFile(filePath, 'utf-8');
@@ -40,20 +46,24 @@ export async function POST(request: Request) {
 
     try {
         const body = await request.json();
-        const { streamId, vtt, language } = body;
+        const { streamId, vtt } = body;
+        const language = body.language || DEFAULT_SUBTITLE_LANGUAGE;
 
         if (!streamId || !vtt) {
             return NextResponse.json({ error: 'streamId and vtt are required' }, { status: 400 });
         }
 
-        // Ensure directory exists
-        await fs.mkdir(SUBTITLES_DIR, { recursive: true });
+        const filePath = resolveSubtitlePath(String(streamId), String(language));
+        if (!filePath) {
+            return NextResponse.json({ error: 'Invalid streamId or language' }, { status: 400 });
+        }
 
-        const filePath = path.join(SUBTITLES_DIR, `subtitle-${streamId}.json`);
+        await fs.mkdir(path.dirname(filePath), { recursive: true });
+
         const subtitleData = {
             streamId,
             vtt,
-            language: language || 'pt-BR',
+            language,
             timestamp: Date.now()
         };
 
@@ -73,12 +83,16 @@ export async function DELETE(request: Request) {
     try {
         const { searchParams } = new URL(request.url);
         const streamId = searchParams.get('streamId');
+        const language = searchParams.get('language') || DEFAULT_SUBTITLE_LANGUAGE;
 
         if (!streamId) {
             return NextResponse.json({ error: 'streamId is required' }, { status: 400 });
         }
 
-        const filePath = path.join(SUBTITLES_DIR, `subtitle-${streamId}.json`);
+        const filePath = resolveSubtitlePath(streamId, language);
+        if (!filePath) {
+            return NextResponse.json({ error: 'Invalid streamId or language' }, { status: 400 });
+        }
 
         try {
             await fs.unlink(filePath);

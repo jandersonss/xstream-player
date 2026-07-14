@@ -45,6 +45,7 @@ interface SeriesInfo {
 
 import { useData } from '@/app/context/DataContext';
 import { useTMDb } from '@/app/context/TMDbContext';
+import { useProfile } from '@/app/context/ProfileContext';
 import { useSubtitle, EpisodeSubtitleStatus } from '@/app/context/SubtitleContext';
 
 const BATCH_LANGUAGES = [
@@ -63,6 +64,7 @@ export default function WatchSeriesPage() {
     const { getCachedDetail, saveCachedDetail } = useData();
     const { searchTV, isConfigured: tmdbConfigured } = useTMDb();
     const { getSavedSubtitle, searchSeriesSubtitles, downloadSeriesSubtitles, autoDownloadEpisodeSubtitle, remainingDownloads } = useSubtitle();
+    const { activeProfile } = useProfile();
     const params = useParams();
     const router = useRouter();
     const seriesId = params.seriesId as string;
@@ -77,7 +79,9 @@ export default function WatchSeriesPage() {
     const [showSubtitlePanel, setShowSubtitlePanel] = useState(false);
     const [parentTmdbId, setParentTmdbId] = useState<number | undefined>(undefined);
     // Searches/downloads subtitles for all episodes in batch.
-    const [batchLanguage, setBatchLanguage] = useState('pt-BR');
+    const [batchLanguage, setBatchLanguage] = useState(
+        () => activeProfile?.prefs.subtitleLanguage ?? 'pt-BR'
+    );
     // Subtitle status per episode (key = episode.id).
     const [availability, setAvailability] = useState<Record<string, EpisodeSubtitleStatus>>({});
     const [batch, setBatch] = useState<{
@@ -204,7 +208,9 @@ export default function WatchSeriesPage() {
 
         const markDownloaded = async () => {
             try {
-                const res = await fetch('/api/subtitles/user/list');
+                const res = await fetch(
+                    `/api/subtitles/user/list?language=${encodeURIComponent(batchLanguage)}`
+                );
                 if (!res.ok) return;
                 const { streamIds } = await res.json();
                 const saved = new Set<string>(streamIds || []);
@@ -227,7 +233,7 @@ export default function WatchSeriesPage() {
             }
         };
         markDownloaded();
-    }, [series]);
+    }, [series, batchLanguage]);
 
     // On opening an episode: loads the saved subtitle or, if the series uses subtitles,
     // downloads the episode one on demand (transparent, respecting the daily quota).

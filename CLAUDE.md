@@ -22,15 +22,20 @@ Não há suíte de testes configurada.
 ## Arquitetura
 
 - **`app/`** — App Router. `app/dashboard/` = UI (rotas de live/movies/series/watch/search/favorites/tv). `app/api/` = backend (todas as chamadas ao provedor Xtream, SQLite, TMDB e OpenSubtitles passam por API routes — o cliente nunca acessa o provedor direto).
-- **`app/lib/`** — lógica server-side. `sqliteCache.ts` (better-sqlite3, único módulo que abre o DB), `xtreamSync.ts` (sincroniza catálogo do provedor), `db.ts` (client-side; chama `/api/library`), `liveShare.ts`/`vodBroadcast.ts` (Modo TV), `tmdb.ts`, `remoteAccess.ts`. Módulos server usam `import 'server-only'`.
+- **`app/lib/`** — lógica server-side. `sqliteCache.ts` e `userStore.ts` (better-sqlite3 — cada um é o **único dono do seu banco**; ninguém mais abre DB), `xtreamSync.ts` (sincroniza catálogo do provedor), `db.ts` (client-side; chama `/api/library`), `liveShare.ts`/`vodBroadcast.ts` (Modo TV), `tmdb.ts`, `remoteAccess.ts`. Módulos server usam `import 'server-only'`.
 - **`components/`** — componentes React compartilhados (VideoPlayer, carousels, modais, navegação TV).
 - **`legacy/`** — app IE11/WebOS antigo, buildado separadamente. `middleware.ts` redireciona WebOS com Chrome < 72 para `/legacy/index.html`. Excluído do tsconfig e do ESLint.
 
 ## Persistência (`data/`)
 
-Tudo em `data/` é **gitignored** (só `data/.keep` versionado) e persiste entre execuções:
-- `xstream-player.sqlite` (+ `-shm`/`-wal`, modo WAL) — cache de catálogo/streams. Aberto só por `app/lib/sqliteCache.ts` via `process.cwd()/data`.
-- JSONs de estado: `config.json` (credenciais Xtream), `favorites.json`, `watch-progress.json`, `live-sessions.json`/`live-sync.json` (Modo TV, funciona multi-instância se a pasta for compartilhada), configs de TMDB/OpenSubtitles.
+Tudo em `data/` é **gitignored** (só `data/.keep` versionado) e persiste entre execuções. São **dois bancos com ciclos de vida opostos** — não misture:
+- `xstream-player.sqlite` — **cache descartável** de catálogo/streams. Apagar para forçar re-sync é operação normal. Aberto só por `app/lib/sqliteCache.ts`.
+- `user-data.sqlite` — **dado do usuário, insubstituível**: perfis, favoritos e progresso (`profiles`, `favorites`, `watch_progress`). Aberto só por `app/lib/userStore.ts`. É o arquivo que importa no backup.
+- Ambos em modo WAL (+ `-shm`/`-wal`), sob `process.cwd()/data`.
+- JSONs de estado restantes: `config.json` (credenciais Xtream), `live-sessions.json`/`live-sync.json` (Modo TV, funciona multi-instância se a pasta for compartilhada), configs de TMDB/OpenSubtitles.
+- Legendas em `subtitles/<idioma>/subtitle-<streamId>.json` — cache compartilhado por todos os perfis, chaveado por idioma (o perfil só decide **qual** idioma pedir).
+
+**Perfis:** o perfil ativo viaja no cookie `xstream_profile`; as rotas resolvem por ele (`resolveProfileId(request)`), então o cliente nunca passa `profileId` à mão. Favoritos e progresso são sempre escopados por perfil.
 
 ## Gotchas
 

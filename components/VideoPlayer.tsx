@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback, type CSSProperties } from 're
 import Hls from 'hls.js';
 import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft, Loader2, Subtitles, SkipForward } from 'lucide-react';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
+import { useProfile } from '@/app/context/ProfileContext';
 import { getDeviceProfile } from '@/app/lib/deviceProfile';
 
 type VideoPreloadMode = 'auto' | 'metadata' | 'none';
@@ -137,6 +138,12 @@ interface VideoPlayerProps {
     onVideoElement?: (el: HTMLVideoElement | null) => void;
 }
 
+const DEFAULT_SUBTITLE_FONT_SIZE = 1.5;
+
+function clampFontSize(size: number): number {
+    return Math.max(0.8, Math.min(2.5, size));
+}
+
 export default function VideoPlayer({
     src,
     poster,
@@ -156,6 +163,7 @@ export default function VideoPlayer({
     subtitle,
     onVideoElement
 }: VideoPlayerProps) {
+    const { activeProfile, updatePrefs } = useProfile();
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -175,10 +183,8 @@ export default function VideoPlayer({
     const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [centerPlayPause, setCenterPlayPause] = useState<{ show: boolean; playing: boolean }>({ show: false, playing: false });
     const [subtitleFontSize, setSubtitleFontSize] = useState(() => {
-        if (typeof window === 'undefined') return 1.5;
-        const savedSize = localStorage.getItem('xstream_subtitle_fontsize');
-        const parsedSize = savedSize ? Number.parseFloat(savedSize) : 1.5;
-        return Number.isFinite(parsedSize) ? parsedSize : 1.5;
+        const saved = activeProfile?.prefs.subtitleFontSize;
+        return Number.isFinite(saved) ? clampFontSize(saved as number) : DEFAULT_SUBTITLE_FONT_SIZE;
     });
     const [disabledSubtitleUrl, setDisabledSubtitleUrl] = useState<string | null>(null);
     const [isMetadataLoaded, setIsMetadataLoaded] = useState(false);
@@ -201,14 +207,11 @@ export default function VideoPlayer({
 
     const saveFontSize = useCallback((size: number) => {
         setSubtitleFontSize(size);
-        if (typeof window !== 'undefined') {
-            localStorage.setItem('xstream_subtitle_fontsize', String(size));
-        }
-    }, []);
+        updatePrefs({ subtitleFontSize: size });
+    }, [updatePrefs]);
 
     const changeFontSize = useCallback((delta: number) => {
-        const newSize = Math.max(0.8, Math.min(2.5, subtitleFontSize + delta));
-        saveFontSize(newSize);
+        saveFontSize(clampFontSize(subtitleFontSize + delta));
     }, [saveFontSize, subtitleFontSize]);
 
     const toggleSubtitles = useCallback(() => {

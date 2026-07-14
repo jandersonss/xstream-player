@@ -1,21 +1,18 @@
 import { NextResponse } from 'next/server';
-import fs from 'fs/promises';
-import path from 'path';
 import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { listFavorites, replaceFavorites, resolveProfileId, FavoriteItem } from '@/app/lib/userStore';
 
-const FAVORITES_PATH = path.join(process.cwd(), 'data', 'favorites.json');
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
 
 export async function GET(request: Request) {
     const remoteAccessResponse = await enforceRemoteAccessForApi(request);
     if (remoteAccessResponse) return remoteAccessResponse;
 
     try {
-        const data = await fs.readFile(FAVORITES_PATH, 'utf-8');
-        return NextResponse.json(JSON.parse(data));
-    } catch (error: any) {
-        if (error.code === 'ENOENT') {
-            return NextResponse.json([]);
-        }
+        return NextResponse.json(listFavorites(resolveProfileId(request)));
+    } catch (error) {
+        console.error('[Favorites] Failed to read favorites', error);
         return NextResponse.json({ error: 'Failed to read favorites' }, { status: 500 });
     }
 }
@@ -25,12 +22,16 @@ export async function POST(request: Request) {
     if (remoteAccessResponse) return remoteAccessResponse;
 
     try {
-        const body = await request.json();
-        // Ensure data directory exists
-        await fs.mkdir(path.dirname(FAVORITES_PATH), { recursive: true });
-        await fs.writeFile(FAVORITES_PATH, JSON.stringify(body, null, 2));
+        // The client owns the whole list and posts it after every add/remove.
+        const items = await request.json() as FavoriteItem[];
+        if (!Array.isArray(items)) {
+            return NextResponse.json({ error: 'Lista de favoritos inválida' }, { status: 400 });
+        }
+
+        replaceFavorites(resolveProfileId(request), items);
         return NextResponse.json({ success: true });
     } catch (error) {
+        console.error('[Favorites] Failed to save favorites', error);
         return NextResponse.json({ error: 'Failed to save favorites' }, { status: 500 });
     }
 }

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 import { SavedSubtitle } from '../lib/db';
+import { useProfile } from './ProfileContext';
 
 interface SubtitleConfig {
     apiKey: string;
@@ -103,6 +104,10 @@ interface EpisodeSubtitleStatus {
 const SubtitleContext = createContext<SubtitleContextType | undefined>(undefined);
 
 export function SubtitleProvider({ children }: { children: ReactNode }) {
+    const { activeProfile } = useProfile();
+    // The stored subtitle cache is keyed by language, so every read/write has to
+    // carry the language this profile watches in.
+    const profileLanguage = activeProfile?.prefs.subtitleLanguage ?? 'pt-BR';
     const [config, setConfig] = useState<SubtitleConfig | null>(null);
     const [isLoading, setIsLoading] = useState(false);
     const [isConfigResolved, setIsConfigResolved] = useState(false);
@@ -299,7 +304,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
 
     const downloadSubtitle = useCallback(async (fileId: number, streamId: string): Promise<string | null> => {
         await ensureConfigLoaded();
-        const result = await performDownload(fileId, streamId, 'pt-BR');
+        const result = await performDownload(fileId, streamId, profileLanguage);
 
         if (result.quotaExceeded) {
             alert('Limite diário de downloads atingido. Tente novamente amanhã (reset à meia-noite UTC).');
@@ -309,11 +314,13 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
 
         const blob = new Blob([result.vtt], { type: 'text/vtt' });
         return URL.createObjectURL(blob);
-    }, [ensureConfigLoaded, performDownload]);
+    }, [ensureConfigLoaded, performDownload, profileLanguage]);
 
     const getSavedSubtitle = useCallback(async (streamId: string) => {
         try {
-            const response = await fetch(`/api/subtitles/user?streamId=${streamId}`);
+            const response = await fetch(
+                `/api/subtitles/user?streamId=${streamId}&language=${encodeURIComponent(profileLanguage)}`
+            );
             if (response.ok) {
                 return await response.json();
             }
@@ -321,17 +328,18 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
             console.warn('[SubtitleContext] Failed to fetch saved subtitle:', err);
         }
         return null;
-    }, []);
+    }, [profileLanguage]);
 
     const clearSavedSubtitle = useCallback(async (streamId: string) => {
         try {
-            await fetch(`/api/subtitles/user?streamId=${streamId}`, {
-                method: 'DELETE'
-            });
+            await fetch(
+                `/api/subtitles/user?streamId=${streamId}&language=${encodeURIComponent(profileLanguage)}`,
+                { method: 'DELETE' }
+            );
         } catch (err) {
             console.warn('[SubtitleContext] Failed to clear saved subtitle:', err);
         }
-    }, []);
+    }, [profileLanguage]);
 
     const autoDownloadEpisodeSubtitle = useCallback(async (
         streamId: string,
