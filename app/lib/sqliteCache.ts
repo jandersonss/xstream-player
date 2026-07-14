@@ -4,6 +4,7 @@ import Database from 'better-sqlite3';
 import fs from 'fs';
 import path from 'path';
 import type { CachedCategory, CachedStream, ContentType, SyncMetadata } from './dbTypes';
+import { foldForSearch } from './searchText';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'xstream-player.sqlite');
@@ -46,7 +47,6 @@ function toStreamParams(stream: CachedStream) {
         icon: toNullable(stream.icon),
         rating: toNullable(stream.rating),
         added: toNullable(stream.added),
-        normalized_name: toNullable(stream.normalized_name),
         container_extension: toNullable(stream.container_extension),
         epg_channel_id: toNullable(stream.epg_channel_id),
         stream_type: toNullable(stream.stream_type),
@@ -59,6 +59,7 @@ function toStreamParams(stream: CachedStream) {
         rating_5based: toNullable(stream.rating_5based),
         backdrop_path_json: stream.backdrop_path ? JSON.stringify(stream.backdrop_path) : null,
         last_modified: toNullable(stream.last_modified),
+        search_name: foldForSearch(stream.name || ''),
     };
 }
 
@@ -93,7 +94,6 @@ function getConnection() {
             icon TEXT,
             rating TEXT,
             added TEXT,
-            normalized_name TEXT,
             container_extension TEXT,
             epg_channel_id TEXT,
             stream_type TEXT,
@@ -105,7 +105,8 @@ function getConnection() {
             release_date TEXT,
             rating_5based TEXT,
             backdrop_path_json TEXT,
-            last_modified TEXT
+            last_modified TEXT,
+            search_name TEXT
         );
 
         CREATE INDEX IF NOT EXISTS idx_streams_category_id
@@ -139,15 +140,55 @@ function getConnection() {
         );
     `);
 
+    migrateStreamsSchema(sqlite);
+
     return sqlite;
 }
 
+/**
+ * Reconcile a database created before `search_name` existed: CREATE TABLE IF NOT
+ * EXISTS leaves an existing table untouched, so the column has to be added and
+ * the names already stored folded into it — otherwise search returns nothing
+ * until the next full catalog sync.
+ *
+ * `normalized_name` is dropped in the same pass: it was never written to, so no
+ * data is lost.
+ */
+function migrateStreamsSchema(db: Database.Database) {
+    const columns = db.prepare('PRAGMA table_info(streams)').all() as { name: string }[];
+    const hasColumn = (name: string) => columns.some(column => column.name === name);
+
+    if (!hasColumn('search_name')) {
+        db.exec('ALTER TABLE streams ADD COLUMN search_name TEXT');
+    }
+
+    if (hasColumn('normalized_name')) {
+        db.exec('ALTER TABLE streams DROP COLUMN normalized_name');
+    }
+
+    const pending = db
+        .prepare('SELECT id, name FROM streams WHERE search_name IS NULL')
+        .all() as { id: string; name: string }[];
+
+    if (pending.length === 0) return;
+
+    const stmt = db.prepare('UPDATE streams SET search_name = ? WHERE id = ?');
+    db.transaction(() => {
+        for (const row of pending) {
+            stmt.run(foldForSearch(row.name || ''), row.id);
+        }
+    })();
+}
+
 const streamColumns = `
-    id, category_id, name, type, icon, rating, added, normalized_name,
+    id, category_id, name, type, icon, rating, added,
     container_extension, epg_channel_id, stream_type, cover, plot, "cast",
     director, genre, release_date, rating_5based, backdrop_path_json,
     last_modified
 `;
+
+// `search_name` is an internal matching column, never projected back to callers.
+const streamInsertColumns = `${streamColumns}, search_name`;
 
 export function saveCategories(categories: CachedCategory[]) {
     if (categories.length === 0) return;
@@ -191,13 +232,13 @@ export function saveStreams(streams: CachedStream[]) {
 
     const db = getConnection();
     const stmt = db.prepare(`
-        INSERT INTO streams (${streamColumns})
+        INSERT INTO streams (${streamInsertColumns})
         VALUES (
             @id, @category_id, @name, @type, @icon, @rating, @added,
-            @normalized_name, @container_extension, @epg_channel_id,
+            @container_extension, @epg_channel_id,
             @stream_type, @cover, @plot, @cast, @director, @genre,
             @release_date, @rating_5based, @backdrop_path_json,
-            @last_modified
+            @last_modified, @search_name
         )
         ON CONFLICT(id) DO UPDATE SET
             category_id = excluded.category_id,
@@ -206,7 +247,6 @@ export function saveStreams(streams: CachedStream[]) {
             icon = excluded.icon,
             rating = excluded.rating,
             added = excluded.added,
-            normalized_name = excluded.normalized_name,
             container_extension = excluded.container_extension,
             epg_channel_id = excluded.epg_channel_id,
             stream_type = excluded.stream_type,
@@ -218,7 +258,8 @@ export function saveStreams(streams: CachedStream[]) {
             release_date = excluded.release_date,
             rating_5based = excluded.rating_5based,
             backdrop_path_json = excluded.backdrop_path_json,
-            last_modified = excluded.last_modified
+            last_modified = excluded.last_modified,
+            search_name = excluded.search_name
     `);
 
     const write = db.transaction((items: CachedStream[]) => {
@@ -243,6 +284,51 @@ export function getAllStreams(type?: ContentType): CachedStream[] {
     const rows = type
         ? db.prepare(`SELECT ${streamColumns} FROM streams WHERE type = ? ORDER BY name COLLATE NOCASE`).all(type) as StreamRow[]
         : db.prepare(`SELECT ${streamColumns} FROM streams ORDER BY type, name COLLATE NOCASE`).all() as StreamRow[];
+
+    return rows.map(rowToStream);
+}
+
+/**
+ * Search the catalog by folded name, best matches first.
+ *
+ * The ranking puts an exact title above a title that starts with the query,
+ * above one where the query starts a word, above a bare substring — so "pânico"
+ * outranks "Pânico na Floresta", which outranks "Entrando em Pânico". Ties break
+ * on the shorter title, which keeps the plain film ahead of its sequels.
+ *
+ * A leading-wildcard LIKE cannot use an index, so this is a full scan either
+ * way; scanning the precomputed column in SQLite still beats shipping the whole
+ * catalog to the client and folding 20k names in JS on every keystroke.
+ */
+export function searchStreams(query: string, type?: ContentType, limit = 300): CachedStream[] {
+    const folded = foldForSearch(query);
+    if (!folded) return [];
+
+    const rows = getConnection()
+        .prepare(`
+            SELECT ${streamColumns}
+            FROM streams
+            WHERE search_name LIKE @contains
+              AND (@type IS NULL OR type = @type)
+            ORDER BY
+                CASE
+                    WHEN search_name = @exact THEN 0
+                    WHEN search_name LIKE @prefix THEN 1
+                    WHEN search_name LIKE @word THEN 2
+                    ELSE 3
+                END,
+                LENGTH(name),
+                name COLLATE NOCASE
+            LIMIT @limit
+        `)
+        .all({
+            exact: folded,
+            prefix: `${folded}%`,
+            word: `% ${folded}%`,
+            contains: `%${folded}%`,
+            type: type ?? null,
+            limit,
+        }) as StreamRow[];
 
     return rows.map(rowToStream);
 }

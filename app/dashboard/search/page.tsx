@@ -1,8 +1,7 @@
 'use client';
 
-import { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '../../context/AuthContext';
-import { Search, Film, Tv, Layers, Play, Info, AlertCircle, Loader as LoaderIcon } from 'lucide-react';
+import { useState, useEffect, useRef } from 'react';
+import { Search, Film, Tv, Layers, Play, AlertCircle, Loader as LoaderIcon } from 'lucide-react';
 import Link from 'next/link';
 import { motion, AnimatePresence } from 'framer-motion';
 
@@ -20,90 +19,66 @@ import { useData } from '../../context/DataContext';
 import { useInfiniteScroll } from '@/app/hooks/useInfiniteScroll';
 import Loader from '@/components/Loader';
 
+const MIN_QUERY_LENGTH = 2;
+const DEBOUNCE_MS = 250;
+
 export default function SearchPage() {
-    const { user, credentials } = useAuth();
-    const { getAllCachedStreams } = useData();
+    const { searchCachedStreams } = useData();
     const [query, setQuery] = useState('');
     const [activeTab, setActiveTab] = useState<SearchCategory>('all');
-    const [loading, setLoading] = useState(false);
-    const [initialLoading, setInitialLoading] = useState(true);
-    const [data, setData] = useState<{
-        live: any[];
-        movies: any[];
-        series: any[];
-    }>({ live: [], movies: [], series: [] });
+    const [results, setResults] = useState<SearchResult[]>([]);
+    const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Load data from cache or API
+    // Only the newest query may write to state: SQLite answers in a few ms, but
+    // the responses are still promises and a slow one must not overwrite a fresh one.
+    const latestRequestRef = useRef(0);
+
     useEffect(() => {
-        const loadCatalog = async () => {
-            if (!credentials) return;
+        const trimmed = query.trim();
+
+        if (trimmed.length < MIN_QUERY_LENGTH) {
+            latestRequestRef.current += 1;
+            setResults([]);
+            setIsSearching(false);
+            setError(null);
+            return;
+        }
+
+        setIsSearching(true);
+
+        const timeout = setTimeout(async () => {
+            const requestId = ++latestRequestRef.current;
 
             try {
-                setInitialLoading(true);
+                const streams = await searchCachedStreams(
+                    trimmed,
+                    activeTab === 'all' ? undefined : activeTab,
+                );
 
-                const [cachedLive, cachedMovies, cachedSeries] = await Promise.all([
-                    getAllCachedStreams('live'),
-                    getAllCachedStreams('movie'),
-                    getAllCachedStreams('series')
-                ]);
+                if (requestId !== latestRequestRef.current) return;
 
-                setData({
-                    live: cachedLive.map(s => ({
-                        stream_id: s.id,
-                        name: s.name,
-                        stream_icon: s.icon,
-                        rating: s.rating,
-                    })),
-                    movies: cachedMovies.map(s => ({
-                        stream_id: s.id,
-                        name: s.name,
-                        stream_icon: s.icon,
-                        rating: s.rating,
-                    })),
-                    series: cachedSeries.map(s => ({
-                        series_id: s.id,
-                        name: s.name,
-                        cover: s.cover || s.icon,
-                        rating: s.rating,
-                    }))
-                });
-
+                setResults(streams.map(stream => ({
+                    id: stream.id,
+                    name: stream.name,
+                    type: stream.type,
+                    image: stream.icon || stream.cover,
+                    rating: stream.rating,
+                })));
+                setError(null);
             } catch (err) {
-                console.error("Failed to load catalog for search", err);
-                setError("Falha ao carregar conteúdo sincronizado para busca.");
+                if (requestId !== latestRequestRef.current) return;
+
+                console.error('Search request failed', err);
+                setResults([]);
+                setError('Falha ao buscar no catálogo sincronizado.');
             } finally {
-                setInitialLoading(false);
+                if (requestId === latestRequestRef.current) setIsSearching(false);
             }
-        };
+        }, DEBOUNCE_MS);
 
-        loadCatalog();
-    }, [credentials, getAllCachedStreams]);
-
-    // Filter data based on query
-    const results = useMemo(() => {
-        if (!query || query.length < 2) return [];
-
-        const lowerQuery = query.toLowerCase();
-
-        const filterItems = (items: any[], type: 'live' | 'movie' | 'series') => {
-            return items
-                .filter(item => item.name && item.name.toLowerCase().includes(lowerQuery))
-                .map(item => ({
-                    id: item.stream_id || item.series_id,
-                    name: item.name,
-                    type,
-                    image: item.stream_icon || item.cover,
-                    rating: item.rating
-                }));
-        };
-
-        const liveResults = activeTab === 'all' || activeTab === 'live' ? filterItems(data.live, 'live') : [];
-        const movieResults = activeTab === 'all' || activeTab === 'movie' ? filterItems(data.movies, 'movie') : [];
-        const seriesResults = activeTab === 'all' || activeTab === 'series' ? filterItems(data.series, 'series') : [];
-
-        return [...liveResults, ...movieResults, ...seriesResults];
-    }, [query, data, activeTab]);
+        return () => clearTimeout(timeout);
+    }, [query, activeTab, searchCachedStreams]);
 
     const { visibleItems, hasMore, sentinelRef } = useInfiniteScroll(results, { initialBatchSize: 30 });
 
@@ -130,7 +105,7 @@ export default function SearchPage() {
                         className="block w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-red-600 focus:bg-white/10 transition-all text-lg"
                         autoFocus
                     />
-                    {initialLoading && (
+                    {isSearching && (
                         <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
                             <LoaderIcon className="h-5 w-5 text-red-600 animate-spin" />
                         </div>
@@ -168,20 +143,25 @@ export default function SearchPage() {
 
             {/* Results */}
             <div className="flex-1 min-h-[300px]">
-                {initialLoading && results.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-500 space-y-4">
-                        <LoaderIcon className="w-10 h-10 animate-spin text-red-600" />
-                        <p className="animate-pulse">Indexando catálogo...</p>
-                    </div>
-                ) : query.length < 2 ? (
+                {query.trim().length < MIN_QUERY_LENGTH ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-600 opacity-50">
                         <Search className="w-24 h-24 mb-4" />
                         <p className="text-xl font-medium">Comece a digitar para pesquisar</p>
                     </div>
+                ) : error ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
+                        <AlertCircle className="w-12 h-12 mb-4 text-red-500/50" />
+                        <p className="text-lg">{error}</p>
+                    </div>
+                ) : isSearching && results.length === 0 ? (
+                    <div className="h-full flex flex-col items-center justify-center text-gray-500 space-y-4">
+                        <LoaderIcon className="w-10 h-10 animate-spin text-red-600" />
+                        <p className="animate-pulse">Buscando...</p>
+                    </div>
                 ) : results.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-gray-500">
                         <AlertCircle className="w-12 h-12 mb-4 text-red-500/50" />
-                        <p className="text-lg">Nenhum resultado encontrado para "{query}"</p>
+                        <p className="text-lg">Nenhum resultado encontrado para &quot;{query}&quot;</p>
                     </div>
                 ) : (
                     <>

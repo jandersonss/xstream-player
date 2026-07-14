@@ -57,8 +57,8 @@ export const getStreams = async (categoryId: string, type: ContentType): Promise
     return await requestCache<CachedStream[]>('getStreams', { categoryId, type }) ?? [];
 };
 
-export const getAllStreams = async (type?: ContentType): Promise<CachedStream[]> => {
-    return await requestCache<CachedStream[]>('getAllStreams', { type }) ?? [];
+export const searchStreams = async (query: string, type?: ContentType, limit?: number): Promise<CachedStream[]> => {
+    return await requestCache<CachedStream[]>('searchStreams', { query, type, limit }) ?? [];
 };
 
 export const getStreamCount = async (type?: ContentType): Promise<number> => {

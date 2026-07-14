@@ -15,7 +15,6 @@ export interface CachedStream {
     icon?: string;
     rating?: string;
     added?: string;
-    normalized_name?: string;
     container_extension?: string;
     epg_channel_id?: string;
     stream_type?: string;

@@ -407,7 +407,7 @@ export const titlesMatch = (title1: string, title2: string, threshold: number = 
  * candidate's year are both known, they must agree within YEAR_TOLERANCE. Pass
  * null/undefined when unknown: the check is then skipped rather than guessed.
  */
-export const findBestMatch = <T extends { name: string; normalized_name?: string }>(
+export const findBestMatch = <T extends { name: string }>(
     targetTitle: string,
     items: T[],
     threshold: number = 0.85,
@@ -426,7 +426,7 @@ export const findBestMatch = <T extends { name: string; normalized_name?: string
     let driftedExact: T | null = null;
 
     for (const entry of items) {
-        const normalizedItem = entry.normalized_name || normalizeTitle(entry.name);
+        const normalizedItem = normalizeTitle(entry.name);
 
         // A sequel is a different film, even when the base titles are identical.
         if (extractSequelNumber(normalizedItem) !== targetSequel) {

@@ -13,7 +13,7 @@ type LibraryAction =
     | 'getCategories'
     | 'saveStreams'
     | 'getStreams'
-    | 'getAllStreams'
+    | 'searchStreams'
     | 'getStreamCount'
     | 'getStreamsByIds'
     | 'saveSyncMetadata'
@@ -35,6 +35,8 @@ interface LibraryRequestBody {
     categories?: Parameters<typeof library.saveCategories>[0];
     streams?: Parameters<typeof library.saveStreams>[0];
     meta?: Parameters<typeof library.saveSyncMetadata>[0];
+    query?: string;
+    limit?: number;
     key?: string;
     dateKey?: string;
     currentDateKey?: string;
@@ -69,8 +71,12 @@ export async function POST(request: Request) {
                 return NextResponse.json({ success: true });
             case 'getStreams':
                 return jsonData(library.getStreams(String(body.categoryId ?? ''), body.type as ContentType));
-            case 'getAllStreams':
-                return jsonData(library.getAllStreams(body.type as ContentType | undefined));
+            case 'searchStreams':
+                return jsonData(library.searchStreams(
+                    String(body.query ?? ''),
+                    body.type as ContentType | undefined,
+                    body.limit,
+                ));
             case 'getStreamCount':
                 return jsonData(library.getStreamCount(body.type as ContentType | undefined));
             case 'getStreamsByIds':

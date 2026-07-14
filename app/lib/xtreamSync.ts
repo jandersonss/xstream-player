@@ -75,7 +75,6 @@ function mapStream(item: unknown, type: ContentType): CachedStream {
         icon: stringValue(record.stream_icon) ?? stringValue(record.cover),
         rating: stringValue(record.rating),
         added: stringValue(record.added),
-        normalized_name: undefined,
         container_extension: stringValue(record.container_extension),
         epg_channel_id: stringValue(record.epg_channel_id),
         stream_type: stringValue(record.stream_type),
