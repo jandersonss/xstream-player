@@ -8,10 +8,12 @@ export const dynamic = 'force-dynamic';
 
 const CONFIG_PATH = path.join(process.cwd(), 'data', 'config.json');
 
-interface StoredCredentials {
-    hostUrl: string;
-    username: string;
-    password: string;
+interface StoredConfig {
+    credentials?: {
+        hostUrl: string;
+        username: string;
+        password: string;
+    };
 }
 
 // Live account snapshot from the provider — connection counters move as devices
@@ -21,11 +23,16 @@ export async function GET(request: Request) {
     if (remoteAccessResponse) return remoteAccessResponse;
 
     try {
-        let creds: StoredCredentials;
+        let config: StoredConfig;
         try {
             const raw = await fs.readFile(CONFIG_PATH, 'utf-8');
-            creds = JSON.parse(raw) as StoredCredentials;
+            config = JSON.parse(raw) as StoredConfig;
         } catch {
+            return NextResponse.json({ error: 'Credenciais não configuradas' }, { status: 404 });
+        }
+
+        const creds = config.credentials;
+        if (!creds?.hostUrl || !creds.username || !creds.password) {
             return NextResponse.json({ error: 'Credenciais não configuradas' }, { status: 404 });
         }
 
@@ -44,7 +51,9 @@ export async function GET(request: Request) {
             return NextResponse.json({ error: 'Resposta inválida do provedor' }, { status: 502 });
         }
 
-        return NextResponse.json({ data: data.user_info });
+        // user_info carries the plaintext password — only the counters go to the client.
+        const { active_cons, max_connections, status } = data.user_info;
+        return NextResponse.json({ data: { active_cons, max_connections, status } });
     } catch (error) {
         console.error('[Account] Failed to fetch account info', error);
         return NextResponse.json({ error: 'Falha ao consultar a conta' }, { status: 500 });
