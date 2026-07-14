@@ -38,14 +38,8 @@ export default function Sidebar() {
     return (
         <aside className="hidden md:flex w-20 lg:w-72 h-full bg-black/60  border-r border-white/10 flex flex-col transition-all duration-300 relative z-50">
 
-            {/* Minimal wordmark. */}
-            <div className="h-12 flex items-center px-2 lg:px-5 justify-start">
-                <span className="text-xl font-black text-red-600 tracking-tighter leading-none">X</span>
-                <span className="hidden lg:block text-xl font-black text-white tracking-tighter leading-none">stream</span>
-            </div>
-
             {/* Profile chip — Netflix-style, at the top. */}
-            <div className="px-2 lg:px-3 mt-2">
+            <div className="px-2 lg:px-3 pt-4">
                 <button
                     onClick={() => setShowProfiles(true)}
                     data-focusable="true"

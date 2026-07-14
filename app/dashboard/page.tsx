@@ -34,7 +34,7 @@ export default function Dashboard() {
         ensureConfigLoaded: ensureSubtitleConfigLoaded,
     } = useSubtitle();
 
-    const [greeting, setGreeting] = useState('Welcome back');
+    const isAccountActive = user?.status === 'Active';
     const [showSettings, setShowSettings] = useState(false);
     const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
     interface CarouselData {
@@ -95,13 +95,6 @@ export default function Dashboard() {
             }));
     }, [progressMap]);
 
-    useEffect(() => {
-        const hour = new Date().getHours();
-        if (hour < 12) setGreeting('Bom dia');
-        else if (hour < 18) setGreeting('Boa tarde');
-        else setGreeting('Boa noite');
-    }, []);
-
     // The subtitle config loads lazily, so the header badge needs it resolved
     // without waiting for the modal to be opened.
     useEffect(() => {
@@ -147,11 +140,9 @@ export default function Dashboard() {
 
                 {/* Header Section - Overlay */}
                 <div className="absolute top-0 left-0 right-0 z-50 flex flex-row justify-between items-center px-4 py-6 md:px-12 md:py-10 bg-gradient-to-b from-black/90 via-black/40 to-transparent">
-                    <div>
-                        <h1 className="text-base md:text-xl font-bold text-white/90 drop-shadow-md flex items-center gap-2">
-                            <span className="opacity-70 font-normal hidden sm:inline">{greeting},</span>
-                            {user?.username}
-                        </h1>
+                    <div className="flex items-center drop-shadow-md">
+                        <span className="text-xl md:text-2xl font-black text-red-600 tracking-tighter leading-none">X</span>
+                        <span className="text-xl md:text-2xl font-black text-white tracking-tighter leading-none">stream</span>
                     </div>
                     <div className="flex items-center gap-2 md:gap-3">
                         <button
@@ -174,9 +165,10 @@ export default function Dashboard() {
                             {isSubtitleConfigResolved && isSubtitleConfigured && <span className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>}
                         </button>
 
-                        <div className="bg-black/30  px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
+                        <div className={`bg-black/30 px-2.5 py-1 rounded-full border flex items-center gap-1.5 text-[10px] md:text-xs hidden sm:flex ${isAccountActive ? 'border-green-500/40 text-green-400' : 'border-white/5 text-gray-400'}`}>
                             <User size={12} />
-                            <span>{user?.status === 'Active' ? 'Ativo' : user?.status}</span>
+                            <span>{user?.username}</span>
+                            <span className={`w-1.5 h-1.5 rounded-full ${isAccountActive ? 'bg-green-500 shadow-[0_0_5px_rgba(34,197,94,0.5)]' : 'bg-gray-500'}`}></span>
                         </div>
 
                         <div className="bg-black/30  px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
