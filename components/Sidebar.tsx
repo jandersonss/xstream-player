@@ -3,12 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw, Subtitles, Radio, User } from 'lucide-react';
+import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw, Radio, User } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useData } from '../app/context/DataContext';
 import { useProfile } from '../app/context/ProfileContext';
 import { getAutoBroadcast, setAutoBroadcast } from '@/app/lib/device';
-import SubtitleSettingsModal from './SubtitleSettingsModal';
 import ProfileModal from './ProfileModal';
 
 const menuItems = [
@@ -26,7 +25,6 @@ export default function Sidebar() {
     const { logout } = useAuth();
     const { syncData, isSyncing, syncProgress, lastSync } = useData();
     const { activeProfile } = useProfile();
-    const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
     const [showProfiles, setShowProfiles] = useState(false);
     // Per-device "broadcast everything" preference — lazy init, no setState in effect.
     const [autoBroadcast, setAutoBroadcastOn] = useState(() => getAutoBroadcast());
@@ -124,16 +122,6 @@ export default function Sidebar() {
                 </button>
 
                 <button
-                    onClick={() => setShowSubtitleSettings(true)}
-                    data-focusable="true"
-                    tabIndex={0}
-                    className="w-full flex items-center gap-0 lg:gap-4 px-2 lg:px-4 py-2.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-xl transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-emerald-600 justify-center lg:justify-start"
-                >
-                    <Subtitles size={22} className="group-hover:scale-110 transition-transform duration-300" />
-                    <span className="hidden lg:block text-sm font-medium">Legendas</span>
-                </button>
-
-                <button
                     onClick={syncData}
                     disabled={isSyncing}
                     data-focusable="true"
@@ -159,11 +147,6 @@ export default function Sidebar() {
                     <span className="hidden lg:block text-sm font-medium">Sair</span>
                 </button>
             </div>
-
-            <SubtitleSettingsModal
-                isOpen={showSubtitleSettings}
-                onClose={() => setShowSubtitleSettings(false)}
-            />
 
             <ProfileModal
                 isOpen={showProfiles}

@@ -16,8 +16,8 @@ export default function SubtitleSettingsModal({ isOpen, onClose }: SubtitleSetti
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
 
-    // This modal is mounted by the Sidebar on every dashboard route, so the
-    // config is only fetched once it is actually opened.
+    // The config load is lazy and shared, so opening the modal is enough to
+    // guarantee it is loaded even when the host page has not requested it.
     useEffect(() => {
         if (isOpen) ensureConfigLoaded();
     }, [isOpen, ensureConfigLoaded]);

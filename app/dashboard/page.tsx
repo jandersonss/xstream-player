@@ -4,13 +4,15 @@ import { useAuth } from '../context/AuthContext';
 import { useData } from '../context/DataContext';
 import { useWatchProgress } from '../context/WatchProgressContext';
 import { useTMDb } from '../context/TMDbContext';
+import { useSubtitle } from '../context/SubtitleContext';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, TrendingUp } from 'lucide-react';
+import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, TrendingUp, Subtitles } from 'lucide-react';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import ContentCarousel from '@/components/ContentCarousel';
 import HeroSection from '@/components/HeroSection';
 import TMDbSettingsModal from '@/components/TMDbSettingsModal';
+import SubtitleSettingsModal from '@/components/SubtitleSettingsModal';
 
 interface CarouselItemData {
     id: string | number;
@@ -26,9 +28,15 @@ export default function Dashboard() {
     const { lastSync } = useData();
     const { progressMap } = useWatchProgress();
     const { isConfigured } = useTMDb();
+    const {
+        isConfigured: isSubtitleConfigured,
+        isConfigResolved: isSubtitleConfigResolved,
+        ensureConfigLoaded: ensureSubtitleConfigLoaded,
+    } = useSubtitle();
 
     const [greeting, setGreeting] = useState('Welcome back');
     const [showSettings, setShowSettings] = useState(false);
+    const [showSubtitleSettings, setShowSubtitleSettings] = useState(false);
     interface CarouselData {
         id: string;
         title: string;
@@ -94,6 +102,12 @@ export default function Dashboard() {
         else setGreeting('Boa noite');
     }, []);
 
+    // The subtitle config loads lazily, so the header badge needs it resolved
+    // without waiting for the modal to be opened.
+    useEffect(() => {
+        ensureSubtitleConfigLoaded();
+    }, [ensureSubtitleConfigLoaded]);
+
     // Load carousels from backend
     useEffect(() => {
         const loadCarousels = async () => {
@@ -148,6 +162,16 @@ export default function Dashboard() {
                             <Settings size={12} className="text-gray-400 group-hover:text-white transition-colors" />
                             <span className="font-medium text-[10px] md:text-xs text-gray-300">TMDb</span>
                             {isConfigured && <span className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>}
+                        </button>
+
+                        <button
+                            onClick={() => setShowSubtitleSettings(true)}
+                            data-focusable="true"
+                            className="bg-black/30 hover:bg-black/50  px-2.5 py-1 rounded-full border border-white/5 hover:border-emerald-500/50 flex items-center gap-1.5 transition-all group"
+                        >
+                            <Subtitles size={12} className="text-gray-400 group-hover:text-white transition-colors" />
+                            <span className="font-medium text-[10px] md:text-xs text-gray-300">Legendas</span>
+                            {isSubtitleConfigResolved && isSubtitleConfigured && <span className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>}
                         </button>
 
                         <div className="bg-black/30  px-2.5 py-1 rounded-full border border-white/5 flex items-center gap-1.5 text-[10px] md:text-xs text-gray-400 hidden sm:flex">
@@ -341,6 +365,9 @@ export default function Dashboard() {
 
                 {/* TMDb Settings Modal */}
                 <TMDbSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />
+
+                {/* Subtitle Settings Modal */}
+                <SubtitleSettingsModal isOpen={showSubtitleSettings} onClose={() => setShowSubtitleSettings(false)} />
             </div>
         </>
     );
