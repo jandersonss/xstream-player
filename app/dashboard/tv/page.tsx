@@ -24,7 +24,7 @@ function DeviceNameEditor() {
     };
 
     return (
-        <div className="flex items-center gap-2 text-sm text-gray-400">
+        <div className="flex items-center space-x-2 text-sm text-gray-400">
             <span>Este aparelho:</span>
             {editing ? (
                 <>
@@ -71,7 +71,7 @@ function SessionCard({ session, onJoin }: { session: ShareSession; onJoin: (s: S
                 ) : (
                     <Icon size={40} className="text-gray-600" />
                 )}
-                <span className="absolute top-2 left-2 flex items-center gap-1 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">
+                <span className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">
                     <Radio size={12} className="animate-pulse" /> {session.contentType === 'live' ? 'AO VIVO' : 'TRANSMITINDO'}
                 </span>
             </div>
@@ -98,9 +98,9 @@ export default function ModoTvPage() {
 
     return (
         <div className="p-4 md:p-8 text-white">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-8">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0 md:space-x-3 mb-8">
                 <div>
-                    <h1 className="text-3xl font-bold flex items-center gap-3">
+                    <h1 className="text-3xl font-bold flex items-center space-x-3">
                         <Radio className="text-red-500" /> Modo TV
                     </h1>
                     <p className="text-gray-400 mt-2 max-w-2xl">

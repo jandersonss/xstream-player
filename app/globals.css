@@ -58,6 +58,22 @@ body {
   border-radius: 4px;
 }
 
+/* Chrome < 88 (WebOS 5/6 TVs) lacks aspect-ratio: a ratio-sized pseudo-element
+   props .aspect-video containers open (float in blocks, extra item in flex) */
+@supports not (aspect-ratio: 16 / 9) {
+  .aspect-video::before {
+    content: "";
+    float: left;
+    padding-top: 56.25%;
+  }
+
+  .aspect-video::after {
+    content: "";
+    display: block;
+    clear: both;
+  }
+}
+
 /* Subtitle Styling */
 video::cue {
   background-color: rgba(0, 0, 0, 0.7) !important;

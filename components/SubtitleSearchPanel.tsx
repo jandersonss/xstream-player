@@ -149,13 +149,13 @@ export default function SubtitleSearchPanel({
             <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-[#333]">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center space-x-3">
                         <div className="p-2 bg-emerald-600/20 rounded-lg">
                             <Subtitles size={24} className="text-emerald-500" />
                         </div>
                         <div>
                             <h2 className="text-lg font-bold text-white">Buscar Legendas</h2>
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center space-x-2">
                                 <p className="text-xs text-gray-500 truncate max-w-[200px]">{title}</p>
                                 {remainingDownloads !== null && (
                                     <span className={`text-xs px-1.5 py-0.5 rounded ${remainingDownloads <= 3 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
@@ -175,7 +175,7 @@ export default function SubtitleSearchPanel({
 
                 {/* Search Controls */}
                 <div className="p-4 border-b border-[#333] space-y-3">
-                    <div className="flex gap-3">
+                    <div className="flex space-x-3">
                         <div className="relative flex-1">
                             <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
                             <select
@@ -194,7 +194,7 @@ export default function SubtitleSearchPanel({
                         <button
                             onClick={handleSearch}
                             disabled={isSearching}
-                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white font-medium transition-colors disabled:opacity-50 flex items-center gap-2 text-sm"
+                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white font-medium transition-colors disabled:opacity-50 flex items-center space-x-2 text-sm"
                         >
                             {isSearching ? (
                                 <Loader2 size={16} className="animate-spin" />
@@ -241,7 +241,7 @@ export default function SubtitleSearchPanel({
                             >
                                 <div className="flex items-center justify-between">
                                     <div className="flex-1 min-w-0">
-                                        <div className="flex items-center gap-2 mb-1">
+                                        <div className="flex items-center space-x-2 mb-1">
                                             <span className="text-xs font-bold px-2 py-0.5 bg-emerald-600/20 text-emerald-400 rounded uppercase">
                                                 {result.attributes.language}
                                             </span>

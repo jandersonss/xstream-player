@@ -84,12 +84,12 @@ export default function MovieList() {
 
     return (
         <div className="space-y-6 p-4 md:p-6 lg:p-10">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 md:space-x-4">
                 <Link
                     href="/dashboard/movies"
                     data-focusable="true"
                     tabIndex={0}
-                    className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors focus:outline-none focus:text-blue-500 focus:scale-110 origin-left"
+                    className="inline-flex items-center space-x-2 text-gray-400 hover:text-white transition-colors focus:outline-none focus:text-blue-500 focus:scale-110 origin-left"
                 >
                     <ArrowLeft size={20} />
                     Voltar para Categorias
@@ -98,7 +98,7 @@ export default function MovieList() {
             </div>
 
             <div className="space-y-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <h3 className="text-xl font-bold text-white flex items-center space-x-2">
                     <span className="w-2 h-8 bg-blue-600 rounded-full"></span>
                     {categoryName || 'Filmes'} ({movies.length})
                 </h3>
@@ -116,16 +116,17 @@ export default function MovieList() {
                                     tabIndex={0}
                                     className="group relative bg-[#1f1f1f] rounded-xl overflow-hidden shadow-lg hover:shadow-2xl hover:shadow-blue-900/20 transition-all duration-300 transform hover:-translate-y-1 focus:outline-none focus:ring-4 focus:ring-blue-600 focus:scale-105 z-10"
                                 >
-                                    <div className="aspect-[2/3] relative overflow-hidden bg-black">
+                                    {/* pt-[150%] keeps the 2:3 poster box on Chrome < 88 (no aspect-ratio) */}
+                                    <div className="relative pt-[150%] overflow-hidden bg-black">
                                         {movie.stream_icon ? (
                                             <img
                                                 src={movie.stream_icon}
                                                 alt={movie.name}
-                                                className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
+                                                className="absolute inset-0 w-full h-full object-cover transition-transform duration-500 group-hover:scale-110"
                                                 onError={(e) => (e.currentTarget.style.display = 'none')}
                                             />
                                         ) : (
-                                            <div className="w-full h-full flex items-center justify-center text-gray-700">
+                                            <div className="absolute inset-0 w-full h-full flex items-center justify-center text-gray-700">
                                                 <Film size={48} />
                                             </div>
                                         )}
@@ -138,7 +139,7 @@ export default function MovieList() {
                                         </div>
 
                                         {movie.rating && (
-                                            <div className="absolute top-2 right-2 bg-black/60 backdrop- px-2 py-1 rounded text-xs font-bold text-yellow-500 flex items-center gap-1">
+                                            <div className="absolute top-2 right-2 bg-black/60 backdrop- px-2 py-1 rounded text-xs font-bold text-yellow-500 flex items-center space-x-1">
                                                 <Star size={10} fill="currentColor" /> {movie.rating}
                                             </div>
                                         )}

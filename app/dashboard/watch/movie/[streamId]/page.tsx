@@ -245,9 +245,9 @@ export default function WatchMoviePage() {
                         title={joinTitle}
                         onVideoElement={setVideoEl}
                         topRightSlot={
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center space-x-2">
                                 {canSync && <SyncButton role="viewer" onClick={sync} />}
-                                <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center gap-2">
+                                <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center space-x-2">
                                     <Radio size={18} className="animate-pulse" /> Modo TV
                                 </span>
                             </div>
@@ -264,7 +264,7 @@ export default function WatchMoviePage() {
         return (
             <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white space-y-4">
                 <p className="text-red-500 text-xl">{error || 'Filme não encontrado'}</p>
-                <button onClick={() => router.back()} className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">
+                <button onClick={() => router.back()} className="flex items-center space-x-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">
                     <ArrowLeft size={20} /> Voltar
                 </button>
             </div>
@@ -283,7 +283,7 @@ export default function WatchMoviePage() {
         const shareToggle = (
             <button
                 onClick={() => setIsSharing((v) => !v)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
                 title={isSharing ? 'Transmitindo para o Modo TV (sem avançar/pausar)' : 'Transmitir este filme no Modo TV'}
             >
                 <Radio size={18} className={isSharing ? 'animate-pulse' : ''} />
@@ -306,7 +306,7 @@ export default function WatchMoviePage() {
                         title={movie.info.name}
                         onVideoElement={setVideoEl}
                         topRightSlot={
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center space-x-2">
                                 {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}
                                 {shareToggle}
                             </div>
@@ -334,12 +334,12 @@ export default function WatchMoviePage() {
                     onClick={() => router.back()}
                     data-focusable="true"
                     tabIndex={0}
-                    className="mb-8 flex items-center gap-2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-red-500 focus:scale-110 origin-left"
+                    className="mb-8 flex items-center space-x-2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-red-500 focus:scale-110 origin-left"
                 >
                     <ArrowLeft size={24} /> Voltar
                 </button>
 
-                <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start">
+                <div className="flex flex-col lg:flex-row space-y-10 lg:space-y-0 lg:space-x-16 items-start">
                     {/* Poster */}
                     <div className="w-full max-w-[300px] lg:max-w-[400px] flex-shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/50 mx-auto lg:mx-0">
                         <img
@@ -354,19 +354,19 @@ export default function WatchMoviePage() {
                     <div className="flex-1 space-y-6">
                         <h1 className="text-3xl lg:text-5xl font-bold leading-tight">{movie.info.name}</h1>
 
-                        <div className="flex flex-wrap items-center gap-4 text-sm lg:text-base text-gray-300">
+                        <div className="flex flex-wrap items-center space-x-4 text-sm lg:text-base text-gray-300">
                             {movie.info.releasedate && (
-                                <span className="flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full">
+                                <span className="flex items-center space-x-1 bg-white/10 px-3 py-1 rounded-full">
                                     <Calendar size={16} /> {movie.info.releasedate}
                                 </span>
                             )}
                             {movie.info.rating && (
-                                <span className="flex items-center gap-1 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full border border-yellow-500/30">
+                                <span className="flex items-center space-x-1 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full border border-yellow-500/30">
                                     <Star size={16} fill="currentColor" /> {movie.info.rating}
                                 </span>
                             )}
                             {movie.info.duration && (
-                                <span className="flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full">
+                                <span className="flex items-center space-x-1 bg-white/10 px-3 py-1 rounded-full">
                                     <Clock size={16} /> {movie.info.duration}
                                 </span>
                             )}
@@ -380,12 +380,12 @@ export default function WatchMoviePage() {
                             <p><strong className="text-white">Gênero:</strong> {movie.info.genre}</p>
                             <p><strong className="text-white">Diretor:</strong> {movie.info.director}</p>
                         </div>
-                        <div className='flex items-center gap-4'>
+                        <div className='flex items-center space-x-4'>
                             <button
                                 onClick={handlePlay}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-full flex items-center gap-3 transition-all transform hover:scale-105 shadow-lg shadow-red-900/40 focus:outline-none focus:ring-4 focus:ring-white focus:scale-110"
+                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-full flex items-center space-x-3 transition-all transform hover:scale-105 shadow-lg shadow-red-900/40 focus:outline-none focus:ring-4 focus:ring-white focus:scale-110"
                             >
                                 <Play size={28} fill="currentColor" />
                                 <span>Reproduzir Filme</span>
@@ -394,7 +394,7 @@ export default function WatchMoviePage() {
                                 onClick={() => setShowSubtitlePanel(true)}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className={`font-bold py-4 px-8 rounded-full flex items-center gap-3 transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-white focus:scale-110 ${subtitleUrl
+                                className={`font-bold py-4 px-8 rounded-full flex items-center space-x-3 transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-white focus:scale-110 ${subtitleUrl
                                     ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/40'
                                     : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
                                     }`}

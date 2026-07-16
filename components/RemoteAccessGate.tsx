@@ -70,7 +70,7 @@ export default function RemoteAccessGate({ mode }: RemoteAccessGateProps) {
                 </div>
 
                 {error && (
-                    <div className="mb-6 flex items-center gap-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
+                    <div className="mb-6 flex items-center space-x-3 rounded-xl border border-red-500/20 bg-red-500/10 p-4 text-sm text-red-200">
                         <AlertCircle size={18} className="flex-shrink-0" />
                         {error}
                     </div>
@@ -119,7 +119,7 @@ export default function RemoteAccessGate({ mode }: RemoteAccessGateProps) {
                     <button
                         type="submit"
                         disabled={isSubmitting}
-                        className={`flex w-full items-center justify-center gap-2 rounded-xl bg-red-600 px-4 py-4 text-lg font-bold text-white shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all duration-300 hover:bg-red-700 ${isSubmitting ? 'cursor-not-allowed opacity-70' : ''}`}
+                        className={`flex w-full items-center justify-center space-x-2 rounded-xl bg-red-600 px-4 py-4 text-lg font-bold text-white shadow-[0_0_20px_rgba(220,38,38,0.3)] transition-all duration-300 hover:bg-red-700 ${isSubmitting ? 'cursor-not-allowed opacity-70' : ''}`}
                         data-focusable="true"
                     >
                         {isSubmitting ? <span className="h-6 w-6 rounded-full border-2 border-white/30 border-t-white animate-spin" /> : 'Liberar acesso'}

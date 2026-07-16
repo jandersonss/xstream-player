@@ -35,14 +35,14 @@ export default function ContentCarousel({
     return (
         <div className="space-y-4">
             <div className="flex items-center justify-between">
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                <h2 className="text-xl font-bold text-white flex items-center space-x-2">
                     {Icon && <Icon size={20} className="text-red-500" />}
                     {title}
                 </h2>
                 {onViewAll && (
                     <button
                         onClick={onViewAll}
-                        className="flex items-center gap-1 text-sm text-gray-400 hover:text-white transition-colors group"
+                        className="flex items-center space-x-1 text-sm text-gray-400 hover:text-white transition-colors group"
                     >
                         Ver Todos
                         <ChevronRight size={16} className="group-hover:translate-x-1 transition-transform" />
@@ -51,13 +51,13 @@ export default function ContentCarousel({
             </div>
 
             <div className="relative">
-                <div className="flex gap-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20">
+                <div className="flex space-x-4 overflow-x-auto pb-4 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent hover:scrollbar-thumb-white/20">
                     {items.map((item) => (
                         <Link
                             key={`${item.name}-${item.id}`}
                             href={item.href || '#'}
                             data-focusable="true"
-                            className="group relative flex-shrink-0 w-[200px] aspect-[2/3] rounded-xl overflow-hidden border border-white/10 hover:border-red-600 transition-all focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105"
+                            className="group relative flex-shrink-0 w-[200px] h-[300px] rounded-xl overflow-hidden border border-white/10 hover:border-red-600 transition-all focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105"
                         >
                             <img
                                 src={item.image}
@@ -83,9 +83,9 @@ export default function ContentCarousel({
 
                                 {/* Rating or Year */}
                                 {(item.rating || item.year) && (
-                                    <div className="flex items-center gap-2 text-xs text-gray-300 mb-1">
+                                    <div className="flex items-center space-x-2 text-xs text-gray-300 mb-1">
                                         {item.rating && (
-                                            <span className="flex items-center gap-1">
+                                            <span className="flex items-center space-x-1">
                                                 ⭐ {typeof item.rating === 'number' ? item.rating.toFixed(1) : item.rating}
                                             </span>
                                         )}

@@ -11,13 +11,14 @@ interface SortControlsProps {
 }
 
 export default function SortControls({ currentSort, onSortChange, showYear = false }: SortControlsProps) {
+    // flex gap needs Chrome 84+ (WebOS TVs lack it): child m-1 margins emulate gap-2 + p-1
     return (
-        <div className="flex flex-wrap items-center gap-2 bg-white/5 p-1 rounded-xl border border-white/10 w-fit">
+        <div className="flex flex-wrap items-center bg-white/5 rounded-xl border border-white/10 w-fit">
             <button
                 onClick={() => onSortChange('name-asc')}
                 data-focusable="true"
                 tabIndex={0}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'name-asc'
+                className={`m-1 flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'name-asc'
                     ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                     }`}
@@ -29,7 +30,7 @@ export default function SortControls({ currentSort, onSortChange, showYear = fal
                 onClick={() => onSortChange('name-desc')}
                 data-focusable="true"
                 tabIndex={0}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'name-desc'
+                className={`m-1 flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'name-desc'
                     ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                     }`}
@@ -41,7 +42,7 @@ export default function SortControls({ currentSort, onSortChange, showYear = fal
                 onClick={() => onSortChange('added')}
                 data-focusable="true"
                 tabIndex={0}
-                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'added'
+                className={`m-1 flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'added'
                     ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
                     : 'text-gray-400 hover:text-white hover:bg-white/5'
                     }`}
@@ -54,7 +55,7 @@ export default function SortControls({ currentSort, onSortChange, showYear = fal
                     onClick={() => onSortChange('year')}
                     data-focusable="true"
                     tabIndex={0}
-                    className={`flex items-center gap-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'year'
+                    className={`m-1 flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'year'
                         ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
                         : 'text-gray-400 hover:text-white hover:bg-white/5'
                         }`}

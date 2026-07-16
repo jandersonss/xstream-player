@@ -85,7 +85,7 @@ export default function SearchPage() {
     return (
         <div className="min-h-full flex flex-col space-y-8 p-4 md:p-6 lg:p-10">
             {/* Header & Search Input */}
-            <div className="flex flex-col gap-6">
+            <div className="flex flex-col space-y-6">
                 <div>
                     <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Pesquisar</h1>
                     <p className="text-gray-400 mt-1 text-sm md:text-base">Encontre seus filmes, séries e canais favoritos.</p>
@@ -113,7 +113,7 @@ export default function SearchPage() {
                 </div>
 
                 {/* Tabs */}
-                <div className="flex gap-2 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
                     {[
                         { id: 'all', label: 'Tudo', icon: Search },
                         { id: 'live', label: 'TV ao Vivo', icon: Tv },
@@ -128,7 +128,7 @@ export default function SearchPage() {
                                 onClick={() => setActiveTab(tab.id as SearchCategory)}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className={`flex items-center gap-2 px-6 py-2.5 rounded-full font-medium transition-all duration-300 whitespace-nowrap focus:outline-none focus:ring-4 focus:ring-white ${isActive
+                                className={`flex items-center space-x-2 px-6 py-2.5 rounded-full font-medium transition-all duration-300 whitespace-nowrap focus:outline-none focus:ring-4 focus:ring-white ${isActive
                                     ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
                                     : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
                                     }`}
@@ -186,16 +186,17 @@ export default function SearchPage() {
                                             tabIndex={0}
                                             className="block focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10 rounded-xl"
                                         >
-                                            <div className="aspect-[2/3] relative">
+                                            {/* pt-[150%] keeps the 2:3 poster box on Chrome < 88 (no aspect-ratio) */}
+                                            <div className="relative pt-[150%]">
                                                 {item.image ? (
                                                     <img
                                                         src={item.image}
                                                         alt={item.name}
-                                                        className="w-full h-full object-cover"
+                                                        className="absolute inset-0 w-full h-full object-cover"
                                                         loading="lazy"
                                                     />
                                                 ) : (
-                                                    <div className="w-full h-full flex items-center justify-center bg-white/5 text-gray-600">
+                                                    <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-white/5 text-gray-600">
                                                         {item.type === 'live' ? <Tv size={40} /> : item.type === 'movie' ? <Film size={40} /> : <Layers size={40} />}
                                                     </div>
                                                 )}
@@ -209,7 +210,7 @@ export default function SearchPage() {
                                             <div className="p-4">
                                                 <h3 className="text-white font-medium line-clamp-2 text-sm">{item.name}</h3>
                                                 {item.rating && (
-                                                    <div className="flex items-center gap-1 mt-1">
+                                                    <div className="flex items-center space-x-1 mt-1">
                                                         <span className="text-yellow-500 text-xs">★</span>
                                                         <span className="text-gray-400 text-xs">{item.rating}</span>
                                                     </div>

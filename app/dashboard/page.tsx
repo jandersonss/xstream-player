@@ -146,11 +146,11 @@ export default function Dashboard() {
                         <span className="text-xl md:text-2xl font-black text-red-600 tracking-tighter leading-none">X</span>
                         <span className="text-xl md:text-2xl font-black text-white tracking-tighter leading-none">stream</span>
                     </div>
-                    <div className="flex items-center gap-2 md:gap-3">
+                    <div className="flex items-center space-x-2 md:space-x-3">
                         <button
                             onClick={() => setShowSettings(true)}
                             data-focusable="true"
-                            className="bg-black/30 hover:bg-black/50  px-2.5 py-1 rounded-full border border-white/5 hover:border-red-500/50 flex items-center gap-1.5 transition-all group"
+                            className="bg-black/30 hover:bg-black/50  px-2.5 py-1 rounded-full border border-white/5 hover:border-red-500/50 flex items-center space-x-1.5 transition-all group"
                         >
                             <Settings size={12} className="text-gray-400 group-hover:text-white transition-colors" />
                             <span className="font-medium text-[10px] md:text-xs text-gray-300">TMDb</span>
@@ -160,14 +160,14 @@ export default function Dashboard() {
                         <button
                             onClick={() => setShowSubtitleSettings(true)}
                             data-focusable="true"
-                            className="bg-black/30 hover:bg-black/50  px-2.5 py-1 rounded-full border border-white/5 hover:border-emerald-500/50 flex items-center gap-1.5 transition-all group"
+                            className="bg-black/30 hover:bg-black/50  px-2.5 py-1 rounded-full border border-white/5 hover:border-emerald-500/50 flex items-center space-x-1.5 transition-all group"
                         >
                             <Subtitles size={12} className="text-gray-400 group-hover:text-white transition-colors" />
                             <span className="font-medium text-[10px] md:text-xs text-gray-300">Legendas</span>
                             {isSubtitleConfigResolved && isSubtitleConfigured && <span className="w-1.5 h-1.5 bg-green-500 rounded-full shadow-[0_0_5px_rgba(34,197,94,0.5)]"></span>}
                         </button>
 
-                        <div className={`bg-black/30 px-2.5 py-1 rounded-full border flex items-center gap-1.5 text-[10px] md:text-xs text-white hidden sm:flex ${isAccountActive ? 'border-green-500/40' : 'border-white/5'}`}>
+                        <div className={`bg-black/30 px-2.5 py-1 rounded-full border flex items-center space-x-1.5 text-[10px] md:text-xs text-white hidden sm:flex ${isAccountActive ? 'border-green-500/40' : 'border-white/5'}`}>
                             <User size={12} />
                             <span>{user?.username}</span>
                             <span className="text-white/30">|</span>
@@ -307,7 +307,7 @@ export default function Dashboard() {
                 {/* Account Details */}
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                     <div className="bg-[#1a1a1a] rounded-xl p-6 border border-[#333]">
-                        <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
+                        <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
                             <Clock size={18} className="text-gray-400" />
                             Detalhes da Conta
                         </h3>

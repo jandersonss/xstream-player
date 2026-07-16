@@ -1090,14 +1090,14 @@ export default function VideoPlayer({
             {showNextEpisodePrompt && (
                 <div
                     ref={nextEpisodePromptRef}
-                    className="absolute bottom-24 right-6 z-20 flex items-center gap-1 rounded-lg border border-white/10 bg-black/70 p-1.5 shadow-2xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300"
+                    className="absolute bottom-24 right-6 z-20 flex items-center space-x-1 rounded-lg border border-white/10 bg-black/70 p-1.5 shadow-2xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300"
                 >
                     <button
                         ref={nextEpisodeButtonRef}
                         type="button"
                         onClick={onNext}
                         data-focusable="true"
-                        className="relative flex items-center gap-2 overflow-hidden rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 focus:bg-red-600 focus:outline-none focus:ring-2 focus:ring-white"
+                        className="relative flex items-center space-x-2 overflow-hidden rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 focus:bg-red-600 focus:outline-none focus:ring-2 focus:ring-white"
                         aria-label="Pular para o próximo episódio"
                     >
                         <SkipForward size={16} aria-hidden="true" />
@@ -1146,8 +1146,8 @@ export default function VideoPlayer({
             >
                 {/* Top Bar with Back Button */}
                 {(onBack || topRightSlot || title) && (
-                    <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3 min-w-0">
+                    <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between space-x-3">
+                        <div className="flex items-center space-x-3 min-w-0">
                             {onBack && (
                                 <button
                                     onClick={onBack}
@@ -1220,8 +1220,8 @@ export default function VideoPlayer({
                     </div>
 
                     {/* Control Buttons */}
-                    <div className="flex items-center justify-between gap-3">
-                        <div className="flex items-center gap-3">
+                    <div className="flex items-center justify-between space-x-3">
+                        <div className="flex items-center space-x-3">
                             {/* Previous Episode */}
                             {onPrevious && (hasPrevious || true) && (
                                 <button
@@ -1275,7 +1275,7 @@ export default function VideoPlayer({
 
                             {/* Time Display integrated here */}
                             {!isLive && (
-                                <div className="flex items-center gap-1.5 px-2 text-[11px] font-medium text-gray-400 whitespace-nowrap tabular-nums">
+                                <div className="flex items-center space-x-1.5 px-2 text-[11px] font-medium text-gray-400 whitespace-nowrap tabular-nums">
                                     <span className="text-white">{formatTime(currentTime)}</span>
                                     <span className="opacity-40">/</span>
                                     <span>{formatTime(duration)}</span>
@@ -1317,7 +1317,7 @@ export default function VideoPlayer({
                                 {/* Volume Slider */}
                                 {showVolumeSlider && (
                                     <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/80  rounded-xl p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                        <div className="flex flex-col items-center gap-2">
+                                        <div className="flex flex-col items-center space-y-2">
                                             <span className="text-white text-xs font-medium">{volumePercent}%</span>
                                             <input
                                                 type="range"
@@ -1358,7 +1358,7 @@ export default function VideoPlayer({
 
                             {/* Live Indicator */}
                             {isLive && (
-                                <div className="flex items-center gap-2 ml-2">
+                                <div className="flex items-center space-x-2 ml-2">
                                     <span className="relative flex h-3 w-3">
                                         <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
                                         <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
@@ -1369,10 +1369,10 @@ export default function VideoPlayer({
                         </div>
 
                         {/* Right Controls */}
-                        <div className="flex items-center gap-3">
+                        <div className="flex items-center space-x-3">
                             {/* Subtitle Font Size Controls */}
                             {subtitleUrl && subtitlesEnabled && (
-                                <div className="flex items-center gap-1 bg-white/5 rounded-lg px-2 py-1">
+                                <div className="flex items-center space-x-1 bg-white/5 rounded-lg px-2 py-1">
                                     <button
                                         onClick={() => changeFontSize(-0.1)}
                                         className="text-white/60 hover:text-white p-1 transition-colors"

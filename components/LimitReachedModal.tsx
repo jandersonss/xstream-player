@@ -55,7 +55,7 @@ export default function LimitReachedModal({ open, onClose }: LimitReachedModalPr
                             <button
                                 key={s.deviceId}
                                 onClick={() => join(s)}
-                                className="w-full flex items-center gap-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-red-500"
+                                className="w-full flex items-center space-x-3 p-3 rounded-xl bg-white/5 hover:bg-white/10 transition-colors text-left focus:outline-none focus:ring-2 focus:ring-red-500"
                             >
                                 <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-red-600/20 text-red-400 shrink-0">
                                     <Radio size={20} className="animate-pulse" />
@@ -72,7 +72,7 @@ export default function LimitReachedModal({ open, onClose }: LimitReachedModalPr
                     )}
                 </div>
 
-                <div className="p-4 border-t border-white/10 flex justify-end gap-3">
+                <div className="p-4 border-t border-white/10 flex justify-end space-x-3">
                     <button
                         onClick={onClose}
                         className="px-4 py-2 rounded-lg text-gray-300 hover:bg-white/5 transition-colors"
@@ -81,7 +81,7 @@ export default function LimitReachedModal({ open, onClose }: LimitReachedModalPr
                     </button>
                     <button
                         onClick={() => router.push('/dashboard/tv')}
-                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center gap-2 transition-colors"
+                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center space-x-2 transition-colors"
                     >
                         <Radio size={18} /> Abrir Modo TV
                     </button>

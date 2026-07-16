@@ -58,7 +58,7 @@ export default function WatchLivePage() {
     const shareToggle = !isJoining ? (
         <button
             onClick={() => setIsSharing((v) => !v)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing
+            className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing
                 ? 'bg-red-600 text-white'
                 : 'bg-black/60 text-gray-200 hover:bg-white/20'
                 }`}
@@ -68,7 +68,7 @@ export default function WatchLivePage() {
             <span>{isSharing ? 'Transmitindo' : 'Transmitir'}</span>
         </button>
     ) : (
-        <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center gap-2">
+        <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center space-x-2">
             <Radio size={18} className="animate-pulse" /> Modo TV
         </span>
     );
@@ -89,7 +89,7 @@ export default function WatchLivePage() {
                     title={title}
                     onVideoElement={setVideoEl}
                     topRightSlot={
-                        <div className="flex items-center gap-2">
+                        <div className="flex items-center space-x-2">
                             {useRelay && canSync && <SyncButton role={isJoining ? 'viewer' : 'broadcaster'} onClick={sync} />}
                             {shareToggle}
                         </div>

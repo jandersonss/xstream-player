@@ -55,7 +55,7 @@ export default function TMDbSettingsModal({ isOpen, onClose }: TMDbSettingsModal
             <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl w-full max-w-md mx-4 animate-in zoom-in-95 duration-200">
                 {/* Header */}
                 <div className="flex items-center justify-between p-6 border-b border-[#333]">
-                    <div className="flex items-center gap-3">
+                    <div className="flex items-center space-x-3">
                         <div className="p-2 bg-red-600/20 rounded-lg">
                             <Key size={24} className="text-red-500" />
                         </div>
@@ -80,7 +80,7 @@ export default function TMDbSettingsModal({ isOpen, onClose }: TMDbSettingsModal
                             href="https://www.themoviedb.org/settings/api"
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="text-sm text-blue-400 hover:text-blue-300 flex items-center gap-1 transition-colors"
+                            className="text-sm text-blue-400 hover:text-blue-300 flex items-center space-x-1 transition-colors"
                         >
                             Obter chave de API
                             <ExternalLink size={14} />
@@ -103,14 +103,14 @@ export default function TMDbSettingsModal({ isOpen, onClose }: TMDbSettingsModal
                     </div>
 
                     {error && (
-                        <div className="flex items-center gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg animate-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center space-x-2 p-3 bg-red-500/10 border border-red-500/20 rounded-lg animate-in slide-in-from-top-2 duration-200">
                             <AlertCircle size={18} className="text-red-500 flex-shrink-0" />
                             <p className="text-sm text-red-300">{error}</p>
                         </div>
                     )}
 
                     {success && (
-                        <div className="flex items-center gap-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg animate-in slide-in-from-top-2 duration-200">
+                        <div className="flex items-center space-x-2 p-3 bg-green-500/10 border border-green-500/20 rounded-lg animate-in slide-in-from-top-2 duration-200">
                             <CheckCircle size={18} className="text-green-500 flex-shrink-0" />
                             <p className="text-sm text-green-300">Configuração salva com sucesso!</p>
                         </div>
@@ -118,7 +118,7 @@ export default function TMDbSettingsModal({ isOpen, onClose }: TMDbSettingsModal
                 </div>
 
                 {/* Footer */}
-                <div className="flex gap-3 p-6 border-t border-[#333]">
+                <div className="flex space-x-3 p-6 border-t border-[#333]">
                     <button
                         onClick={handleClose}
                         disabled={isLoading}
@@ -129,7 +129,7 @@ export default function TMDbSettingsModal({ isOpen, onClose }: TMDbSettingsModal
                     <button
                         onClick={handleSave}
                         disabled={isLoading}
-                        className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 rounded-lg text-white font-medium transition-colors disabled:opacity-50 flex items-center justify-center gap-2"
+                        className="flex-1 px-4 py-3 bg-red-600 hover:bg-red-700 rounded-lg text-white font-medium transition-colors disabled:opacity-50 flex items-center justify-center space-x-2"
                     >
                         {isLoading ? (
                             <>

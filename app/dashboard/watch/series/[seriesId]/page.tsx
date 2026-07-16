@@ -476,9 +476,9 @@ export default function WatchSeriesPage() {
                         title={joinTitle}
                         onVideoElement={setVideoEl}
                         topRightSlot={
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center space-x-2">
                                 {canSync && <SyncButton role="viewer" onClick={sync} />}
-                                <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center gap-2">
+                                <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center space-x-2">
                                     <Radio size={18} className="animate-pulse" /> Modo TV
                                 </span>
                             </div>
@@ -495,7 +495,7 @@ export default function WatchSeriesPage() {
         return (
             <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white space-y-4">
                 <p className="text-red-500 text-xl">{error || 'Série não encontrada'}</p>
-                <button onClick={() => router.back()} className="flex items-center gap-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">
+                <button onClick={() => router.back()} className="flex items-center space-x-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">
                     <ArrowLeft size={20} /> Voltar
                 </button>
             </div>
@@ -514,7 +514,7 @@ export default function WatchSeriesPage() {
         const shareToggle = (
             <button
                 onClick={() => setIsSharing((v) => !v)}
-                className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
+                className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
                 title={isSharing ? 'Transmitindo para o Modo TV (sem avançar/pausar)' : 'Transmitir este episódio no Modo TV'}
             >
                 <Radio size={18} className={isSharing ? 'animate-pulse' : ''} />
@@ -572,9 +572,9 @@ export default function WatchSeriesPage() {
                         subtitle={`T${selectedEpisode.season} · Ep ${selectedEpisode.episode_num}${selectedEpisode.title ? ` - ${selectedEpisode.title}` : ''}`}
                         onVideoElement={setVideoEl}
                         topRightSlot={
-                            <div className="flex items-center gap-2">
+                            <div className="flex items-center space-x-2">
                                 {autoSubLoading && (
-                                    <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-emerald-300 flex items-center gap-2">
+                                    <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-emerald-300 flex items-center space-x-2">
                                         <Loader2 size={16} className="animate-spin" /> Legenda…
                                     </span>
                                 )}
@@ -612,12 +612,12 @@ export default function WatchSeriesPage() {
                     onClick={() => router.back()}
                     data-focusable="true"
                     tabIndex={0}
-                    className="mb-8 flex items-center gap-2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-red-500 focus:scale-110 origin-left"
+                    className="mb-8 flex items-center space-x-2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-red-500 focus:scale-110 origin-left"
                 >
                     <ArrowLeft size={24} /> Voltar
                 </button>
 
-                <div className="flex flex-col lg:flex-row gap-10 lg:gap-16 items-start mb-16">
+                <div className="flex flex-col lg:flex-row space-y-10 lg:space-y-0 lg:space-x-16 items-start mb-16">
                     {/* Poster */}
                     <div className="w-full max-w-[250px] lg:max-w-[350px] flex-shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/50 mx-auto lg:mx-0">
                         <img
@@ -632,14 +632,14 @@ export default function WatchSeriesPage() {
                     <div className="flex-1 space-y-6">
                         <h1 className="text-3xl lg:text-5xl font-bold leading-tight">{series.info.name}</h1>
 
-                        <div className="flex flex-wrap items-center gap-4 text-sm lg:text-base text-gray-300">
+                        <div className="flex flex-wrap items-center space-x-4 text-sm lg:text-base text-gray-300">
                             {series.info.releaseDate && (
-                                <span className="flex items-center gap-1 bg-white/10 px-3 py-1 rounded-full">
+                                <span className="flex items-center space-x-1 bg-white/10 px-3 py-1 rounded-full">
                                     <Calendar size={16} /> {series.info.releaseDate}
                                 </span>
                             )}
                             {series.info.rating && (
-                                <span className="flex items-center gap-1 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full border border-yellow-500/30">
+                                <span className="flex items-center space-x-1 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full border border-yellow-500/30">
                                     <Star size={16} fill="currentColor" /> {series.info.rating}
                                 </span>
                             )}
@@ -649,7 +649,7 @@ export default function WatchSeriesPage() {
                             {series.info.plot || "Nenhuma sinopse disponível."}
                         </p>
 
-                        <div className="flex gap-4 mt-8">
+                        <div className="flex space-x-4 mt-8">
                             <button
                                 onClick={() => {
                                     const id = seriesId;
@@ -667,7 +667,7 @@ export default function WatchSeriesPage() {
                                 }}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className={`flex items-center gap-2 px-6 py-3 rounded-full border transition-all focus:outline-none focus:ring-4 focus:ring-white ${isFavorite(seriesId, 'series')
+                                className={`flex items-center space-x-2 px-6 py-3 rounded-full border transition-all focus:outline-none focus:ring-4 focus:ring-white ${isFavorite(seriesId, 'series')
                                     ? 'bg-white text-red-600 border-white font-bold'
                                     : 'bg-transparent text-white border-white/30 hover:bg-white/10'
                                     }`}
@@ -687,14 +687,15 @@ export default function WatchSeriesPage() {
                 {/* Episodes Section */}
                 <div className="space-y-6">
                     {/* Buscar / baixar legendas de todos os episódios */}
-                    <div className="flex flex-wrap items-center gap-3 p-4 bg-[#1a1a1a] border border-[#333] rounded-xl">
-                        <div className="flex items-center gap-2 text-emerald-500">
+                    {/* flex gap needs Chrome 84+ (WebOS TVs lack it): child m-1.5 + p-2.5 emulate gap-3 + p-4 */}
+                    <div className="flex flex-wrap items-center p-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl">
+                        <div className="m-1.5 flex items-center space-x-2 text-emerald-500">
                             <Subtitles size={20} />
                             <span className="text-sm font-semibold text-white">Legendas de toda a série</span>
                         </div>
 
                         {remainingDownloads !== null && (
-                            <span className={`text-xs px-2 py-1 rounded ${remainingDownloads <= 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
+                            <span className={`m-1.5 text-xs px-2 py-1 rounded ${remainingDownloads <= 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
                                 {remainingDownloads} download{remainingDownloads === 1 ? '' : 's'} restante{remainingDownloads === 1 ? '' : 's'} hoje
                             </span>
                         )}
@@ -703,7 +704,7 @@ export default function WatchSeriesPage() {
                             value={batchLanguage}
                             onChange={(e) => setBatchLanguage(e.target.value)}
                             disabled={isBatchBusy}
-                            className="px-3 py-2 bg-[#0f0f0f] border border-[#333] rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:opacity-50"
+                            className="m-1.5 px-3 py-2 bg-[#0f0f0f] border border-[#333] rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:opacity-50"
                         >
                             {BATCH_LANGUAGES.map(lang => (
                                 <option key={lang.code} value={lang.code}>{lang.label}</option>
@@ -713,7 +714,7 @@ export default function WatchSeriesPage() {
                         {isBatchBusy ? (
                             <button
                                 onClick={() => { batchCancelRef.current = true; }}
-                                className="px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                className="m-1.5 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm font-medium flex items-center space-x-2 transition-colors"
                             >
                                 <X size={16} /> Cancelar
                             </button>
@@ -721,14 +722,14 @@ export default function WatchSeriesPage() {
                             <>
                                 <button
                                     onClick={handleBatchSearch}
-                                    className="px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                    className="m-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white text-sm font-medium flex items-center space-x-2 transition-colors"
                                 >
                                     <Search size={16} /> Buscar legendas
                                 </button>
                                 {availableCount > 0 && (
                                     <button
                                         onClick={handleBatchDownload}
-                                        className="px-4 py-2 bg-white/10 hover:bg-white/20 border border-emerald-500/40 rounded-lg text-white text-sm font-medium flex items-center gap-2 transition-colors"
+                                        className="m-1.5 px-4 py-2 bg-white/10 hover:bg-white/20 border border-emerald-500/40 rounded-lg text-white text-sm font-medium flex items-center space-x-2 transition-colors"
                                     >
                                         <Download size={16} /> Baixar {availableCount} legenda{availableCount > 1 ? 's' : ''}
                                     </button>
@@ -737,7 +738,7 @@ export default function WatchSeriesPage() {
                         )}
 
                         {batch && (
-                            <div className="flex items-center gap-2 text-xs text-gray-400 ml-auto">
+                            <div className="m-1.5 flex items-center space-x-2 text-xs text-gray-400 ml-auto">
                                 {isBatchBusy && <Loader2 size={14} className="animate-spin text-emerald-500" />}
                                 <span>
                                     {batch.phase === 'searching' && `Buscando ${batch.done}/${batch.total}…`}
@@ -764,7 +765,7 @@ export default function WatchSeriesPage() {
                         )}
                     </div>
 
-                    <div className="flex items-center gap-4 overflow-x-auto pb-4 scrollbar-hide border-b border-white/10">
+                    <div className="flex items-center space-x-4 overflow-x-auto pb-4 scrollbar-hide border-b border-white/10">
                         {seasons.map(season => (
                             <button
                                 key={season}
@@ -795,7 +796,7 @@ export default function WatchSeriesPage() {
                                     onClick={() => setSelectedEpisode(ep)}
                                     data-focusable="true"
                                     tabIndex={0}
-                                    className="relative flex items-center gap-4 p-4 bg-[#1f1f1f] rounded-xl hover:bg-[#2a2a2a] transition-all cursor-pointer group border border-white/5 hover:border-red-500/30 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-[1.02] z-10 w-full text-left overflow-hidden"
+                                    className="relative flex items-center space-x-4 p-4 bg-[#1f1f1f] rounded-xl hover:bg-[#2a2a2a] transition-all cursor-pointer group border border-white/5 hover:border-red-500/30 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-[1.02] z-10 w-full text-left overflow-hidden"
                                 >
                                     <div className="w-12 h-12 flex items-center justify-center bg-white/10 rounded-full group-hover:bg-red-600 transition-colors flex-shrink-0">
                                         <Play size={20} fill="currentColor" className="text-white ml-1" />
@@ -808,7 +809,7 @@ export default function WatchSeriesPage() {
                                     </div>
                                     {/* Status da legenda (após buscar em lote) */}
                                     {availability[ep.id]?.status === 'downloaded' && (
-                                        <span className="text-xs px-2 py-1 rounded bg-emerald-600/20 text-emerald-400 flex items-center gap-1 flex-shrink-0">
+                                        <span className="text-xs px-2 py-1 rounded bg-emerald-600/20 text-emerald-400 flex items-center space-x-1 flex-shrink-0">
                                             <Check size={12} /> Legenda
                                         </span>
                                     )}

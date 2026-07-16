@@ -46,5 +46,6 @@ Tudo em `data/` é **gitignored** (só `data/.keep` versionado) e persiste entre
 - TypeScript `strict: true`; alias `@/*` → raiz do projeto. Indentação de **4 espaços** nos módulos de `app/lib` e API routes.
 - Rotas de API que usam APIs de Node (ffmpeg, `fs`) precisam de `export const runtime = 'nodejs'`.
 - Ao editar `legacy/`, lembre que roda em IE11 — sem sintaxe/APIs modernas não polyfilladas.
+- **Compatibilidade com TVs (browsers-alvo):** o app moderno precisa rodar em **WebOS 6 (Chromium ~79)**; **WebOS 5 (Chromium ~68)** cai no app legacy via `middleware.ts` (redireciona WebOS com Chrome < 72). Tailwind é v3 com browserslist `chrome >= 60`, mas o autoprefixer só adiciona prefixos — não emula recursos ausentes. Regras práticas: **nunca use `gap-*` em flexbox** (exige Chrome 84; use `space-x-*`/`space-y-*` ou margins — `gap` em **grid** é ok, Chrome 66+); evite `aspect-ratio` (Chrome 88+), `:focus-visible` (86+), `backdrop-filter` sem fallback (76+ com ressalvas) e `@supports` para detectar flex gap (dá falso positivo, pois o `gap` de grid valida a query).
 - Docker roda como uid 1001; em Linux o volume `data/` pode dar `EACCES` (corrija com `chmod -R 777 data/` ou `chown -R 1001:1001 data/`).
 - `better-sqlite3` é módulo nativo (precisa de `python3/make/g++` para buildar).

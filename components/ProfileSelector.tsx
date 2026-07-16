@@ -32,14 +32,15 @@ export default function ProfileSelector() {
         <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6">
             <h1 className="text-3xl lg:text-4xl font-bold text-white mb-10">Quem está assistindo?</h1>
 
-            <div className="flex flex-wrap justify-center gap-6 max-w-4xl">
+            {/* flex gap needs Chrome 84+ (WebOS TVs lack it): child m-3 + container -m-3 emulate gap-6 */}
+            <div className="flex flex-wrap justify-center -m-3 max-w-4xl">
                 {profiles.map(profile => (
                     <button
                         key={profile.id}
                         onClick={() => selectProfile(profile.id)}
                         data-focusable="true"
                         tabIndex={0}
-                        className="group flex flex-col items-center gap-3 focus:outline-none"
+                        className="group m-3 flex flex-col items-center space-y-3 focus:outline-none"
                     >
                         <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-focus:ring-white transition-all">
                             <User size={48} className="text-white" />
@@ -51,7 +52,7 @@ export default function ProfileSelector() {
                 ))}
 
                 {isCreating ? (
-                    <div className="flex flex-col items-center gap-3">
+                    <div className="m-3 flex flex-col items-center space-y-3">
                         <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
                             <User size={48} className="text-gray-600" />
                         </div>
@@ -73,7 +74,7 @@ export default function ProfileSelector() {
                         onClick={() => setIsCreating(true)}
                         data-focusable="true"
                         tabIndex={0}
-                        className="group flex flex-col items-center gap-3 focus:outline-none"
+                        className="group m-3 flex flex-col items-center space-y-3 focus:outline-none"
                     >
                         <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 group-focus:ring-2 group-focus:ring-white transition-all">
                             <Plus size={48} className="text-gray-500 group-hover:text-white transition-colors" />

@@ -45,7 +45,7 @@ export default function Sidebar() {
                     data-focusable="true"
                     tabIndex={0}
                     title="Trocar perfil"
-                    className="w-full flex items-center gap-3 rounded-lg px-2 lg:px-3 py-1.5 hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-red-600 justify-start"
+                    className="w-full flex items-center space-x-3 rounded-lg px-2 lg:px-3 py-1.5 hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-red-600 justify-start"
                 >
                     <span className="w-8 h-8 flex-shrink-0 rounded-md bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center text-white text-xs font-bold uppercase">
                         {activeProfile?.name?.charAt(0) ?? <User size={16} />}
@@ -73,7 +73,7 @@ export default function Sidebar() {
                             href={item.path}
                             data-focusable="true"
                             tabIndex={0}
-                            className={`flex items-center gap-3 px-2 lg:px-3 py-1.5 rounded-lg transition-all duration-300 group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-red-600 justify-start ${isActive
+                            className={`flex items-center space-x-3 px-2 lg:px-3 py-1.5 rounded-lg transition-all duration-300 group relative overflow-hidden focus:outline-none focus:ring-2 focus:ring-red-600 justify-start ${isActive
                                 ? 'bg-red-600/10 text-red-500 shadow-[0_0_20px_rgba(229,9,20,0.15)]'
                                 : 'text-gray-400 hover:text-white hover:bg-white/5'
                                 }`}
@@ -98,7 +98,7 @@ export default function Sidebar() {
                     tabIndex={0}
                     title="Transmitir sempre"
                     aria-pressed={autoBroadcast}
-                    className={`w-full flex items-center gap-3 rounded-lg border-l-2 px-2 lg:px-3 py-1.5 text-left transition-all focus:outline-none focus:ring-2 focus:ring-sky-500 justify-start ${autoBroadcast ? 'border-sky-400 bg-sky-400/10' : 'border-sky-400/30 hover:bg-white/5'}`}
+                    className={`w-full flex items-center space-x-3 rounded-lg border-l-2 px-2 lg:px-3 py-1.5 text-left transition-all focus:outline-none focus:ring-2 focus:ring-sky-500 justify-start ${autoBroadcast ? 'border-sky-400 bg-sky-400/10' : 'border-sky-400/30 hover:bg-white/5'}`}
                 >
                     <Radio size={18} className={`flex-shrink-0 ${autoBroadcast ? 'text-sky-400 animate-pulse' : 'text-sky-400/60'}`} />
                     <span className="hidden lg:flex flex-1 flex-col items-start min-w-0">
@@ -117,7 +117,7 @@ export default function Sidebar() {
                     disabled={isSyncing}
                     data-focusable="true"
                     tabIndex={0}
-                    className="w-full flex items-center gap-3 px-2 lg:px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-red-600 relative overflow-hidden justify-start"
+                    className="w-full flex items-center space-x-3 px-2 lg:px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-red-600 relative overflow-hidden justify-start"
                 >
                     <RefreshCw size={18} className={`flex-shrink-0 group-hover:rotate-180 transition-transform duration-700 ${isSyncing ? 'animate-spin text-red-500' : ''}`} />
                     <div className="hidden lg:flex flex-col items-start min-w-0">
@@ -136,7 +136,7 @@ export default function Sidebar() {
                     onClick={logout}
                     data-focusable="true"
                     tabIndex={0}
-                    className="w-full flex items-center gap-3 px-2 lg:px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-red-600 justify-start"
+                    className="w-full flex items-center space-x-3 px-2 lg:px-3 py-1.5 text-gray-400 hover:text-white hover:bg-white/5 rounded-lg transition-all duration-300 group focus:outline-none focus:ring-2 focus:ring-red-600 justify-start"
                 >
                     <LogOut size={18} className="group-hover:-translate-x-1 transition-transform" />
                     <span className="hidden lg:block text-sm font-medium">Sair</span>

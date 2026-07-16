@@ -76,7 +76,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         return (
                             <div
                                 key={profile.id}
-                                className={`flex items-center gap-3 px-3 py-2.5 rounded-xl border transition-colors ${
+                                className={`flex items-center space-x-3 px-3 py-2.5 rounded-xl border transition-colors ${
                                     isActive
                                         ? 'bg-red-600/10 border-red-600/40'
                                         : 'bg-white/5 border-transparent hover:bg-white/10'
@@ -141,7 +141,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                     })}
                 </div>
 
-                <div className="flex gap-2">
+                <div className="flex space-x-2">
                     <input
                         value={newName}
                         onChange={e => setNewName(e.target.value)}
@@ -154,7 +154,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         onClick={handleCreate}
                         data-focusable="true"
                         tabIndex={0}
-                        className="flex items-center gap-1.5 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl focus:outline-none focus:ring-2 focus:ring-white transition-colors"
+                        className="flex items-center space-x-1.5 px-4 py-2.5 bg-red-600 hover:bg-red-700 text-white text-sm font-medium rounded-xl focus:outline-none focus:ring-2 focus:ring-white transition-colors"
                     >
                         <Plus size={16} />
                         Criar

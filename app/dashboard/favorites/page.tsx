@@ -13,7 +13,7 @@ export default function FavoritesPage() {
 
     const renderSection = (title: string, items: any[], emptyMsg: string, icon: any) => (
         <div className="space-y-6">
-            <div className="flex items-center gap-3 border-b border-white/10 pb-4">
+            <div className="flex items-center space-x-3 border-b border-white/10 pb-4">
                 {icon}
                 <h2 className="text-2xl font-bold text-white">{title}</h2>
                 <span className="text-sm font-medium text-gray-400 bg-white/10 px-2 py-0.5 rounded-full">{items.length}</span>
@@ -26,11 +26,12 @@ export default function FavoritesPage() {
                     {items.map((item) => (
                         <div key={`${item.type}-${item.id}`} className="group relative bg-[#1f1f1f] rounded-xl overflow-hidden shadow-lg border border-white/5 hover:border-red-500/30 transition-all hover:-translate-y-1">
                             <Link href={`/dashboard/watch/${item.type}/${item.id}`} data-focusable="true" tabIndex={0} className="block focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10 rounded-xl">
-                                <div className="aspect-[2/3] relative">
+                                {/* pt-[150%] keeps the 2:3 poster box on Chrome < 88 (no aspect-ratio) */}
+                                <div className="relative pt-[150%]">
                                     {item.image ? (
-                                        <img src={item.image} alt={item.name} className="w-full h-full object-cover" />
+                                        <img src={item.image} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />
                                     ) : (
-                                        <div className="w-full h-full flex items-center justify-center bg-white/5 text-gray-600">
+                                        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-white/5 text-gray-600">
                                             <Heart size={40} />
                                         </div>
                                     )}
@@ -48,7 +49,7 @@ export default function FavoritesPage() {
                                     }}
                                     data-focusable="true"
                                     tabIndex={0}
-                                    className="text-xs text-red-500 hover:text-red-400 flex items-center gap-1 transition-colors focus:outline-none focus:text-white focus:bg-red-600 px-2 py-1 rounded"
+                                    className="text-xs text-red-500 hover:text-red-400 flex items-center space-x-1 transition-colors focus:outline-none focus:text-white focus:bg-red-600 px-2 py-1 rounded"
                                 >
                                     <Heart size={12} fill="currentColor" /> Remover
                                 </button>
@@ -62,7 +63,7 @@ export default function FavoritesPage() {
 
     return (
         <div className="space-y-12 p-4 md:p-6 lg:p-10">
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col space-y-2">
                 <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Meus Favoritos</h1>
                 <p className="text-gray-400 text-sm md:text-base">Sua coleção personalizada de conteúdo.</p>
             </div>

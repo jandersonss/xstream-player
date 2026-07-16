@@ -51,14 +51,14 @@ export default function LiveCategories() {
 
     return (
         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 p-4 md:p-6 lg:p-10">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 mb-8">
-                <div className="flex items-center gap-3">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 md:space-x-4 mb-8">
+                <div className="flex items-center space-x-3">
                     <div className="p-2 md:p-3 bg-red-600 rounded-lg shadow-lg shadow-red-900/40">
                         <Tv size={24} className="text-white" />
                     </div>
                     <h1 className="text-2xl md:text-3xl font-bold text-white">Categorias ao Vivo</h1>
                 </div>
-                <div className="flex items-center gap-4">
+                <div className="flex items-center space-x-4">
                     <span className="text-xs text-gray-400 uppercase tracking-widest hidden sm:block">Ordenar</span>
                     <SortControls currentSort={sort} onSortChange={setSort} />
                 </div>
@@ -75,7 +75,7 @@ export default function LiveCategories() {
                     >
                         <div className="absolute top-0 right-0 w-16 h-16 bg-gradient-to-br from-transparent to-white/5 rounded-bl-full transform translate-x-8 -translate-y-8 group-hover:translate-x-4 group-hover:-translate-y-4 transition-transform duration-500"></div>
 
-                        <div className="relative z-10 flex flex-col items-start gap-4 h-full justify-between">
+                        <div className="relative z-10 flex flex-col items-start space-y-4 h-full justify-between">
                             <div>
                                 <h3 className="font-semibold text-gray-200 group-hover:text-white line-clamp-3 leading-tight">
                                     {cat.category_name}

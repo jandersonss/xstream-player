@@ -92,12 +92,12 @@ export default function LiveStreams() {
 
     return (
         <div className="space-y-6 p-4 md:p-6 lg:p-10">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center space-y-4 md:space-y-0 md:space-x-4">
                 <Link
                     href="/dashboard/live"
                     data-focusable="true"
                     tabIndex={0}
-                    className="inline-flex items-center gap-2 text-gray-400 hover:text-white transition-colors focus:outline-none focus:text-red-500 focus:scale-110 origin-left"
+                    className="inline-flex items-center space-x-2 text-gray-400 hover:text-white transition-colors focus:outline-none focus:text-red-500 focus:scale-110 origin-left"
                 >
                     <ArrowLeft size={20} />
                     Voltar para Categorias
@@ -106,7 +106,7 @@ export default function LiveStreams() {
             </div>
 
             <div className="space-y-4">
-                <h3 className="text-xl font-bold text-white flex items-center gap-2">
+                <h3 className="text-xl font-bold text-white flex items-center space-x-2">
                     <span className="w-2 h-8 bg-red-600 rounded-full"></span>
                     {categoryName || 'Canais'} ({streams.length})
                 </h3>
@@ -122,7 +122,7 @@ export default function LiveStreams() {
                                     href={`/dashboard/watch/live/${stream.stream_id}`}
                                     data-focusable="true"
                                     tabIndex={0}
-                                    className="group bg-[#1f1f1f] hover:bg-[#252525] border border-[#333] rounded-lg p-3 flex items-center gap-4 transition-all focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-[1.02] z-10 hover:border-gray-500"
+                                    className="group bg-[#1f1f1f] hover:bg-[#252525] border border-[#333] rounded-lg p-3 flex items-center space-x-4 transition-all focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-[1.02] z-10 hover:border-gray-500"
                                 >
                                     <div className="w-12 h-12 flex-shrink-0 bg-black rounded-md flex items-center justify-center overflow-hidden border border-[#333]">
                                         {stream.stream_icon ? (

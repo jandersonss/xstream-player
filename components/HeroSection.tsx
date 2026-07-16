@@ -201,14 +201,14 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     className={`transition-all duration-700 transform ${showLogo ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
                 >
                     {/* Metadata Tags */}
-                    <div className="flex items-center gap-2 mb-2">
+                    <div className="flex items-center space-x-2 mb-2">
                         <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded uppercase tracking-wider">
                             {currentItem.type === 'movie' ? 'Filme' : 'Série'}
                         </span>
                         <span className="px-2 py-1 bg-white/20  text-white text-xs font-bold rounded border border-white/10">
                             {currentItem.year}
                         </span>
-                        <div className="flex items-center gap-1 text-yellow-500">
+                        <div className="flex items-center space-x-1 text-yellow-500">
                             <span className="text-sm font-bold">{currentItem.rating.toFixed(1)}</span>
                         </div>
                     </div>
