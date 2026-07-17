@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Tv, Film, Layers, LogOut, Search, Heart, RefreshCw, Radio, User, ChevronDown } from 'lucide-react';
+import { Home, Tv, Film, Layers, LogOut, Search, Bookmark, RefreshCw, Radio, User, ChevronDown } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useData } from '../app/context/DataContext';
 import { useProfile } from '../app/context/ProfileContext';
@@ -13,7 +13,7 @@ import ProfileModal from './ProfileModal';
 const menuItems = [
     { name: 'Busca', icon: Search, path: '/dashboard/search' },
     { name: 'Início', icon: Home, path: '/dashboard' },
-    { name: 'Favoritos', icon: Heart, path: '/dashboard/favorites' },
+    { name: 'Minha Lista', icon: Bookmark, path: '/dashboard/favorites' },
     { name: 'TV ao vivo', icon: Tv, path: '/dashboard/live' },
     { name: 'Filmes', icon: Film, path: '/dashboard/movies' },
     { name: 'Séries', icon: Layers, path: '/dashboard/series' },

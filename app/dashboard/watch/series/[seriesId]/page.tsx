@@ -6,7 +6,7 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
-import { ArrowLeft, Play, Calendar, Star, Clock, List, Heart, Subtitles, Radio, Download, Loader2, X, Search, Check } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, List, Bookmark, Subtitles, Radio, Download, Loader2, X, Search, Check } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import SyncButton from '@/components/SyncButton';
@@ -672,8 +672,8 @@ export default function WatchSeriesPage() {
                                     : 'bg-transparent text-white border-white/30 hover:bg-white/10'
                                     }`}
                             >
-                                <Heart size={20} fill={isFavorite(seriesId, 'series') ? "currentColor" : "none"} />
-                                {isFavorite(seriesId, 'series') ? 'Favoritado' : 'Adicionar aos Favoritos'}
+                                <Bookmark size={20} fill={isFavorite(seriesId, 'series') ? "currentColor" : "none"} />
+                                {isFavorite(seriesId, 'series') ? 'Na Minha Lista' : 'Adicionar à Minha Lista'}
                             </button>
                         </div>
 

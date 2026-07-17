@@ -45,7 +45,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     };
 
     const handleDelete = async (id: string, name: string) => {
-        if (!confirm(`Excluir o perfil "${name}"? Os favoritos e o progresso dele serão apagados.`)) return;
+        if (!confirm(`Excluir o perfil "${name}"? A Minha Lista e o progresso dele serão apagados.`)) return;
 
         const failure = await deleteProfile(id);
         setError(failure);

@@ -1,7 +1,7 @@
 'use client';
 
 import { useFavorites } from '@/app/context/FavoritesContext';
-import { Heart, Play, Tv, Film, Layers, AlertCircle } from 'lucide-react';
+import { Bookmark, Play, Tv, Film, Layers, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
 
 export default function FavoritesPage() {
@@ -32,7 +32,7 @@ export default function FavoritesPage() {
                                         <img src={item.image} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />
                                     ) : (
                                         <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-white/5 text-gray-600">
-                                            <Heart size={40} />
+                                            <Bookmark size={40} />
                                         </div>
                                     )}
                                     <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-">
@@ -51,7 +51,7 @@ export default function FavoritesPage() {
                                     tabIndex={0}
                                     className="text-xs text-red-500 hover:text-red-400 flex items-center space-x-1 transition-colors focus:outline-none focus:text-white focus:bg-red-600 px-2 py-1 rounded"
                                 >
-                                    <Heart size={12} fill="currentColor" /> Remover
+                                    <Bookmark size={12} fill="currentColor" /> Remover
                                 </button>
                             </div>
                         </div>
@@ -64,23 +64,23 @@ export default function FavoritesPage() {
     return (
         <div className="space-y-12 p-4 md:p-6 lg:p-10">
             <div className="flex flex-col space-y-2">
-                <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Meus Favoritos</h1>
+                <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Minha Lista</h1>
                 <p className="text-gray-400 text-sm md:text-base">Sua coleção personalizada de conteúdo.</p>
             </div>
 
             {favorites.length === 0 ? (
                 <div className="flex flex-col items-center justify-center py-20 text-gray-500 space-y-4">
-                    <Heart size={64} className="opacity-20" />
-                    <p className="text-xl">Você ainda não adicionou nenhum favorito.</p>
+                    <Bookmark size={64} className="opacity-20" />
+                    <p className="text-xl">Sua lista ainda está vazia.</p>
                     <Link href="/dashboard/search" className="text-red-500 hover:text-red-400 font-medium">
                         Explore o conteúdo para adicionar alguns!
                     </Link>
                 </div>
             ) : (
                 <>
-                    {renderSection('Canais de TV ao Vivo', liveItems, 'Nenhum canal favorito.', <Tv className="text-red-500" />)}
-                    {renderSection('Filmes', movieItems, 'Nenhum filme favorito.', <Film className="text-blue-500" />)}
-                    {renderSection('Séries', seriesItems, 'Nenhuma série favorita.', <Layers className="text-purple-500" />)}
+                    {renderSection('Canais de TV ao Vivo', liveItems, 'Nenhum canal na lista.', <Tv className="text-red-500" />)}
+                    {renderSection('Filmes', movieItems, 'Nenhum filme na lista.', <Film className="text-blue-500" />)}
+                    {renderSection('Séries', seriesItems, 'Nenhuma série na lista.', <Layers className="text-purple-500" />)}
                 </>
             )}
         </div>

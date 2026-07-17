@@ -6,7 +6,7 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import VideoPlayer from '@/components/VideoPlayer';
-import { ArrowLeft, Play, Calendar, Star, Clock, Heart, Subtitles, Radio } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles, Radio } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import LimitReachedModal from '@/components/LimitReachedModal';
@@ -411,7 +411,7 @@ export default function WatchMoviePage() {
                                     : 'bg-transparent text-white border-white/30 hover:bg-white/10'
                                     }`}
                             >
-                                <Heart size={28} fill={movie && isFavorite(movie.movie_data.stream_id, 'movie') ? "currentColor" : "none"} />
+                                <Bookmark size={28} fill={movie && isFavorite(movie.movie_data.stream_id, 'movie') ? "currentColor" : "none"} />
                             </button>
                         </div>
                     </div>
