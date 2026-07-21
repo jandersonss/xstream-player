@@ -35,6 +35,12 @@ export const HEARTBEAT_MS = 20 * 1000;
 const PARTICIPANT_TTL_MS = 15 * 1000;
 /** A "sync" command older than this is ignored (avoids endless re-seeking). */
 const COMMAND_TTL_MS = 30 * 1000;
+/**
+ * How long a forced stop keeps blocking a device. It must outlive one heartbeat
+ * round (HEARTBEAT_MS), otherwise the stopped device re-registers and the broadcast
+ * pops back into the list as if nothing happened.
+ */
+const STOP_MARK_TTL_MS = 60 * 1000;
 
 let sqlite: Database.Database | null = null;
 
@@ -133,6 +139,11 @@ function getConnection(): Database.Database {
             epoch INTEGER NOT NULL,
             target_latency REAL NOT NULL
         );
+
+        CREATE TABLE IF NOT EXISTS stopped_devices (
+            device_id TEXT PRIMARY KEY,
+            stopped_at INTEGER NOT NULL
+        );
     `);
 
     dropLegacyJson();
@@ -222,6 +233,34 @@ export function upsertSession(input: Omit<ShareSession, 'updatedAt'>): ShareSess
 /** Ends a device broadcast. */
 export function endSession(deviceId: string): void {
     getConnection().prepare('DELETE FROM share_sessions WHERE device_id = ?').run(deviceId);
+}
+
+/**
+ * Forced stop from the TV Mode screen: ends the broadcast and marks the device, so
+ * its next heartbeat is refused instead of resurrecting the session. The device learns
+ * it was stopped from that refusal and turns sharing off on its own.
+ */
+export function stopDevice(deviceId: string): void {
+    const db = getConnection();
+    db.transaction(() => {
+        db.prepare('DELETE FROM share_sessions WHERE device_id = ?').run(deviceId);
+        db.prepare(
+            `INSERT INTO stopped_devices (device_id, stopped_at) VALUES (?, ?)
+             ON CONFLICT(device_id) DO UPDATE SET stopped_at = excluded.stopped_at`
+        ).run(deviceId, Date.now());
+    })();
+}
+
+/** Is this device under a recent forced stop? Expired marks are cleaned up here. */
+export function isDeviceStopped(deviceId: string): boolean {
+    const db = getConnection();
+    db.prepare('DELETE FROM stopped_devices WHERE stopped_at < ?').run(Date.now() - STOP_MARK_TTL_MS);
+    return db.prepare('SELECT 1 FROM stopped_devices WHERE device_id = ?').get(deviceId) !== undefined;
+}
+
+/** Clears the mark — the user explicitly turned sharing back on. */
+export function clearDeviceStop(deviceId: string): void {
+    getConnection().prepare('DELETE FROM stopped_devices WHERE device_id = ?').run(deviceId);
 }
 
 // --- Playback sync ---

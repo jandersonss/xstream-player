@@ -66,10 +66,17 @@ export function joinHref(session: ShareSession): string {
 /**
  * While `enabled` is true, keeps the device broadcast registered on the
  * server (periodic heartbeat) and ends it on unmount.
+ *
+ * `onStopped` fires when the server refuses the heartbeat because the broadcast was
+ * ended from the TV Mode screen. Without honoring that refusal the device would just
+ * re-register on the next beat and the stop would be undone.
  */
-export function useShareBroadcast(enabled: boolean, info: BroadcastInfo | null) {
+export function useShareBroadcast(enabled: boolean, info: BroadcastInfo | null, onStopped?: () => void) {
     const streamKey = info ? `${info.contentType}:${info.streamId}` : '';
     const ipRef = useRef<string | null>(null);
+    const onStoppedRef = useRef(onStopped);
+
+    useEffect(() => { onStoppedRef.current = onStopped; }, [onStopped]);
 
     // Discover the LAN IP once (best-effort) to enrich the registration.
     useEffect(() => {
@@ -87,19 +94,25 @@ export function useShareBroadcast(enabled: boolean, info: BroadcastInfo | null) 
         const deviceName = getDeviceName();
         let cancelled = false;
 
-        const beat = async () => {
+        // The first beat carries `resume`: the user turned sharing on by hand, which
+        // clears any earlier forced stop. Later beats must not, or a stopped device
+        // would resurrect itself seconds later.
+        const beat = async (resume = false) => {
             try {
-                await fetch('/api/live-sessions', {
+                const res = await fetch('/api/live-sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ deviceId, deviceName, ip: ipRef.current ?? undefined, ...info }),
+                    body: JSON.stringify({ deviceId, deviceName, ip: ipRef.current ?? undefined, resume, ...info }),
                 });
+                if (!cancelled && res.status === 409) {
+                    onStoppedRef.current?.();
+                }
             } catch {
                 /* heartbeat is best-effort */
             }
         };
 
-        beat();
+        beat(true);
         const interval = setInterval(() => {
             if (!cancelled) beat();
         }, HEARTBEAT_MS);

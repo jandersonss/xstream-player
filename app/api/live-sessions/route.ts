@@ -1,7 +1,9 @@
 import { NextResponse } from 'next/server';
 import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 import {
+    clearDeviceStop,
     endSession,
+    isDeviceStopped,
     listActiveSessions,
     upsertSession,
     HEARTBEAT_MS,
@@ -39,10 +41,19 @@ export async function POST(request: Request) {
         return NextResponse.json({ error: 'Corpo inválido' }, { status: 400 });
     }
 
-    const { deviceId, deviceName, contentType, streamId, title, poster, ip, ext, seriesId } = body;
+    const { deviceId, deviceName, contentType, streamId, title, poster, ip, ext, seriesId, resume } = body;
 
     if (!deviceId || !deviceName || !streamId || !title || !VALID_TYPES.includes(contentType)) {
         return NextResponse.json({ error: 'Campos obrigatórios ausentes' }, { status: 400 });
+    }
+
+    // `resume` marks a sharing session the user just turned on by hand, which overrides
+    // an earlier forced stop. A plain heartbeat does not — otherwise the stopped device
+    // would re-register itself a few seconds later and nothing would have been stopped.
+    if (resume === true) {
+        clearDeviceStop(String(deviceId));
+    } else if (isDeviceStopped(String(deviceId))) {
+        return NextResponse.json({ stopped: true }, { status: 409 });
     }
 
     // Prefer the IP discovered on the client (WebRTC); otherwise the proxy header.

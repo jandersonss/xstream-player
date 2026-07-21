@@ -12,6 +12,7 @@ import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import LimitReachedModal from '@/components/LimitReachedModal';
 import { useConnectionLimit } from '@/app/hooks/useConnectionLimit';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
+import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
 import { getAutoBroadcast } from '@/app/lib/device';
 import SyncButton from '@/components/SyncButton';
 
@@ -74,6 +75,18 @@ export default function WatchMoviePage() {
         streamKey: syncKey('movie', streamId),
         role: isJoining ? 'viewer' : 'broadcaster',
         active: isJoining || (isPlaying && isSharing),
+    });
+
+    // Holds the ffmpeg broadcast only while this device is really playing it.
+    useVodRelayHeartbeat({
+        videoEl,
+        contentType: 'movie',
+        streamId,
+        active: isJoining || (isPlaying && isSharing),
+        onEnded: () => {
+            if (isJoining) router.back();
+            else setIsSharing(false);
+        },
     });
 
     // Calculate resumeTime synchronously based on progressLoaded
@@ -228,7 +241,7 @@ export default function WatchMoviePage() {
         [movie, streamId]
     );
     // Registers the broadcast when I share (not when just joining someone else's).
-    useShareBroadcast(isSharing && !isJoining, broadcastInfo);
+    useShareBroadcast(isSharing && !isJoining, broadcastInfo, () => setIsSharing(false));
 
     // Join another device broadcast (via VOD relay): does not depend on loading details.
     if (isJoining) {

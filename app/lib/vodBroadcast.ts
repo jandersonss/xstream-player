@@ -1,5 +1,4 @@
 import { spawn, type ChildProcess } from 'child_process';
-import fs from 'fs';
 import fsp from 'fs/promises';
 import os from 'os';
 import path from 'path';
@@ -13,6 +12,12 @@ import { buildUpstreamVodUrl } from './liveShare';
  * consume those segments through the relay, joining at the live edge — just like a
  * channel. So N people watching the same movie = ~1 connection on the provider.
  *
+ * Liveness is driven by PLAYBACK, not by downloads. Fetching a segment proves
+ * nothing: on a DEMUXER_ERROR the browser keeps pulling segments with 200 OK while
+ * the <video> is dead, which used to keep ffmpeg (and the upstream connection) alive
+ * forever. Only the client knows whether frames advanced, so each device reports it
+ * through `reportConsumer` and the broadcast lives while someone is really watching.
+ *
  * Guards against directory races:
  *  - Each run uses a UNIQUE directory (includes PID + timestamp + counter).
  *  - We NEVER delete the shared root folder (another process/instance — e.g.
@@ -22,19 +27,35 @@ import { buildUpstreamVodUrl } from './liveShare';
 
 export type VodType = 'movie' | 'series';
 
+/** What a device reports about its own playback. */
+export type ConsumerState = 'playing' | 'paused' | 'stalled';
+
 const ROOT_DIR = path.join(os.tmpdir(), 'xstream-vod');
-const IDLE_TIMEOUT_MS = 45 * 1000;
 const MAX_BROADCASTS = 3;
-const REAP_INTERVAL_MS = 15 * 1000;
+const REAP_INTERVAL_MS = 5 * 1000;
 const SEGMENT_DURATION = 4;
+/** A device that stops reporting for longer than this no longer holds the broadcast. */
+const CONSUMER_TTL_MS = 15 * 1000;
+/** Between spawning ffmpeg and the first played frame there is no liveness signal yet. */
+const STARTUP_GRACE_MS = 30 * 1000;
+/** ffmpeg is stuck if it has not written a segment for ~3 segment durations. */
+const STALL_TIMEOUT_MS = 3 * SEGMENT_DURATION * 1000;
+/** After a forced stop, refuse to respawn for this long (a retrying player would resurrect it). */
+const STOP_MARK_MS = 30 * 1000;
 /** A directory not written to for longer than this is treated as orphan and may be swept. */
 const STALE_DIR_MS = 3 * 60 * 1000;
+
+interface Consumer {
+    lastAlive: number;
+    paused: boolean;
+}
 
 interface Broadcast {
     key: string;
     dir: string;
     proc: ChildProcess;
-    lastAccess: number;
+    /** Devices reporting active playback, by deviceId. */
+    consumers: Map<string, Consumer>;
     startedAt: number;
     alive: boolean;
 }
@@ -44,6 +65,8 @@ type EnsureResult = { key: string; dir: string } | { error: string };
 const broadcasts = new Map<string, Broadcast>();
 /** In-flight starts — prevents two requests from starting the same broadcast in parallel. */
 const starting = new Map<string, Promise<EnsureResult>>();
+/** Keys stopped on purpose, with the instant the block expires. */
+const stopMarks = new Map<string, number>();
 let runCounter = 0;
 
 function keyFor(type: VodType, streamId: string): string {
@@ -59,6 +82,7 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 /** Stops a SPECIFIC broadcast (the object), without affecting another run on the same key. */
 function stopBroadcast(b: Broadcast) {
     b.alive = false;
+    b.consumers.clear();
     try {
         b.proc.kill('SIGKILL');
     } catch {
@@ -97,17 +121,63 @@ async function sweepStaleDirs() {
     );
 }
 
+/** Drops expired devices and returns how many are still reporting playback. */
+function pruneConsumers(b: Broadcast, now: number): number {
+    for (const [deviceId, consumer] of b.consumers) {
+        if (now - consumer.lastAlive > CONSUMER_TTL_MS) {
+            b.consumers.delete(deviceId);
+        }
+    }
+    return b.consumers.size;
+}
+
+/**
+ * ffmpeg can hang without ever emitting `exit` (upstream stalls mid-transfer), so
+ * process liveness is not enough — what matters is whether segments keep appearing.
+ * The directory mtime moves on every segment written or deleted by `delete_segments`.
+ */
+async function hasStalled(b: Broadcast, now: number): Promise<boolean> {
+    try {
+        const stat = await fsp.stat(b.dir);
+        return now - stat.mtimeMs > STALL_TIMEOUT_MS;
+    } catch {
+        return true; // directory vanished — there is nothing left to serve
+    }
+}
+
+async function reapOnce() {
+    const now = Date.now();
+
+    for (const b of [...broadcasts.values()]) {
+        if (!b.alive) {
+            stopBroadcast(b);
+            continue;
+        }
+        if (now - b.startedAt < STARTUP_GRACE_MS) continue;
+
+        if (pruneConsumers(b, now) === 0) {
+            console.log(`[VodBroadcast ${b.key}] encerrado: nenhum aparelho reproduzindo`);
+            stopBroadcast(b);
+            continue;
+        }
+        if (await hasStalled(b, now)) {
+            console.log(`[VodBroadcast ${b.key}] encerrado: ffmpeg parou de gerar segmentos`);
+            stopBroadcast(b);
+        }
+    }
+
+    for (const [key, expiresAt] of stopMarks) {
+        if (now > expiresAt) stopMarks.delete(key);
+    }
+
+    await sweepStaleDirs();
+}
+
 let reaper: NodeJS.Timeout | null = null;
 function ensureReaper() {
     if (reaper) return;
     reaper = setInterval(() => {
-        const now = Date.now();
-        for (const b of broadcasts.values()) {
-            if (!b.alive || now - b.lastAccess > IDLE_TIMEOUT_MS) {
-                stopBroadcast(b);
-            }
-        }
-        void sweepStaleDirs();
+        void reapOnce();
     }, REAP_INTERVAL_MS);
     if (typeof reaper.unref === 'function') reaper.unref();
 }
@@ -137,7 +207,7 @@ function spawnFfmpeg(key: string, dir: string, upstreamUrl: string): Broadcast {
         key,
         dir,
         proc,
-        lastAccess: Date.now(),
+        consumers: new Map(),
         startedAt: Date.now(),
         alive: true,
     };
@@ -168,7 +238,6 @@ export async function ensureVodBroadcast(
 
     const existing = broadcasts.get(key);
     if (existing && existing.alive) {
-        existing.lastAccess = Date.now();
         return { key, dir: existing.dir };
     }
 
@@ -179,6 +248,11 @@ export async function ensureVodBroadcast(
         const stale = broadcasts.get(key);
         if (stale && !stale.alive) {
             stopBroadcast(stale);
+        }
+
+        const stopMark = stopMarks.get(key);
+        if (stopMark && Date.now() < stopMark) {
+            return { error: 'Transmissão encerrada' };
         }
 
         if (broadcasts.size >= MAX_BROADCASTS) {
@@ -207,11 +281,40 @@ export async function ensureVodBroadcast(
     }
 }
 
-/** Marks access (so the reaper does not kill a broadcast in use). */
-export function touchBroadcast(key: string): boolean {
+/**
+ * Records what a device is doing with the broadcast. Returns whether the broadcast
+ * still exists, so the client can give up instead of retrying forever.
+ *
+ * `paused` counts as watching (the viewer is there, deliberately stopped); `stalled`
+ * releases the device immediately, without waiting out the TTL.
+ */
+export function reportConsumer(key: string, deviceId: string, state: ConsumerState): boolean {
     const b = broadcasts.get(key);
     if (!b || !b.alive) return false;
-    b.lastAccess = Date.now();
+
+    if (state === 'stalled') {
+        b.consumers.delete(deviceId);
+    } else {
+        b.consumers.set(deviceId, { lastAlive: Date.now(), paused: state === 'paused' });
+    }
+    return true;
+}
+
+/** Releases a device from the broadcast (left the player, closed the page). */
+export function dropConsumer(key: string, deviceId: string): void {
+    broadcasts.get(key)?.consumers.delete(deviceId);
+}
+
+/**
+ * Forced stop, from the TV Mode screen. Blocks respawn for a while: a paused player
+ * keeps reloading the playlist and would otherwise bring ffmpeg straight back.
+ */
+export function killBroadcast(key: string): boolean {
+    stopMarks.set(key, Date.now() + STOP_MARK_MS);
+    const b = broadcasts.get(key);
+    if (!b) return false;
+    console.log(`[VodBroadcast ${key}] encerrado manualmente`);
+    stopBroadcast(b);
     return true;
 }
 
@@ -252,12 +355,15 @@ export async function waitForPlaylist(key: string, dir: string, timeoutMs = 2000
     return null;
 }
 
-/** Reads a .ts segment from the broadcast (validates the name to avoid path traversal). */
+/**
+ * Reads a segment from the broadcast (validates the name to avoid path traversal).
+ * Deliberately does NOT extend the broadcast lifetime — see the note at the top of
+ * the file: downloading is not watching.
+ */
 export async function readSegment(key: string, name: string): Promise<Buffer | null> {
     if (!isValidSegmentName(name)) return null;
     const dir = getBroadcastDir(key);
     if (!dir) return null;
-    touchBroadcast(key);
     try {
         return await fsp.readFile(path.join(dir, name));
     } catch {

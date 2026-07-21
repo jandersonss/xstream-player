@@ -11,6 +11,7 @@ import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import SyncButton from '@/components/SyncButton';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
+import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
 import { getAutoBroadcast } from '@/app/lib/device';
 
 // Types
@@ -113,6 +114,18 @@ export default function WatchSeriesPage() {
         streamKey: syncKey('series', isJoining ? (joinEpisode || '') : (selectedEpisode?.id || '')),
         role: isJoining ? 'viewer' : 'broadcaster',
         active: isJoining || (!!selectedEpisode && isSharing),
+    });
+
+    // Holds the ffmpeg broadcast only while this device is really playing it.
+    useVodRelayHeartbeat({
+        videoEl,
+        contentType: 'series',
+        streamId: isJoining ? (joinEpisode || '') : (selectedEpisode?.id || ''),
+        active: isJoining || (!!selectedEpisode && isSharing),
+        onEnded: () => {
+            if (isJoining) router.back();
+            else setIsSharing(false);
+        },
     });
 
     // Calculate resumeTime synchronously based on selected episode
@@ -459,7 +472,7 @@ export default function WatchSeriesPage() {
                 : null,
         [series, selectedEpisode, seriesId]
     );
-    useShareBroadcast(isSharing && !isJoining, broadcastInfo);
+    useShareBroadcast(isSharing && !isJoining, broadcastInfo, () => setIsSharing(false));
 
     // Join an episode broadcast from another device (via VOD relay).
     if (isJoining) {

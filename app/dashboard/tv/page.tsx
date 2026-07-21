@@ -1,8 +1,9 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Radio, Tv, Film, Layers, Pencil, Check } from 'lucide-react';
+import { useNavigationOverride } from '@/app/context/NavigationContext';
+import { Radio, Tv, Film, Layers, Pencil, Check, PowerOff, Play } from 'lucide-react';
 import { useLiveSessions, excludeSelf, joinHref, type ShareSession } from '@/app/hooks/useLiveShare';
 import { getDeviceName, setDeviceName } from '@/app/lib/device';
 
@@ -55,12 +56,12 @@ function DeviceNameEditor() {
     );
 }
 
-function SessionCard({ session, onJoin }: { session: ShareSession; onJoin: (s: ShareSession) => void }) {
+function SessionCard({ session, onSelect }: { session: ShareSession; onSelect: (s: ShareSession) => void }) {
     const Icon = TYPE_ICON[session.contentType];
 
     return (
         <button
-            onClick={() => onJoin(session)}
+            onClick={() => onSelect(session)}
             data-focusable="true"
             className="text-left rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 hover:scale-[1.02] cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-red-500"
         >
@@ -86,14 +87,123 @@ function SessionCard({ session, onJoin }: { session: ShareSession; onJoin: (s: S
     );
 }
 
+/**
+ * Actions for the selected broadcast. The options are stacked in a single column so the
+ * remote only has to move up/down, and the destructive one asks for confirmation in this
+ * same dialog instead of opening a second one on top.
+ */
+function SessionActionsDialog({
+    session,
+    busy,
+    onJoin,
+    onStop,
+    onClose,
+}: {
+    session: ShareSession;
+    busy: boolean;
+    onJoin: () => void;
+    onStop: () => void;
+    onClose: () => void;
+}) {
+    const [confirming, setConfirming] = useState(false);
+
+    // On a TV the remote's back button would otherwise leave the page with the dialog open.
+    useNavigationOverride(
+        useCallback(() => {
+            if (busy) return;
+            if (confirming) setConfirming(false);
+            else onClose();
+        }, [busy, confirming, onClose])
+    );
+
+    return (
+        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
+            <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#1c1c1c] p-6">
+                <h2 className="text-xl font-bold text-white truncate">{session.title}</h2>
+                <p className="text-sm text-gray-400 mt-1 truncate">
+                    {TYPE_LABEL[session.contentType]} · {session.deviceName}
+                </p>
+
+                {confirming ? (
+                    <>
+                        <p className="text-gray-400 mt-5">
+                            Encerrar esta transmissão? Todos os aparelhos assistindo serão desconectados.
+                        </p>
+                        <div className="mt-6 space-y-2">
+                            <button
+                                onClick={onStop}
+                                disabled={busy}
+                                autoFocus
+                                data-focusable="true"
+                                className="w-full flex items-center justify-center px-4 py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-500 disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-white"
+                            >
+                                <PowerOff size={18} className="mr-2" /> {busy ? 'Encerrando...' : 'Encerrar agora'}
+                            </button>
+                            <button
+                                onClick={() => setConfirming(false)}
+                                disabled={busy}
+                                data-focusable="true"
+                                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
+                            >
+                                Voltar
+                            </button>
+                        </div>
+                    </>
+                ) : (
+                    <div className="mt-6 space-y-2">
+                        <button
+                            onClick={onJoin}
+                            autoFocus
+                            data-focusable="true"
+                            className="w-full flex items-center justify-center px-4 py-3 rounded-lg bg-white text-black font-semibold hover:bg-gray-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
+                        >
+                            <Play size={18} className="mr-2" /> Assistir
+                        </button>
+                        <button
+                            onClick={() => setConfirming(true)}
+                            data-focusable="true"
+                            className="w-full flex items-center justify-center px-4 py-3 rounded-lg bg-white/10 text-white hover:bg-red-600 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                        >
+                            <PowerOff size={18} className="mr-2" /> Encerrar transmissão
+                        </button>
+                        <button
+                            onClick={onClose}
+                            data-focusable="true"
+                            className="w-full px-4 py-3 rounded-lg text-gray-400 hover:text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
+                        >
+                            Cancelar
+                        </button>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+}
+
 export default function ModoTvPage() {
     const router = useRouter();
-    const { sessions, loading } = useLiveSessions(8000);
+    const { sessions, loading, refresh } = useLiveSessions(8000);
+    const [selected, setSelected] = useState<ShareSession | null>(null);
+    const [stopping, setStopping] = useState(false);
     // excludeSelf uses localStorage (getDeviceId), evaluated on every list change.
     const visible = useMemo(() => excludeSelf(sessions), [sessions]);
 
-    const handleJoin = (s: ShareSession) => {
-        router.push(joinHref(s));
+    const confirmStop = async () => {
+        if (!selected) return;
+        setStopping(true);
+        const query = new URLSearchParams({
+            deviceId: selected.deviceId,
+            contentType: selected.contentType,
+            streamId: selected.streamId,
+        });
+        try {
+            await fetch(`/api/relay/vod?${query.toString()}`, { method: 'DELETE' });
+        } catch {
+            /* the list refresh below shows whether it actually ended */
+        }
+        setStopping(false);
+        setSelected(null);
+        refresh();
     };
 
     return (
@@ -122,9 +232,19 @@ export default function ModoTvPage() {
             ) : (
                 <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
                     {visible.map((s) => (
-                        <SessionCard key={s.deviceId} session={s} onJoin={handleJoin} />
+                        <SessionCard key={s.deviceId} session={s} onSelect={setSelected} />
                     ))}
                 </div>
+            )}
+
+            {selected && (
+                <SessionActionsDialog
+                    session={selected}
+                    busy={stopping}
+                    onJoin={() => router.push(joinHref(selected))}
+                    onStop={confirmStop}
+                    onClose={() => setSelected(null)}
+                />
             )}
         </div>
     );
