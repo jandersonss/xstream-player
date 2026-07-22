@@ -181,8 +181,12 @@ export function syncKey(contentType: ShareContentType, streamId: string): string
     return `${contentType}:${streamId}`;
 }
 
-/** Heartbeat/poll cadence of the sync (positions change slowly). */
-const SYNC_TICK_MS = 4000;
+/**
+ * Poll cadence of the sync. This is also how long a viewer waits before even seeing
+ * a "sync everyone" command, so it is the floor on how fast the button can feel;
+ * the payload is tiny and this only runs on a private network.
+ */
+const SYNC_TICK_MS = 1000;
 /** Latency difference (s) beyond which we consider the players out of sync. */
 const SYNC_THRESHOLD_S = 5;
 

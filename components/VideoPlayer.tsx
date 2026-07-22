@@ -690,7 +690,12 @@ export default function VideoPlayer({
         const isLegacyWebOs = /webos|web0s/.test(userAgent) && playbackProfile.isConstrained;
         const isHLS = src.toLowerCase().includes('.m3u8');
         const isDirectVideo = /\.(mp4|mkv|avi|webm|mov)$/i.test(src.split('?')[0]);
-        const isLiveHls = isHLS && /\/live\//i.test(src);
+        const isProviderLive = isHLS && /\/live\//i.test(src);
+        // Modo TV: our own ffmpeg relay is just as live (sliding window, no ENDLIST),
+        // but its URL has no "/live/" — so it used to fall through to the VOD tuning
+        // and inherit hls.js defaults, most damagingly an unbounded live latency.
+        const isBroadcastRelay = isHLS && src.includes('/api/relay/vod/');
+        const isLiveHls = isProviderLive || isBroadcastRelay;
         const supportsNativeHls = isHLS && (
             video.canPlayType('application/vnd.apple.mpegurl') !== '' ||
             video.canPlayType('application/x-mpegURL') !== ''
@@ -821,8 +826,15 @@ export default function VideoPlayer({
                 ...(isLiveHls
                     ? {
                           liveDurationInfinity: true,
-                          liveSyncDurationCount: 5,
-                          liveMaxLatencyDurationCount: 14,
+                          // Counted in segments, so each source needs its own numbers.
+                          // Our relay window is 6 segments (hls_list_size) of ~4-7s:
+                          // sit 3 back (mid-window) and never drift past 5, which is
+                          // the last one still on disk. Bounding the latency is what
+                          // makes the devices converge on their own — the default is
+                          // Infinity, so a device that stalled once stayed behind for
+                          // good and only a manual sync could rescue it.
+                          liveSyncDurationCount: isBroadcastRelay ? 3 : 5,
+                          liveMaxLatencyDurationCount: isBroadcastRelay ? 5 : 14,
                           initialLiveManifestSize: 2,
                       }
                     : {}),
