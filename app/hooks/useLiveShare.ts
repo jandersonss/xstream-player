@@ -33,17 +33,26 @@ export interface BroadcastInfo {
     seriesId?: string;
 }
 
-/** Playback URL through the relay (live or VOD), on the same origin as the app. */
+/**
+ * Playback URL through the relay (live or VOD), on the same origin as the app.
+ *
+ * `start` (seconds) only matters for whoever CREATES the VOD broadcast — the server
+ * ignores it when the broadcast already exists, so viewers joining keep landing at
+ * whatever point it is playing now.
+ */
 export function relaySrc(info: {
     contentType: ShareContentType;
     streamId: string;
     ext?: string;
+    start?: number;
 }): string {
     if (info.contentType === 'live') {
         return `/api/relay?type=live&streamId=${encodeURIComponent(info.streamId)}`;
     }
     const ext = info.ext || 'mp4';
-    return `/api/relay/vod/index.m3u8?type=${info.contentType}&streamId=${encodeURIComponent(info.streamId)}&ext=${encodeURIComponent(ext)}`;
+    const start = Math.max(0, Math.floor(info.start ?? 0));
+    const startParam = start > 0 ? `&start=${start}` : '';
+    return `/api/relay/vod/index.m3u8?type=${info.contentType}&streamId=${encodeURIComponent(info.streamId)}&ext=${encodeURIComponent(ext)}${startParam}`;
 }
 
 /** App route to JOIN a broadcast (TV Mode / limit modal). */

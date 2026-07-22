@@ -136,6 +136,19 @@ interface VideoPlayerProps {
     subtitle?: string;
     /** Recebe o elemento <video> (ou null ao desmontar) — usado para sincronizar players. */
     onVideoElement?: (el: HTMLVideoElement | null) => void;
+    /**
+     * Modo TV: o stream carrega só uma janela deslizante do título, começando neste
+     * ponto. Com `totalDuration`, a barra passa a mostrar o tempo real do filme em vez
+     * do tamanho da janela (que cresce enquanto carrega).
+     */
+    timeOffset?: number;
+    /** Duração real do título (s). Ativa o modo de linha do tempo absoluta. */
+    totalDuration?: number;
+    /**
+     * Pedido de salto para fora da janela disponível (segundo absoluto do título).
+     * Sem isso, a barra vira apenas indicador — arrastar não faz nada.
+     */
+    onSeekBeyondWindow?: (absoluteSeconds: number) => void;
 }
 
 const DEFAULT_SUBTITLE_FONT_SIZE = 1.5;
@@ -161,7 +174,10 @@ export default function VideoPlayer({
     topRightSlot,
     title,
     subtitle,
-    onVideoElement
+    onVideoElement,
+    timeOffset = 0,
+    totalDuration = 0,
+    onSeekBeyondWindow
 }: VideoPlayerProps) {
     const { activeProfile, updatePrefs } = useProfile();
     const videoRef = useRef<HTMLVideoElement>(null);
@@ -487,20 +503,54 @@ export default function VideoPlayer({
 
 
 
+    /** TV Mode: the stream is a sliding window over a title whose real length we know. */
+    const isBroadcastTimeline = totalDuration > 0;
+
+    /**
+     * Seeks using the title's own timeline (Modo TV). Only ~30s of the title exists on
+     * disk at a time, so a jump inside that window is a normal seek, and anything else
+     * has to be delegated: the upstream must be re-read from the new point.
+     */
+    const seekToAbsolute = useCallback((absolute: number) => {
+        const video = videoRef.current;
+        if (!video) return;
+
+        const target = Math.max(0, Math.min(absolute, totalDuration));
+        const local = target - timeOffset;
+
+        if (video.seekable.length > 0) {
+            const windowStart = video.seekable.start(0);
+            const windowEnd = video.seekable.end(video.seekable.length - 1);
+            if (local >= windowStart && local <= windowEnd) {
+                video.currentTime = local;
+                setCurrentTime(local);
+                return;
+            }
+        }
+        onSeekBeyondWindow?.(target);
+    }, [timeOffset, totalDuration, onSeekBeyondWindow]);
+
     const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
         const time = parseFloat(e.target.value);
+        if (isBroadcastTimeline) {
+            seekToAbsolute(time);
+            return;
+        }
         setCurrentTime(time);
         if (videoRef.current) {
             videoRef.current.currentTime = time;
         }
-    }, []);
+    }, [isBroadcastTimeline, seekToAbsolute]);
 
     const skip = useCallback((seconds: number) => {
-        if (videoRef.current) {
+        if (!videoRef.current) return;
+        if (isBroadcastTimeline) {
+            seekToAbsolute(timeOffset + videoRef.current.currentTime + seconds);
+        } else {
             videoRef.current.currentTime += seconds;
-            showSkipFeedback(seconds);
         }
-    }, [showSkipFeedback]);
+        showSkipFeedback(seconds);
+    }, [showSkipFeedback, isBroadcastTimeline, seekToAbsolute, timeOffset]);
 
     const adjustVolume = useCallback((delta: number) => {
         if (videoRef.current) {
@@ -518,11 +568,15 @@ export default function VideoPlayer({
     }, [isMuted]);
 
     const jumpToPercent = useCallback((percent: number) => {
+        if (isBroadcastTimeline) {
+            seekToAbsolute((percent / 100) * totalDuration);
+            return;
+        }
         if (videoRef.current && duration > 0) {
             const targetTime = (percent / 100) * duration;
             videoRef.current.currentTime = targetTime;
         }
-    }, [duration]);
+    }, [duration, isBroadcastTimeline, seekToAbsolute, totalDuration]);
 
     const handleInteraction = useCallback(() => {
         setShowControls(true);
@@ -1003,7 +1057,11 @@ export default function VideoPlayer({
         }
     }, [src, isMetadataLoaded]);
 
-    const isLive = duration === Infinity || duration === 0;
+    // In Modo TV the stream's own duration is just the sliding window (a few seconds,
+    // and growing) — the title's real timeline comes from the offset + known duration.
+    const isLive = isBroadcastTimeline ? false : (duration === Infinity || duration === 0);
+    const displayTime = isBroadcastTimeline ? timeOffset + currentTime : currentTime;
+    const displayDuration = isBroadcastTimeline ? totalDuration : duration;
     const volumePercent = Math.round(volume * 100);
     const autoSkipProgress = ((NEXT_EPISODE_AUTO_SKIP_SEC - autoSkipSecondsLeft) / NEXT_EPISODE_AUTO_SKIP_SEC) * 100;
 
@@ -1189,15 +1247,15 @@ export default function VideoPlayer({
                                     <div
                                         className="absolute inset-y-0 left-0 bg-red-500 rounded-full pointer-events-none z-[1]"
                                         style={{
-                                            width: `${duration > 0 ? Math.min(100, (currentTime / duration) * 100) : 0}%`
+                                            width: `${displayDuration > 0 ? Math.min(100, (displayTime / displayDuration) * 100) : 0}%`
                                         }}
                                     />
 
                                     <input
                                         type="range"
                                         min={0}
-                                        max={duration || 0}
-                                        value={currentTime}
+                                        max={displayDuration || 0}
+                                        value={displayTime}
                                         onChange={handleSeek}
                                         onMouseDown={() => setIsSeeking(true)}
                                         onMouseUp={() => setIsSeeking(false)}
@@ -1276,9 +1334,9 @@ export default function VideoPlayer({
                             {/* Time Display integrated here */}
                             {!isLive && (
                                 <div className="flex items-center space-x-1.5 px-2 text-[11px] font-medium text-gray-400 whitespace-nowrap tabular-nums">
-                                    <span className="text-white">{formatTime(currentTime)}</span>
+                                    <span className="text-white">{formatTime(displayTime)}</span>
                                     <span className="opacity-40">/</span>
-                                    <span>{formatTime(duration)}</span>
+                                    <span>{formatTime(displayDuration)}</span>
                                 </div>
                             )}
 

@@ -10,6 +10,7 @@ import { ArrowLeft, Play, Calendar, Star, Clock, List, Bookmark, Subtitles, Radi
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import SyncButton from '@/components/SyncButton';
+import BroadcastStartModal from '@/components/BroadcastStartModal';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
 import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
 import { getAutoBroadcast } from '@/app/lib/device';
@@ -99,6 +100,10 @@ export default function WatchSeriesPage() {
     // Searching/downloading a subtitle automatically when opening an episode.
     const [autoSubLoading, setAutoSubLoading] = useState(false);
     const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
+    const [showStartModal, setShowStartModal] = useState(false);
+    // Where the broadcast should start. `null` = not picked by hand (auto-broadcast),
+    // which falls back to the saved progress.
+    const [broadcastStart, setBroadcastStart] = useState<number | null>(null);
     // "Join" (Modo TV) params — via useSearchParams to work on the client.
     const searchParams = useSearchParams();
     const isJoining = searchParams.get('join') === '1';
@@ -144,6 +149,12 @@ export default function WatchSeriesPage() {
         }
         return 0;
     }, [selectedEpisode?.id, getProgress]);
+
+    // The picked start belongs to one episode; carrying it to the next would start
+    // the new one halfway through.
+    useEffect(() => {
+        setBroadcastStart(null);
+    }, [selectedEpisode?.id]);
 
     useEffect(() => {
         if (!credentials || !seriesId || isJoining) return;
@@ -519,14 +530,52 @@ export default function WatchSeriesPage() {
         const { hostUrl, username, password } = credentials!;
         const extension = selectedEpisode.container_extension;
         const directUrl = `${hostUrl}/series/${username}/${password}/${selectedEpisode.id}.${extension}`;
+        const startSeconds = broadcastStart ?? resumeTime;
+        // Only the provider's own length is trustworthy here; the relay stream carries
+        // just a sliding window, so without this the bar would measure the window.
+        const rawDuration: unknown = selectedEpisode.info?.duration_secs;
+        const titleDuration = typeof rawDuration === 'number' ? rawDuration : 0;
+
+        // Seek outside the window: the upstream is re-read from the new point, which
+        // moves every device watching this broadcast (one stream, like a channel).
+        const handleBroadcastSeek = async (absolute: number) => {
+            const start = Math.floor(absolute);
+            try {
+                const res = await fetch('/api/relay/vod', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        action: 'seek',
+                        contentType: 'series',
+                        streamId: selectedEpisode.id,
+                        ext: extension,
+                        start,
+                    }),
+                });
+                if (!res.ok) return;
+                // Reloads the player at the new offset (the src carries `start`).
+                setBroadcastStart(start);
+            } catch {
+                /* seek is best-effort; the broadcast keeps running where it was */
+            }
+        };
         // Sharing → plays the episode via relay (channel-style; others join at the same point).
         const streamUrl = isSharing
-            ? relaySrc({ contentType: 'series', streamId: selectedEpisode.id, ext: extension })
+            ? relaySrc({ contentType: 'series', streamId: selectedEpisode.id, ext: extension, start: startSeconds })
             : directUrl;
 
         const shareToggle = (
             <button
-                onClick={() => setIsSharing((v) => !v)}
+                onClick={() => {
+                    // Stopping is immediate; starting asks where to begin (the point is
+                    // baked into ffmpeg and cannot change once it is running).
+                    if (isSharing) {
+                        setIsSharing(false);
+                        setBroadcastStart(null);
+                    } else {
+                        setShowStartModal(true);
+                    }
+                }}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
                 title={isSharing ? 'Transmitindo para o Modo TV (sem avançar/pausar)' : 'Transmitir este episódio no Modo TV'}
             >
@@ -574,6 +623,9 @@ export default function WatchSeriesPage() {
                         autoPlay={true}
                         initialTime={isSharing ? 0 : resumeTime}
                         onProgress={isSharing ? undefined : handleProgress}
+                        timeOffset={isSharing ? startSeconds : 0}
+                        totalDuration={isSharing ? titleDuration : 0}
+                        onSeekBeyondWindow={isSharing ? handleBroadcastSeek : undefined}
                         onNext={hasNext ? playNext : undefined}
                         onPrevious={hasPrevious ? playPrevious : undefined}
                         hasNext={hasNext}
@@ -597,6 +649,16 @@ export default function WatchSeriesPage() {
                         }
                     />
                 </div>
+                {showStartModal && <BroadcastStartModal
+                    resumeTime={resumeTime}
+                    duration={getProgress(selectedEpisode.id)?.duration}
+                    onCancel={() => setShowStartModal(false)}
+                    onConfirm={(start) => {
+                        setBroadcastStart(start);
+                        setIsSharing(true);
+                        setShowStartModal(false);
+                    }}
+                />}
             </div>
         );
     }

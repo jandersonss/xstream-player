@@ -67,12 +67,16 @@ export async function GET(
         const type = searchParams.get('type') || '';
         const streamId = searchParams.get('streamId') || '';
         const ext = searchParams.get('ext') || 'mp4';
+        const startParam = searchParams.get('start') || '0';
 
         if (!VALID_TYPES.includes(type as VodType) || !/^\d+$/.test(streamId) || !/^[a-z0-9]{1,5}$/i.test(ext)) {
             return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 });
         }
+        if (!/^\d{1,6}$/.test(startParam)) {
+            return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 });
+        }
 
-        const result = await ensureVodBroadcast(type as VodType, streamId, ext);
+        const result = await ensureVodBroadcast(type as VodType, streamId, ext, Number(startParam));
         if ('error' in result) {
             return NextResponse.json({ error: result.error }, { status: 503 });
         }

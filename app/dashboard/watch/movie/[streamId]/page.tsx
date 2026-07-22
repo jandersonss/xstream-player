@@ -10,6 +10,7 @@ import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles, Radio } fr
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import LimitReachedModal from '@/components/LimitReachedModal';
+import BroadcastStartModal from '@/components/BroadcastStartModal';
 import { useConnectionLimit } from '@/app/hooks/useConnectionLimit';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
 import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
@@ -26,6 +27,8 @@ interface MovieInfo {
         releasedate: string;
         rating: string;
         duration: string;
+        /** Real length in seconds, from the provider — the broadcast timeline needs it. */
+        duration_secs?: number;
         genre: string;
     };
     movie_data: {
@@ -61,6 +64,10 @@ export default function WatchMoviePage() {
     const [showLimitModal, setShowLimitModal] = useState(false);
     const checkConnectionLimit = useConnectionLimit();
     const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
+    const [showStartModal, setShowStartModal] = useState(false);
+    // Where the broadcast should start. `null` = not picked by hand (auto-broadcast),
+    // which falls back to the saved progress.
+    const [broadcastStart, setBroadcastStart] = useState<number | null>(null);
     // "Join" (Modo TV) params — via useSearchParams to work on the client.
     const searchParams = useSearchParams();
     const isJoining = searchParams.get('join') === '1';
@@ -288,14 +295,45 @@ export default function WatchMoviePage() {
         const { hostUrl, username, password } = credentials!;
         const extension = movie.movie_data.container_extension;
         const directUrl = `${hostUrl}/movie/${username}/${password}/${streamId}.${extension}`;
+        const startSeconds = broadcastStart ?? resumeTime;
+        // Only the provider's own length is trustworthy here; the relay stream carries
+        // just a sliding window, so without this the bar would measure the window.
+        const titleDuration = movie.info.duration_secs ?? 0;
+
+        // Seek outside the window: the upstream is re-read from the new point, which
+        // moves every device watching this broadcast (one stream, like a channel).
+        const handleBroadcastSeek = async (absolute: number) => {
+            const start = Math.floor(absolute);
+            try {
+                const res = await fetch('/api/relay/vod', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ action: 'seek', contentType: 'movie', streamId, ext: extension, start }),
+                });
+                if (!res.ok) return;
+                // Reloads the player at the new offset (the src carries `start`).
+                setBroadcastStart(start);
+            } catch {
+                /* seek is best-effort; the broadcast keeps running where it was */
+            }
+        };
         // Compartilhando → toca via relay (mesmo stream que outros aparelhos entram, estilo canal).
         const streamUrl = isSharing
-            ? relaySrc({ contentType: 'movie', streamId, ext: extension })
+            ? relaySrc({ contentType: 'movie', streamId, ext: extension, start: startSeconds })
             : directUrl;
 
         const shareToggle = (
             <button
-                onClick={() => setIsSharing((v) => !v)}
+                onClick={() => {
+                    // Stopping is immediate; starting asks where to begin (the point is
+                    // baked into ffmpeg and cannot change once it is running).
+                    if (isSharing) {
+                        setIsSharing(false);
+                        setBroadcastStart(null);
+                    } else {
+                        setShowStartModal(true);
+                    }
+                }}
                 className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
                 title={isSharing ? 'Transmitindo para o Modo TV (sem avançar/pausar)' : 'Transmitir este filme no Modo TV'}
             >
@@ -313,6 +351,9 @@ export default function WatchMoviePage() {
                         autoPlay={true}
                         initialTime={isSharing ? 0 : resumeTime}
                         onProgress={isSharing ? undefined : handleProgress}
+                        timeOffset={isSharing ? startSeconds : 0}
+                        totalDuration={isSharing ? titleDuration : 0}
+                        onSeekBeyondWindow={isSharing ? handleBroadcastSeek : undefined}
                         enterFullscreen={true}
                         onBack={() => setIsPlaying(false)}
                         subtitleUrl={subtitleUrl || undefined}
@@ -326,6 +367,16 @@ export default function WatchMoviePage() {
                         }
                     />
                 </div>
+                {showStartModal && <BroadcastStartModal
+                    resumeTime={resumeTime}
+                    duration={getProgress(streamId)?.duration}
+                    onCancel={() => setShowStartModal(false)}
+                    onConfirm={(start) => {
+                        setBroadcastStart(start);
+                        setIsSharing(true);
+                        setShowStartModal(false);
+                    }}
+                />}
             </div>
         );
     }

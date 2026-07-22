@@ -182,10 +182,19 @@ function ensureReaper() {
     if (typeof reaper.unref === 'function') reaper.unref();
 }
 
-function spawnFfmpeg(key: string, dir: string, upstreamUrl: string): Broadcast {
+/** Unique per process (PID) + timestamp + counter → never collides across instances. */
+function newRunDir(key: string): string {
+    return path.join(ROOT_DIR, `${key}-p${process.pid}-${Date.now().toString(36)}-${runCounter++}`);
+}
+
+function spawnFfmpeg(key: string, dir: string, upstreamUrl: string, startSeconds: number): ChildProcess {
     const args = [
         '-hide_banner',
         '-loglevel', 'error',
+        // Input seek (before -i): the provider serves the VOD with Range support, so
+        // ffmpeg jumps straight to the byte offset instead of decoding from the start.
+        // Lands on the nearest preceding keyframe, so precision is one GOP (~4s).
+        ...(startSeconds > 0 ? ['-ss', String(startSeconds)] : []),
         '-re',
         '-i', upstreamUrl,
         '-c', 'copy',
@@ -201,36 +210,41 @@ function spawnFfmpeg(key: string, dir: string, upstreamUrl: string): Broadcast {
         path.join(dir, 'index.m3u8'),
     ];
 
-    const proc = spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+    return spawn('ffmpeg', args, { stdio: ['ignore', 'ignore', 'pipe'] });
+}
 
-    const broadcast: Broadcast = {
-        key,
-        dir,
-        proc,
-        consumers: new Map(),
-        startedAt: Date.now(),
-        alive: true,
-    };
-
+/**
+ * Binds a process to the broadcast that owns it.
+ *
+ * The exit handler must check it is still the CURRENT process: a restart (seek) kills
+ * the previous ffmpeg on purpose, and without this guard that deliberate kill would
+ * mark the broadcast dead — dropping every viewer that was meant to follow along.
+ */
+function trackProc(b: Broadcast, proc: ChildProcess) {
     proc.stderr?.on('data', (chunk) => {
-        console.error(`[VodBroadcast ${key}] ffmpeg: ${String(chunk).trim()}`);
+        console.error(`[VodBroadcast ${b.key}] ffmpeg: ${String(chunk).trim()}`);
     });
     proc.on('exit', (code) => {
-        console.log(`[VodBroadcast ${key}] ffmpeg saiu (code ${code})`);
-        broadcast.alive = false;
+        if (b.proc !== proc) return; // replaced by a restart
+        console.log(`[VodBroadcast ${b.key}] ffmpeg saiu (code ${code})`);
+        b.alive = false;
     });
-
-    return broadcast;
 }
 
 /**
  * Ensures an active HLS broadcast exists for the VOD and returns its directory.
  * Spawns ffmpeg on the first call (lazy), with a per-key concurrency lock.
+ *
+ * `startSeconds` only takes effect when the broadcast is CREATED. Whoever starts it
+ * picks where the "channel" begins; everyone joining afterwards lands wherever it is
+ * playing now — exactly like tuning into a live channel. Changing the starting point
+ * of a running broadcast means stopping it (killBroadcast) and starting over.
  */
 export async function ensureVodBroadcast(
     type: VodType,
     streamId: string,
-    ext: string
+    ext: string,
+    startSeconds = 0
 ): Promise<EnsureResult> {
     ensureReaper();
 
@@ -264,11 +278,22 @@ export async function ensureVodBroadcast(
             return { error: 'Conta não configurada' };
         }
 
-        // Unique per process (PID) + timestamp + counter → never collides across instances.
-        const dir = path.join(ROOT_DIR, `${key}-p${process.pid}-${Date.now().toString(36)}-${runCounter++}`);
+        const dir = newRunDir(key);
         await fsp.mkdir(dir, { recursive: true });
 
-        const broadcast = spawnFfmpeg(key, dir, upstreamUrl);
+        if (startSeconds > 0) {
+            console.log(`[VodBroadcast ${key}] iniciando em ${Math.round(startSeconds)}s`);
+        }
+        const proc = spawnFfmpeg(key, dir, upstreamUrl, startSeconds);
+        const broadcast: Broadcast = {
+            key,
+            dir,
+            proc,
+            consumers: new Map(),
+            startedAt: Date.now(),
+            alive: true,
+        };
+        trackProc(broadcast, proc);
         broadcasts.set(key, broadcast);
         return { key, dir };
     })();
@@ -279,6 +304,60 @@ export async function ensureVodBroadcast(
     } finally {
         starting.delete(key);
     }
+}
+
+/**
+ * Moves a running broadcast to another point of the title (seek from the broadcaster).
+ *
+ * The sliding HLS window only holds ~30s, so jumping outside it means re-reading the
+ * upstream from a new offset — there is nothing else to serve. The Broadcast object is
+ * REUSED (only its process and directory are swapped) so registered devices are never
+ * seen as gone: dropping them would make every viewer's heartbeat report the broadcast
+ * as ended and kick them out of the player.
+ *
+ * `startedAt` is reset, which re-arms the startup grace — viewers whose hls.js stumbles
+ * on the swap have time to recover before the reaper counts them as absent.
+ */
+export async function restartVodBroadcast(
+    type: VodType,
+    streamId: string,
+    ext: string,
+    startSeconds: number
+): Promise<EnsureResult> {
+    const key = keyFor(type, streamId);
+    const b = broadcasts.get(key);
+    if (!b || !b.alive) {
+        // Nothing running (it may have just been reaped) — a plain start is the same thing.
+        return ensureVodBroadcast(type, streamId, ext, startSeconds);
+    }
+
+    const upstreamUrl = await buildUpstreamVodUrl(type, streamId, ext);
+    if (!upstreamUrl) {
+        return { error: 'Conta não configurada' };
+    }
+
+    const dir = newRunDir(key);
+    await fsp.mkdir(dir, { recursive: true });
+
+    console.log(`[VodBroadcast ${key}] reiniciando em ${Math.round(startSeconds)}s`);
+
+    const oldProc = b.proc;
+    const oldDir = b.dir;
+
+    const proc = spawnFfmpeg(key, dir, upstreamUrl, startSeconds);
+    b.proc = proc;
+    b.dir = dir;
+    b.startedAt = Date.now();
+    trackProc(b, proc);
+
+    try {
+        oldProc.kill('SIGKILL');
+    } catch {
+        /* ignore */
+    }
+    fsp.rm(oldDir, { recursive: true, force: true }).catch(() => {});
+
+    return { key, dir };
 }
 
 /**
