@@ -15,10 +15,23 @@ function keyFor(type: string, streamId: string) {
     return `${type}_${streamId}`;
 }
 
+/**
+ * Where every device starts inside the live window, in seconds behind the edge.
+ *
+ * Left to themselves the players each pick their own start, so two TVs joining a few
+ * seconds apart begin a few seconds apart and stay that way — the manual sync exists to
+ * clean up after that. Pinning the point server-side aligns them by construction.
+ *
+ * Kept equal to the client's liveSyncDurationCount (3) times the real segment length
+ * (~5.5s, since -c copy can only cut on keyframes) so hls.js does not slowly drift away
+ * from the point it was told to start at. Well inside the 6-segment window either way.
+ */
+const START_OFFSET_S = 16;
+
 /** Reescreve o index.m3u8 do ffmpeg para segmentos/init passarem pelo relay. */
 function rewritePlaylist(text: string, key: string): string {
     const q = `?key=${encodeURIComponent(key)}`;
-    return text
+    const lines = text
         .split('\n')
         .map((line) => {
             const trimmed = line.trim();
@@ -31,8 +44,15 @@ function rewritePlaylist(text: string, key: string): string {
                 return `${trimmed}${q}`;
             }
             return line;
-        })
-        .join('\n');
+        });
+
+    // Header tag: it has to land before the first segment to be honoured.
+    const start = lines.findIndex((line) => line.trim().startsWith('#EXTM3U'));
+    if (start !== -1 && !lines.some((line) => line.trim().startsWith('#EXT-X-START'))) {
+        lines.splice(start + 1, 0, `#EXT-X-START:TIME-OFFSET=-${START_OFFSET_S},PRECISE=YES`);
+    }
+
+    return lines.join('\n');
 }
 
 export async function GET(
