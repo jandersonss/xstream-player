@@ -39,13 +39,14 @@ export default function WatchLivePage() {
 
     const streamUrl = useMemo(() => {
         if (!credentials || !streamId) return null;
-        if (useRelay) {
-            // Shared relay on the server: one upstream connection for everyone.
-            return `/api/relay?type=live&streamId=${encodeURIComponent(streamId)}`;
-        }
-        const { hostUrl, username, password } = credentials;
-        return `${hostUrl}/live/${username}/${password}/${streamId}.m3u8`;
-    }, [credentials, streamId, useRelay]);
+        // Live always goes through the same-origin relay — never straight to the
+        // provider. Xtream answers the .m3u8 with a 302 to a tokenized CDN that
+        // sends no CORS headers, so hls.js (the only HLS path on WebOS/desktop
+        // Chrome, which lack native HLS) is blocked when it fetches directly.
+        // The relay does the cross-origin fetch server-side, rewrites the
+        // playlist, and coalesces viewers into ~1 upstream connection.
+        return `/api/relay?type=live&streamId=${encodeURIComponent(streamId)}`;
+    }, [credentials, streamId]);
 
     const broadcastInfo = useMemo(
         () => ({ contentType: 'live' as const, streamId, title, poster }),
