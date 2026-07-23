@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
-import { reportConsumer, type ConsumerState } from '@/app/lib/vodBroadcast';
+import { reportConsumer, getBroadcastGeneration, type ConsumerState } from '@/app/lib/vodBroadcast';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -38,7 +38,10 @@ export async function POST(request: Request) {
             return NextResponse.json({ error: 'Parâmetros inválidos' }, { status: 400 });
         }
 
-        return NextResponse.json({ alive: reportConsumer(key, deviceId, state) });
+        // generation lets a viewer notice the broadcast was seeked (timeline reset) and
+        // reload, instead of stalling on an HLS playlist that jumped backwards.
+        const alive = reportConsumer(key, deviceId, state);
+        return NextResponse.json({ alive, generation: getBroadcastGeneration(key) });
     } catch (error) {
         console.error('[VodHeartbeat] Falha ao registrar reprodução', error);
         return NextResponse.json({ error: 'Falha ao registrar reprodução' }, { status: 500 });

@@ -97,7 +97,11 @@ export default function WatchMoviePage() {
             if (isJoining) router.back();
             else setIsSharing(false);
         },
+        // Viewer only: the broadcaster reloads itself through its own src change.
+        onRestart: () => { if (isJoining) setReloadNonce((n) => n + 1); },
     });
+    // Bumped when the broadcast is seeked, to force the joined player to reload.
+    const [reloadNonce, setReloadNonce] = useState(0);
 
     // Calculate resumeTime synchronously based on progressLoaded
     const resumeTime = useMemo(() => {
@@ -255,7 +259,10 @@ export default function WatchMoviePage() {
 
     // Join another device broadcast (via VOD relay): does not depend on loading details.
     if (isJoining) {
-        const src = relaySrc({ contentType: 'movie', streamId, ext: joinExt });
+        // The nonce changes on a broadcast seek, so the player reloads onto the new
+        // timeline instead of stalling on a playlist that jumped backwards.
+        const src = relaySrc({ contentType: 'movie', streamId, ext: joinExt })
+            + (reloadNonce ? `&_r=${reloadNonce}` : '');
         return (
             <div className="fixed inset-0 bg-black z-50 flex flex-col">
                 <div className="relative flex-1 flex items-center justify-center">

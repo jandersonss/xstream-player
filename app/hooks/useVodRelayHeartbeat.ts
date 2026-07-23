@@ -3,8 +3,11 @@
 import { useEffect, useRef } from 'react';
 import { getDeviceId } from '@/app/lib/device';
 
-/** Same cadence as the sync tick: positions move slowly and this is cheap. */
-const TICK_MS = 4000;
+/**
+ * How often each device reports playback. It also bounds how soon a viewer notices a
+ * broadcast seek and reloads, so it is kept short; the payload is tiny and LAN-only.
+ */
+const TICK_MS = 2000;
 
 type ConsumerState = 'playing' | 'paused' | 'stalled';
 
@@ -27,15 +30,24 @@ export function useVodRelayHeartbeat(opts: {
     active: boolean;
     /** Called when the broadcast no longer exists (ended elsewhere or stopped by hand). */
     onEnded?: () => void;
+    /**
+     * Called when the broadcast's timeline was reset by a seek. The playlist restarts
+     * from a new point that hls.js cannot follow in place, so the player must reload.
+     */
+    onRestart?: () => void;
 }) {
-    const { videoEl, contentType, streamId, active, onEnded } = opts;
+    const { videoEl, contentType, streamId, active, onEnded, onRestart } = opts;
     const videoRef = useRef(videoEl);
     const onEndedRef = useRef(onEnded);
+    const onRestartRef = useRef(onRestart);
     const lastTimeRef = useRef<number | null>(null);
     const everAliveRef = useRef(false);
+    /** Generation last seen alive; a later, different value means a restart happened. */
+    const generationRef = useRef<number | null>(null);
 
     useEffect(() => { videoRef.current = videoEl; }, [videoEl]);
     useEffect(() => { onEndedRef.current = onEnded; }, [onEnded]);
+    useEffect(() => { onRestartRef.current = onRestart; }, [onRestart]);
 
     useEffect(() => {
         if (!active || !streamId) return;
@@ -44,6 +56,7 @@ export function useVodRelayHeartbeat(opts: {
         const deviceId = getDeviceId();
         lastTimeRef.current = null;
         everAliveRef.current = false;
+        generationRef.current = null;
         let cancelled = false;
 
         const classify = (): ConsumerState => {
@@ -77,6 +90,17 @@ export function useVodRelayHeartbeat(opts: {
                 // request, so `alive: false` only means "ended" after we have seen it alive.
                 if (data.alive === true) {
                     everAliveRef.current = true;
+
+                    // A generation bump while alive is a seek: the player is following a
+                    // playlist that just reset and needs to reload onto the new timeline.
+                    const generation = typeof data.generation === 'number' ? data.generation : null;
+                    if (generation !== null) {
+                        const previous = generationRef.current;
+                        generationRef.current = generation;
+                        if (previous !== null && generation !== previous) {
+                            onRestartRef.current?.();
+                        }
+                    }
                 } else if (everAliveRef.current) {
                     onEndedRef.current?.();
                 }

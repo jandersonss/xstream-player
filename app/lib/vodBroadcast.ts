@@ -58,6 +58,12 @@ interface Broadcast {
     consumers: Map<string, Consumer>;
     startedAt: number;
     alive: boolean;
+    /**
+     * Bumped on every restart (seek). A restart resets the HLS timeline — segments and
+     * MEDIA-SEQUENCE start over — which a viewer's hls.js cannot follow in place. Viewers
+     * watch this number through the heartbeat and reload their player when it changes.
+     */
+    generation: number;
 }
 
 type EnsureResult = { key: string; dir: string } | { error: string };
@@ -295,6 +301,7 @@ export async function ensureVodBroadcast(
             consumers: new Map(),
             startedAt: Date.now(),
             alive: true,
+            generation: 1,
         };
         trackProc(broadcast, proc);
         broadcasts.set(key, broadcast);
@@ -351,6 +358,7 @@ export async function restartVodBroadcast(
     b.proc = proc;
     b.dir = dir;
     b.startedAt = Date.now();
+    b.generation += 1;
     trackProc(b, proc);
 
     try {
@@ -409,6 +417,15 @@ export function getBroadcastDir(key: string): string | null {
 export function hasBroadcast(key: string): boolean {
     const b = broadcasts.get(key);
     return Boolean(b && b.alive);
+}
+
+/**
+ * Current generation of a live broadcast, or 0 when none. A change means the timeline
+ * was reset by a seek and viewers must reload their player.
+ */
+export function getBroadcastGeneration(key: string): number {
+    const b = broadcasts.get(key);
+    return b && b.alive ? b.generation : 0;
 }
 
 /**
