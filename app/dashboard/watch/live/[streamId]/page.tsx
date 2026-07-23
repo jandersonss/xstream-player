@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { Radio } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import VideoPlayer from '@/components/VideoPlayer';
+import type Hls from 'hls.js';
 import SyncButton from '@/components/SyncButton';
 import { useShareBroadcast, useSyncPlayback, syncKey } from '@/app/hooks/useLiveShare';
 import { getAutoBroadcast } from '@/app/lib/device';
@@ -27,8 +28,10 @@ export default function WatchLivePage() {
 
     // Time sync between players (only when playback goes through the relay).
     const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+    const [hlsInstance, setHlsInstance] = useState<Hls | null>(null);
     const { canSync, sync } = useSyncPlayback({
         videoEl,
+        hls: hlsInstance,
         streamKey: syncKey('live', streamId),
         role: isJoining ? 'viewer' : 'broadcaster',
         active: useRelay,
@@ -88,6 +91,7 @@ export default function WatchLivePage() {
                     enterFullscreen={true}
                     title={title}
                     onVideoElement={setVideoEl}
+                        onHlsInstance={setHlsInstance}
                     topRightSlot={
                         <div className="flex items-center space-x-2">
                             {useRelay && canSync && <SyncButton role={isJoining ? 'viewer' : 'broadcaster'} onClick={sync} />}

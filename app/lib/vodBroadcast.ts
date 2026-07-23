@@ -201,7 +201,10 @@ function spawnFfmpeg(key: string, dir: string, upstreamUrl: string, startSeconds
         '-f', 'hls',
         '-hls_time', String(SEGMENT_DURATION),
         '-hls_list_size', '6',
-        '-hls_flags', 'delete_segments+omit_endlist',
+        // program_date_time stamps every segment with an absolute instant, identical for
+        // every device reading this playlist. It is what lets the players compare their
+        // positions directly instead of each measuring against its own view of the edge.
+        '-hls_flags', 'delete_segments+omit_endlist+program_date_time',
         // fMP4 is consumed natively by the browser MSE (TS would require transmux
         // by hls.js, which fails on some players → DEMUXER_ERROR_COULD_NOT_PARSE).
         '-hls_segment_type', 'fmp4',

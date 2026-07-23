@@ -18,6 +18,16 @@ function sanitizeLatency(value: unknown): number {
     return Math.min(n, 3600);
 }
 
+/**
+ * Absolute instant from the playlist (EXT-X-PROGRAM-DATE-TIME, ms). Absent on streams
+ * without the tag, so anything unusable becomes null and the caller falls back to latency.
+ */
+function sanitizeMediaTime(value: unknown): number | null {
+    if (value === null || value === undefined) return null;
+    const n = Number(value);
+    return Number.isFinite(n) && n > 0 ? n : null;
+}
+
 export async function GET(request: Request) {
     const remoteAccessResponse = await enforceRemoteAccessForApi(request);
     if (remoteAccessResponse) return remoteAccessResponse;
@@ -41,7 +51,11 @@ export async function POST(request: Request) {
 
     // Broadcaster command: "sync everyone" to the target latency.
     if (body.command) {
-        const state = setSyncCommand(body.streamKey, sanitizeLatency(body.targetLatency));
+        const state = setSyncCommand(
+            body.streamKey,
+            sanitizeLatency(body.targetLatency),
+            sanitizeMediaTime(body.targetMediaTime)
+        );
         return NextResponse.json(state);
     }
 
@@ -53,7 +67,8 @@ export async function POST(request: Request) {
         body.streamKey,
         body.deviceId,
         body.role,
-        sanitizeLatency(body.latency)
+        sanitizeLatency(body.latency),
+        sanitizeMediaTime(body.mediaTime)
     );
     return NextResponse.json(state);
 }

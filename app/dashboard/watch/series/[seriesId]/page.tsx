@@ -5,6 +5,7 @@ import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
+import type Hls from 'hls.js';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import { ArrowLeft, Play, Calendar, Star, Clock, List, Bookmark, Subtitles, Radio, Download, Loader2, X, Search, Check } from 'lucide-react';
 import Loader from '@/components/Loader';
@@ -114,8 +115,10 @@ export default function WatchSeriesPage() {
 
     // Time sync between players (broadcaster + viewers of the same episode).
     const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+    const [hlsInstance, setHlsInstance] = useState<Hls | null>(null);
     const { canSync, sync } = useSyncPlayback({
         videoEl,
+        hls: hlsInstance,
         streamKey: syncKey('series', isJoining ? (joinEpisode || '') : (selectedEpisode?.id || '')),
         role: isJoining ? 'viewer' : 'broadcaster',
         active: isJoining || (!!selectedEpisode && isSharing),
@@ -499,6 +502,7 @@ export default function WatchSeriesPage() {
                         enterFullscreen={true}
                         title={joinTitle}
                         onVideoElement={setVideoEl}
+                        onHlsInstance={setHlsInstance}
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {canSync && <SyncButton role="viewer" onClick={sync} />}
@@ -636,6 +640,7 @@ export default function WatchSeriesPage() {
                         title={series.info.name}
                         subtitle={`T${selectedEpisode.season} · Ep ${selectedEpisode.episode_num}${selectedEpisode.title ? ` - ${selectedEpisode.title}` : ''}`}
                         onVideoElement={setVideoEl}
+                        onHlsInstance={setHlsInstance}
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {autoSubLoading && (

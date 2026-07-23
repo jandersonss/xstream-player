@@ -6,6 +6,7 @@ import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import VideoPlayer from '@/components/VideoPlayer';
+import type Hls from 'hls.js';
 import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles, Radio } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
@@ -77,8 +78,10 @@ export default function WatchMoviePage() {
 
     // Time sync between players (broadcaster + viewers of the same movie).
     const [videoEl, setVideoEl] = useState<HTMLVideoElement | null>(null);
+    const [hlsInstance, setHlsInstance] = useState<Hls | null>(null);
     const { canSync, sync } = useSyncPlayback({
         videoEl,
+        hls: hlsInstance,
         streamKey: syncKey('movie', streamId),
         role: isJoining ? 'viewer' : 'broadcaster',
         active: isJoining || (isPlaying && isSharing),
@@ -264,6 +267,7 @@ export default function WatchMoviePage() {
                         enterFullscreen={true}
                         title={joinTitle}
                         onVideoElement={setVideoEl}
+                        onHlsInstance={setHlsInstance}
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {canSync && <SyncButton role="viewer" onClick={sync} />}
@@ -359,6 +363,7 @@ export default function WatchMoviePage() {
                         subtitleUrl={subtitleUrl || undefined}
                         title={movie.info.name}
                         onVideoElement={setVideoEl}
+                        onHlsInstance={setHlsInstance}
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}

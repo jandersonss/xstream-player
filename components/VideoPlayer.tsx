@@ -137,6 +137,11 @@ interface VideoPlayerProps {
     /** Recebe o elemento <video> (ou null ao desmontar) — usado para sincronizar players. */
     onVideoElement?: (el: HTMLVideoElement | null) => void;
     /**
+     * Recebe a instância do hls.js (ou null). O relógio absoluto da transmissão
+     * (`playingDate`, de EXT-X-PROGRAM-DATE-TIME) só existe nela, não no <video>.
+     */
+    onHlsInstance?: (hls: Hls | null) => void;
+    /**
      * Modo TV: o stream carrega só uma janela deslizante do título, começando neste
      * ponto. Com `totalDuration`, a barra passa a mostrar o tempo real do filme em vez
      * do tamanho da janela (que cresce enquanto carrega).
@@ -175,6 +180,7 @@ export default function VideoPlayer({
     title,
     subtitle,
     onVideoElement,
+    onHlsInstance,
     timeOffset = 0,
     totalDuration = 0,
     onSeekBeyondWindow
@@ -400,6 +406,8 @@ export default function VideoPlayer({
     // Hands the <video> element to the parent (player sync) — stable across the lifecycle.
     const onVideoElementRef = useRef(onVideoElement);
     useEffect(() => { onVideoElementRef.current = onVideoElement; }, [onVideoElement]);
+    const onHlsInstanceRef = useRef(onHlsInstance);
+    useEffect(() => { onHlsInstanceRef.current = onHlsInstance; }, [onHlsInstance]);
     useEffect(() => {
         onVideoElementRef.current?.(videoRef.current);
         return () => onVideoElementRef.current?.(null);
@@ -842,6 +850,7 @@ export default function VideoPlayer({
 
             hls.loadSource(src);
             hls.attachMedia(video);
+            onHlsInstanceRef.current?.(hls);
 
             hls.on(Hls.Events.MANIFEST_PARSED, () => {
                 console.log('[VideoPlayer] HLS Manifest parsed.');
@@ -1028,7 +1037,10 @@ export default function VideoPlayer({
             window.clearTimeout(resetPlaybackStateTimer);
             cancelBufferedAutoplayWait?.();
             playSettleTimers.forEach(timer => window.clearTimeout(timer));
-            if (hls) hls.destroy();
+            if (hls) {
+                onHlsInstanceRef.current?.(null);
+                hls.destroy();
+            }
             video.removeEventListener('play', updatePlayState);
             video.removeEventListener('pause', updatePlayState);
             video.removeEventListener('loadedmetadata', handleLoadedMetadata);

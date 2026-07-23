@@ -70,11 +70,23 @@ export interface SyncParticipant {
     deviceId: string;
     role: SyncRole;
     latency: number;
+    /**
+     * Absolute instant of the frame the device was showing (EXT-X-PROGRAM-DATE-TIME, ms).
+     * Comes from the playlist, so it means the same thing on every device — unlike
+     * `latency`, which each one measures against its own view of the live edge. Null on
+     * streams without the tag (a provider channel), where `latency` is all there is.
+     */
+    mediaTime: number | null;
+    /**
+     * How long ago this was reported, measured by the server. The reading ages while it
+     * sits here, and only the server can date it without trusting device clocks.
+     */
+    ageMs: number;
 }
 
 export interface SyncState {
     participants: SyncParticipant[];
-    command?: { epoch: number; targetLatency: number };
+    command?: { epoch: number; targetLatency: number; targetMediaTime: number | null };
 }
 
 interface SessionRow {
@@ -94,11 +106,14 @@ interface ParticipantRow {
     device_id: string;
     role: SyncRole;
     latency: number;
+    media_time: number | null;
+    updated_at: number;
 }
 
 interface CommandRow {
     epoch: number;
     target_latency: number;
+    target_media_time: number | null;
 }
 
 function getConnection(): Database.Database {
@@ -130,6 +145,7 @@ function getConnection(): Database.Database {
             device_id TEXT NOT NULL,
             role TEXT NOT NULL,
             latency REAL NOT NULL,
+            media_time REAL,
             updated_at INTEGER NOT NULL,
             PRIMARY KEY (stream_key, device_id)
         );
@@ -137,7 +153,8 @@ function getConnection(): Database.Database {
         CREATE TABLE IF NOT EXISTS sync_commands (
             stream_key TEXT PRIMARY KEY,
             epoch INTEGER NOT NULL,
-            target_latency REAL NOT NULL
+            target_latency REAL NOT NULL,
+            target_media_time REAL
         );
 
         CREATE TABLE IF NOT EXISTS stopped_devices (
@@ -146,9 +163,26 @@ function getConnection(): Database.Database {
         );
     `);
 
+    // Files created before the absolute-clock columns existed. Nothing to backfill:
+    // every row here expires in seconds, so the column just needs to be there.
+    addColumnIfMissing(sqlite, 'sync_participants', 'media_time', 'REAL');
+    addColumnIfMissing(sqlite, 'sync_commands', 'target_media_time', 'REAL');
+
     dropLegacyJson();
 
     return sqlite;
+}
+
+function addColumnIfMissing(
+    db: Database.Database,
+    table: string,
+    column: string,
+    definition: string
+): void {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!columns.some((c) => c.name === column)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
 }
 
 /** The JSON files this store replaced. Nothing to migrate: every row expires in seconds. */
@@ -271,25 +305,33 @@ function pruneSync(db: Database.Database, now: number): void {
     db.prepare('DELETE FROM sync_commands WHERE epoch < ?').run(now - COMMAND_TTL_MS);
 }
 
-function snapshot(db: Database.Database, streamKey: string): SyncState {
+function snapshot(db: Database.Database, streamKey: string, now: number): SyncState {
     const participants = db
-        .prepare('SELECT device_id, role, latency FROM sync_participants WHERE stream_key = ?')
+        .prepare(
+            'SELECT device_id, role, latency, media_time, updated_at FROM sync_participants WHERE stream_key = ?'
+        )
         .all(streamKey) as ParticipantRow[];
 
     const command = db
-        .prepare('SELECT epoch, target_latency FROM sync_commands WHERE stream_key = ?')
+        .prepare('SELECT epoch, target_latency, target_media_time FROM sync_commands WHERE stream_key = ?')
         .get(streamKey) as CommandRow | undefined;
 
     const state: SyncState = {
         participants: participants.map((p) => ({
             deviceId: p.device_id,
             role: p.role,
-            latency: p.latency
+            latency: p.latency,
+            mediaTime: p.media_time,
+            ageMs: Math.max(0, now - p.updated_at)
         }))
     };
 
     if (command) {
-        state.command = { epoch: command.epoch, targetLatency: command.target_latency };
+        state.command = {
+            epoch: command.epoch,
+            targetLatency: command.target_latency,
+            targetMediaTime: command.target_media_time
+        };
     }
 
     return state;
@@ -300,7 +342,8 @@ export function reportParticipant(
     streamKey: string,
     deviceId: string,
     role: SyncRole,
-    latency: number
+    latency: number,
+    mediaTime: number | null
 ): SyncState {
     const db = getConnection();
     const now = Date.now();
@@ -308,34 +351,40 @@ export function reportParticipant(
     return db.transaction(() => {
         pruneSync(db, now);
         db.prepare(
-            `INSERT INTO sync_participants (stream_key, device_id, role, latency, updated_at)
-             VALUES (?, ?, ?, ?, ?)
+            `INSERT INTO sync_participants (stream_key, device_id, role, latency, media_time, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?)
              ON CONFLICT(stream_key, device_id) DO UPDATE SET
                 role = excluded.role,
                 latency = excluded.latency,
+                media_time = excluded.media_time,
                 updated_at = excluded.updated_at`
-        ).run(streamKey, deviceId, role, latency, now);
+        ).run(streamKey, deviceId, role, latency, mediaTime, now);
 
-        return snapshot(db, streamKey);
+        return snapshot(db, streamKey, now);
     })();
 }
 
 /** The broadcaster asks out-of-sync viewers to jump to the target latency. */
-export function setSyncCommand(streamKey: string, targetLatency: number): SyncState {
+export function setSyncCommand(
+    streamKey: string,
+    targetLatency: number,
+    targetMediaTime: number | null
+): SyncState {
     const db = getConnection();
     const now = Date.now();
 
     return db.transaction(() => {
         pruneSync(db, now);
         db.prepare(
-            `INSERT INTO sync_commands (stream_key, epoch, target_latency)
-             VALUES (?, ?, ?)
+            `INSERT INTO sync_commands (stream_key, epoch, target_latency, target_media_time)
+             VALUES (?, ?, ?, ?)
              ON CONFLICT(stream_key) DO UPDATE SET
                 epoch = excluded.epoch,
-                target_latency = excluded.target_latency`
-        ).run(streamKey, now, targetLatency);
+                target_latency = excluded.target_latency,
+                target_media_time = excluded.target_media_time`
+        ).run(streamKey, now, targetLatency, targetMediaTime);
 
-        return snapshot(db, streamKey);
+        return snapshot(db, streamKey, now);
     })();
 }
 
@@ -346,6 +395,6 @@ export function getSyncState(streamKey: string): SyncState {
 
     return db.transaction(() => {
         pruneSync(db, now);
-        return snapshot(db, streamKey);
+        return snapshot(db, streamKey, now);
     })();
 }

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import type Hls from 'hls.js';
 import { getDeviceId, getDeviceName, detectLocalIp } from '@/app/lib/device';
 
 /** Intervalo de heartbeat (menor que o TTL de 45s do servidor). */
@@ -190,14 +191,27 @@ const SYNC_TICK_MS = 1000;
 /** Latency difference (s) beyond which we consider the players out of sync. */
 const SYNC_THRESHOLD_S = 5;
 
+/** Drift this small counts as aligned; chasing it would only churn the playback rate. */
+const IN_SYNC_S = 0.3;
+/** Past this, nudging the rate would take too long to close the gap — jump instead. */
+const SEEK_THRESHOLD_S = 3;
+/** A gap is closed over roughly this long, which keeps the rate change gentle. */
+const CATCHUP_WINDOW_S = 5;
+/** Bound on the rate change; past this the pitch shift starts to be noticeable. */
+const MAX_RATE_DELTA = 0.1;
+
 interface SyncParticipantDTO {
     deviceId: string;
     role: SyncRole;
     latency: number;
+    /** Absolute instant of the frame being shown (from the playlist), or null. */
+    mediaTime: number | null;
+    /** How long ago the server received this reading. */
+    ageMs: number;
 }
 interface SyncStateDTO {
     participants: SyncParticipantDTO[];
-    command?: { epoch: number; targetLatency: number };
+    command?: { epoch: number; targetLatency: number; targetMediaTime: number | null };
 }
 
 /** Live latency: distance (s) from the current position to the live edge (seekable.end). */
@@ -207,12 +221,59 @@ function measureLatency(v: HTMLVideoElement | null): number | null {
     return Math.max(0, edge - v.currentTime);
 }
 
+/**
+ * The instant of the broadcast currently on screen, in ms.
+ *
+ * This is the whole point of the absolute clock: it comes from the playlist, so it means
+ * the same thing on every device. `latency` cannot, because each player measures it
+ * against the live edge as its own last playlist refresh reported it.
+ */
+function measureMediaTime(hls: Hls | null): number | null {
+    const date = hls?.playingDate;
+    return date ? date.getTime() : null;
+}
+
 /** Moves the player to sit `targetLatency` seconds behind the live edge. */
 function seekToLatency(v: HTMLVideoElement, targetLatency: number) {
     if (v.seekable.length === 0) return;
     const edge = v.seekable.end(v.seekable.length - 1);
     const start = v.seekable.start(0);
     v.currentTime = Math.min(edge, Math.max(start, edge - targetLatency));
+}
+
+/**
+ * Closes a measured drift (positive = the player is behind and must catch up).
+ *
+ * Small gaps are absorbed by playing slightly faster or slower, which is invisible;
+ * seeking would flush the buffer and stall the picture for seconds, and that stall is
+ * what made syncing feel slow even once the command arrived quickly.
+ */
+function applyDrift(v: HTMLVideoElement, driftSeconds: number) {
+    const drift = Math.abs(driftSeconds);
+
+    if (drift > SEEK_THRESHOLD_S) {
+        if (v.playbackRate !== 1) v.playbackRate = 1;
+        const target = v.currentTime + driftSeconds;
+        if (v.seekable.length > 0) {
+            const start = v.seekable.start(0);
+            const end = v.seekable.end(v.seekable.length - 1);
+            v.currentTime = Math.min(end, Math.max(start, target));
+        } else {
+            v.currentTime = target;
+        }
+        return;
+    }
+
+    if (drift < IN_SYNC_S) {
+        if (v.playbackRate !== 1) v.playbackRate = 1;
+        return;
+    }
+
+    const adjustment = Math.max(
+        -MAX_RATE_DELTA,
+        Math.min(MAX_RATE_DELTA, driftSeconds / CATCHUP_WINDOW_S)
+    );
+    v.playbackRate = 1 + adjustment;
 }
 
 /**
@@ -226,38 +287,79 @@ function seekToLatency(v: HTMLVideoElement, targetLatency: number) {
  */
 export function useSyncPlayback(opts: {
     videoEl: HTMLVideoElement | null;
+    /** hls.js instance of the same player — carries the broadcast's absolute clock. */
+    hls?: Hls | null;
     streamKey: string | null;
     role: SyncRole;
     active: boolean;
 }) {
-    const { videoEl, streamKey, role, active } = opts;
+    const { videoEl, hls, streamKey, role, active } = opts;
     const [canSync, setCanSync] = useState(false);
     const videoRef = useRef(videoEl);
+    const hlsRef = useRef(hls ?? null);
     const lastAppliedEpochRef = useRef(0);
 
     useEffect(() => { videoRef.current = videoEl; }, [videoEl]);
+    useEffect(() => { hlsRef.current = hls ?? null; }, [hls]);
+
+    /**
+     * Where the broadcaster is right now, on the shared clock. The reading aged on the
+     * server while it waited to be collected, and the broadcaster kept playing during
+     * that time, so the age has to be added back. The server measures it, since
+     * comparing its timestamp against this device's clock would fold in their skew.
+     */
+    const broadcasterMediaTime = (p: SyncParticipantDTO | undefined): number | null =>
+        p && p.mediaTime !== null ? p.mediaTime + p.ageMs : null;
 
     useEffect(() => {
         if (!active || !streamKey) return;
         const deviceId = getDeviceId();
         let cancelled = false;
 
-        const applyState = (state: SyncStateDTO, myLatency: number | null) => {
+        const applyState = (
+            state: SyncStateDTO,
+            myLatency: number | null,
+            myMediaTime: number | null
+        ) => {
             const broadcaster = state.participants.find((p) => p.role === 'broadcaster');
             const video = videoRef.current;
+            const targetMediaTime = broadcasterMediaTime(broadcaster);
+            const drift =
+                myMediaTime !== null && targetMediaTime !== null
+                    ? (targetMediaTime - myMediaTime) / 1000
+                    : null;
 
-            // Espectador: aplica o comando "sincronizar todos" (uma vez por epoch).
-            if (role === 'viewer' && state.command && state.command.epoch > lastAppliedEpochRef.current) {
+            // With the shared clock a viewer corrects itself continuously, so the players
+            // stay together instead of drifting until someone presses the button.
+            if (role === 'viewer' && video && drift !== null) {
+                applyDrift(video, drift);
+            }
+
+            // Without it, all we have is the broadcaster's command and its own latency.
+            if (drift === null && state.command && state.command.epoch > lastAppliedEpochRef.current) {
                 lastAppliedEpochRef.current = state.command.epoch;
-                if (video && myLatency !== null && Math.abs(myLatency - state.command.targetLatency) > SYNC_THRESHOLD_S) {
+                if (
+                    role === 'viewer'
+                    && video
+                    && myLatency !== null
+                    && Math.abs(myLatency - state.command.targetLatency) > SYNC_THRESHOLD_S
+                ) {
                     seekToLatency(video, state.command.targetLatency);
                 }
-            } else if (state.command && state.command.epoch > lastAppliedEpochRef.current) {
-                lastAppliedEpochRef.current = state.command.epoch; // broadcaster just tracks
             }
 
             let show = false;
-            if (myLatency !== null) {
+            if (drift !== null) {
+                // Only worth offering while the automatic correction has not caught up.
+                show = role === 'viewer'
+                    ? Math.abs(drift) > SYNC_THRESHOLD_S
+                    : state.participants.some(
+                        (p) => p.role === 'viewer'
+                            && p.mediaTime !== null
+                            && myMediaTime !== null
+                            && Math.abs((p.mediaTime + p.ageMs - myMediaTime) / 1000) > SYNC_THRESHOLD_S
+                    );
+            } else if (myLatency !== null) {
                 if (role === 'viewer') {
                     show = !!broadcaster && Math.abs(myLatency - broadcaster.latency) > SYNC_THRESHOLD_S;
                 } else {
@@ -271,14 +373,23 @@ export function useSyncPlayback(opts: {
 
         const tick = async () => {
             const myLatency = measureLatency(videoRef.current);
+            const myMediaTime = measureMediaTime(hlsRef.current);
             try {
                 const res = await fetch('/api/live-sync', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ streamKey, deviceId, role, latency: myLatency ?? 0 }),
+                    body: JSON.stringify({
+                        streamKey,
+                        deviceId,
+                        role,
+                        latency: myLatency ?? 0,
+                        mediaTime: myMediaTime,
+                    }),
                 });
                 const state = (await res.json()) as SyncStateDTO;
-                if (!cancelled && Array.isArray(state.participants)) applyState(state, myLatency);
+                if (!cancelled && Array.isArray(state.participants)) {
+                    applyState(state, myLatency, myMediaTime);
+                }
             } catch {
                 /* best-effort */
             }
@@ -290,6 +401,9 @@ export function useSyncPlayback(opts: {
             cancelled = true;
             clearInterval(interval);
             setCanSync(false);
+            // Never leave the player running off-speed once syncing stops.
+            const video = videoRef.current;
+            if (video && video.playbackRate !== 1) video.playbackRate = 1;
         };
     }, [active, streamKey, role]);
 
@@ -298,23 +412,35 @@ export function useSyncPlayback(opts: {
         if (!video || !streamKey) return;
 
         if (role === 'viewer') {
-            // Pull to the broadcaster current latency (fetch the freshest state).
+            // Pull to where the broadcaster is (fetch the freshest state).
             try {
                 const res = await fetch(`/api/live-sync?streamKey=${encodeURIComponent(streamKey)}`);
                 const state = (await res.json()) as SyncStateDTO;
                 const broadcaster = state.participants?.find((p) => p.role === 'broadcaster');
-                if (broadcaster) seekToLatency(video, broadcaster.latency);
+                const targetMediaTime = broadcasterMediaTime(broadcaster);
+                const myMediaTime = measureMediaTime(hlsRef.current);
+
+                if (targetMediaTime !== null && myMediaTime !== null) {
+                    applyDrift(video, (targetMediaTime - myMediaTime) / 1000);
+                } else if (broadcaster) {
+                    seekToLatency(video, broadcaster.latency);
+                }
             } catch {
                 /* ignore */
             }
         } else {
-            // Broadcaster: publish a command with its own latency for the viewers.
+            // Broadcaster: publish a command for viewers without the shared clock.
             const myLatency = measureLatency(video);
             if (myLatency === null) return;
             fetch('/api/live-sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ streamKey, command: true, targetLatency: myLatency }),
+                body: JSON.stringify({
+                    streamKey,
+                    command: true,
+                    targetLatency: myLatency,
+                    targetMediaTime: measureMediaTime(hlsRef.current),
+                }),
             }).catch(() => {});
         }
         setCanSync(false);
