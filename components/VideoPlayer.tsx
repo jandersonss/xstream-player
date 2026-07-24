@@ -418,19 +418,27 @@ export default function VideoPlayer({
         durationChangedAtTimeRef.current = videoRef.current?.currentTime ?? 0;
     }, [duration]);
 
+    /** TV Mode: the stream is a sliding window over a title whose real length we know. */
+    const isBroadcastTimeline = totalDuration > 0;
+    const displayTime = isBroadcastTimeline ? timeOffset + currentTime : currentTime;
+    const displayDuration = isBroadcastTimeline ? totalDuration : duration;
+
     // Next-episode prompt: series only (onNext + hasNext), never on live/unknown duration.
-    // Everything is anchored to video time, so the countdown freezes on pause and rewinds on seek.
+    // Everything is anchored to the title's timeline, so the countdown freezes on pause and
+    // rewinds on seek — and while broadcasting it follows the title, not the relay window.
     const postponedUntil = postponement?.src === src ? postponement.until : 0;
-    const nextEpisodePromptAt = Math.max(duration - NEXT_EPISODE_PROMPT_LEAD_SEC, postponedUntil);
+    const nextEpisodePromptAt = Math.max(displayDuration - NEXT_EPISODE_PROMPT_LEAD_SEC, postponedUntil);
     const autoSkipAt = nextEpisodePromptAt + NEXT_EPISODE_AUTO_SKIP_SEC;
     const showNextEpisodePrompt = Boolean(onNext)
         && hasNext
-        && Number.isFinite(duration)
-        && duration > NEXT_EPISODE_PROMPT_LEAD_SEC
-        && durationStable
-        && currentTime >= nextEpisodePromptAt
-        && currentTime < duration;
-    const autoSkipSecondsLeft = Math.max(0, Math.ceil(autoSkipAt - currentTime));
+        && Number.isFinite(displayDuration)
+        && displayDuration > NEXT_EPISODE_PROMPT_LEAD_SEC
+        // The stability guard exists for progressive streams that re-estimate their
+        // duration; the broadcast length comes from the provider and needs no warm-up.
+        && (isBroadcastTimeline || durationStable)
+        && displayTime >= nextEpisodePromptAt
+        && displayTime < displayDuration;
+    const autoSkipSecondsLeft = Math.max(0, Math.ceil(autoSkipAt - displayTime));
 
     // The prompt stays visible until `src` changes, so it locks against firing `onNext` twice.
     useEffect(() => {
@@ -438,10 +446,10 @@ export default function VideoPlayer({
             autoSkipFiredRef.current = false;
             return;
         }
-        if (currentTime < autoSkipAt || autoSkipFiredRef.current) return;
+        if (displayTime < autoSkipAt || autoSkipFiredRef.current) return;
         autoSkipFiredRef.current = true;
         onNextRef.current?.();
-    }, [showNextEpisodePrompt, currentTime, autoSkipAt]);
+    }, [showNextEpisodePrompt, displayTime, autoSkipAt]);
 
     useEffect(() => {
         if (showNextEpisodePrompt) {
@@ -451,8 +459,9 @@ export default function VideoPlayer({
 
     const handlePostponeNextEpisode = useCallback(() => {
         const videoTime = videoRef.current?.currentTime ?? 0;
-        setPostponement({ src, until: videoTime + NEXT_EPISODE_POSTPONE_SEC });
-    }, [src]);
+        const timelineTime = isBroadcastTimeline ? timeOffset + videoTime : videoTime;
+        setPostponement({ src, until: timelineTime + NEXT_EPISODE_POSTPONE_SEC });
+    }, [src, isBroadcastTimeline, timeOffset]);
 
     /** Arrows move between the two buttons while focus is on the prompt; outside it they keep seeking the video. */
     const moveNextEpisodePromptFocus = useCallback((direction: 'left' | 'right') => {
@@ -510,9 +519,6 @@ export default function VideoPlayer({
     }, []);
 
 
-
-    /** TV Mode: the stream is a sliding window over a title whose real length we know. */
-    const isBroadcastTimeline = totalDuration > 0;
 
     /**
      * Seeks using the title's own timeline (Modo TV). Only ~30s of the title exists on
@@ -1086,8 +1092,6 @@ export default function VideoPlayer({
     // In Modo TV the stream's own duration is just the sliding window (a few seconds,
     // and growing) — the title's real timeline comes from the offset + known duration.
     const isLive = isBroadcastTimeline ? false : (duration === Infinity || duration === 0);
-    const displayTime = isBroadcastTimeline ? timeOffset + currentTime : currentTime;
-    const displayDuration = isBroadcastTimeline ? totalDuration : duration;
     const volumePercent = Math.round(volume * 100);
     const autoSkipProgress = ((NEXT_EPISODE_AUTO_SKIP_SEC - autoSkipSecondsLeft) / NEXT_EPISODE_AUTO_SKIP_SEC) * 100;
 

@@ -102,9 +102,10 @@ export default function WatchSeriesPage() {
     const [autoSubLoading, setAutoSubLoading] = useState(false);
     const [isSharing, setIsSharing] = useState(() => getAutoBroadcast());
     const [showStartModal, setShowStartModal] = useState(false);
-    // Where the broadcast should start. `null` = not picked by hand (auto-broadcast),
-    // which falls back to the saved progress.
-    const [broadcastStart, setBroadcastStart] = useState<number | null>(null);
+    // Where the broadcast should start, tied to the episode it was picked for — carrying it
+    // to the next one would start that episode halfway through. `null` = not picked by hand
+    // (auto-broadcast), which falls back to the saved progress.
+    const [broadcastStart, setBroadcastStart] = useState<{ episodeId: string; start: number } | null>(null);
     // "Join" (Modo TV) params — via useSearchParams to work on the client.
     const searchParams = useSearchParams();
     const isJoining = searchParams.get('join') === '1';
@@ -157,11 +158,15 @@ export default function WatchSeriesPage() {
         return 0;
     }, [selectedEpisode?.id, getProgress]);
 
-    // The picked start belongs to one episode; carrying it to the next would start
-    // the new one halfway through.
+    // The start point is baked into ffmpeg when the broadcast is created, so it is decided
+    // once per episode. Leaving it derived from the saved progress would move it while
+    // broadcasting (the progress now keeps being written), rewriting the stream URL
+    // mid-playback and reloading the player over and over.
     useEffect(() => {
-        setBroadcastStart(null);
-    }, [selectedEpisode?.id]);
+        const episodeId = selectedEpisode?.id;
+        if (!isSharing || !episodeId) return;
+        setBroadcastStart(prev => (prev?.episodeId === episodeId ? prev : { episodeId, start: resumeTime }));
+    }, [isSharing, selectedEpisode?.id, resumeTime]);
 
     useEffect(() => {
         if (!credentials || !seriesId || isJoining) return;
@@ -541,7 +546,9 @@ export default function WatchSeriesPage() {
         const { hostUrl, username, password } = credentials!;
         const extension = selectedEpisode.container_extension;
         const directUrl = `${hostUrl}/series/${username}/${password}/${selectedEpisode.id}.${extension}`;
-        const startSeconds = broadcastStart ?? resumeTime;
+        const startSeconds = broadcastStart?.episodeId === selectedEpisode.id
+            ? broadcastStart.start
+            : resumeTime;
         // Only the provider's own length is trustworthy here; the relay stream carries
         // just a sliding window, so without this the bar would measure the window.
         const rawDuration: unknown = selectedEpisode.info?.duration_secs;
@@ -565,10 +572,16 @@ export default function WatchSeriesPage() {
                 });
                 if (!res.ok) return;
                 // Reloads the player at the new offset (the src carries `start`).
-                setBroadcastStart(start);
+                setBroadcastStart({ episodeId: selectedEpisode.id, start });
             } catch {
                 /* seek is best-effort; the broadcast keeps running where it was */
             }
+        };
+        // While broadcasting the player's clock is the relay window, not the episode: the real
+        // position is where ffmpeg started plus what has played since. Without this conversion
+        // the progress would be unusable, which is why it used to be dropped altogether.
+        const handleBroadcastProgress = (currentTime: number) => {
+            handleProgress(startSeconds + currentTime, titleDuration);
         };
         // Sharing → plays the episode via relay (channel-style; others join at the same point).
         const streamUrl = isSharing
@@ -633,7 +646,7 @@ export default function WatchSeriesPage() {
                         poster={series.info.cover}
                         autoPlay={true}
                         initialTime={isSharing ? 0 : resumeTime}
-                        onProgress={isSharing ? undefined : handleProgress}
+                        onProgress={isSharing ? handleBroadcastProgress : handleProgress}
                         timeOffset={isSharing ? startSeconds : 0}
                         totalDuration={isSharing ? titleDuration : 0}
                         onSeekBeyondWindow={isSharing ? handleBroadcastSeek : undefined}
@@ -666,7 +679,7 @@ export default function WatchSeriesPage() {
                     duration={getProgress(selectedEpisode.id)?.duration}
                     onCancel={() => setShowStartModal(false)}
                     onConfirm={(start) => {
-                        setBroadcastStart(start);
+                        setBroadcastStart({ episodeId: selectedEpisode.id, start });
                         setIsSharing(true);
                         setShowStartModal(false);
                     }}

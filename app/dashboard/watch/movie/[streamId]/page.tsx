@@ -118,6 +118,15 @@ export default function WatchMoviePage() {
         return 0;
     }, [streamId, getProgress, progressLoaded]);
 
+    // The start point is baked into ffmpeg when the broadcast is created, so it is decided
+    // once. Leaving it derived from the saved progress would move it while broadcasting
+    // (the progress now keeps being written), rewriting the stream URL mid-playback and
+    // reloading the player over and over.
+    useEffect(() => {
+        if (!isSharing || !isPlaying) return;
+        setBroadcastStart(prev => prev ?? resumeTime);
+    }, [isSharing, isPlaying, resumeTime]);
+
     useEffect(() => {
         if (!credentials || !streamId || isJoining) return;
 
@@ -328,6 +337,12 @@ export default function WatchMoviePage() {
                 /* seek is best-effort; the broadcast keeps running where it was */
             }
         };
+        // While broadcasting the player's clock is the relay window, not the title: the real
+        // position is where ffmpeg started plus what has played since. Without this conversion
+        // the progress would be unusable, which is why it used to be dropped altogether.
+        const handleBroadcastProgress = (currentTime: number) => {
+            handleProgress(startSeconds + currentTime, titleDuration);
+        };
         // Compartilhando → toca via relay (mesmo stream que outros aparelhos entram, estilo canal).
         const streamUrl = isSharing
             ? relaySrc({ contentType: 'movie', streamId, ext: extension, start: startSeconds })
@@ -361,7 +376,7 @@ export default function WatchMoviePage() {
                         poster={movie.info.movie_image}
                         autoPlay={true}
                         initialTime={isSharing ? 0 : resumeTime}
-                        onProgress={isSharing ? undefined : handleProgress}
+                        onProgress={isSharing ? handleBroadcastProgress : handleProgress}
                         timeOffset={isSharing ? startSeconds : 0}
                         totalDuration={isSharing ? titleDuration : 0}
                         onSeekBeyondWindow={isSharing ? handleBroadcastSeek : undefined}
