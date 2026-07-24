@@ -835,14 +835,16 @@ export default function VideoPlayer({
                     ? {
                           liveDurationInfinity: true,
                           // Counted in segments, so each source needs its own numbers.
-                          // Our relay window is 6 segments (hls_list_size) of ~4-7s:
-                          // sit 3 back (mid-window) and never drift past 5, which is
-                          // the last one still on disk. Bounding the latency is what
-                          // makes the devices converge on their own — the default is
-                          // Infinity, so a device that stalled once stayed behind for
-                          // good and only a manual sync could rescue it.
+                          // Our relay window is 10 segments (hls_list_size) of ~4-7s:
+                          // sit 3 back (near the middle) and only force-seek to the edge
+                          // past 8. The gap between 3 and 8 is slack a transient buffer
+                          // dip is played through instead of yanking the picture forward
+                          // (the "video jumps on its own" while broadcasting). Bounding
+                          // the latency at all is still what makes the devices converge —
+                          // the default is Infinity, so a device that stalled once stayed
+                          // behind for good and only a manual sync could rescue it.
                           liveSyncDurationCount: isBroadcastRelay ? 3 : 5,
-                          liveMaxLatencyDurationCount: isBroadcastRelay ? 5 : 14,
+                          liveMaxLatencyDurationCount: isBroadcastRelay ? 8 : 14,
                           initialLiveManifestSize: 2,
                       }
                     : {}),

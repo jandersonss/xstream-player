@@ -206,7 +206,14 @@ function spawnFfmpeg(key: string, dir: string, upstreamUrl: string, startSeconds
         '-c', 'copy',
         '-f', 'hls',
         '-hls_time', String(SEGMENT_DURATION),
-        '-hls_list_size', '6',
+        // Sliding window kept wide (10 segments, ~55s with keyframe-cut ~5.5s segments):
+        // with -c copy the segment lengths are irregular, so a narrow window put the live
+        // latency cap right at the oldest segment on disk — any buffering dip pushed the
+        // player past it and hls.js yanked it back to the edge (the "video jumps on its
+        // own" while broadcasting). A wider window lets a transient stall be played
+        // through at 1x instead of force-seeked. Latency stays bounded (see hls.js
+        // liveMaxLatencyDurationCount), so multiple devices still converge.
+        '-hls_list_size', '10',
         // program_date_time stamps every segment with an absolute instant, identical for
         // every device reading this playlist. It is what lets the players compare their
         // positions directly instead of each measuring against its own view of the edge.
