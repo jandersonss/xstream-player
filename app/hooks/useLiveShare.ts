@@ -200,6 +200,20 @@ const CATCHUP_WINDOW_S = 5;
 /** Bound on the rate change; past this the pitch shift starts to be noticeable. */
 const MAX_RATE_DELTA = 0.1;
 
+/**
+ * A broadcaster reading older than this cannot be extrapolated into a media position:
+ * meanwhile it may have paused, buffered, or had its tab backgrounded (which throttles
+ * the heartbeat to once a minute), so `mediaTime + ageMs` would point at a phantom
+ * instant and yank the viewer there. Past this age the reading is treated as unavailable.
+ */
+const MAX_MEDIA_AGE_MS = 3000;
+/**
+ * After a corrective seek, ignore further large drifts for this long so the freshly
+ * flushed buffer can settle. Without it a stale post-seek `playingDate` reads as another
+ * big gap and the picture bounces back and forth.
+ */
+const SEEK_COOLDOWN_MS = 4000;
+
 interface SyncParticipantDTO {
     deviceId: string;
     role: SyncRole;
@@ -298,6 +312,10 @@ export function useSyncPlayback(opts: {
     const videoRef = useRef(videoEl);
     const hlsRef = useRef(hls ?? null);
     const lastAppliedEpochRef = useRef(0);
+    /** Wall-clock of the last corrective seek — gates the cooldown. */
+    const lastSeekAtRef = useRef(0);
+    /** A big drift must be seen on two consecutive ticks before we act on it. */
+    const bigDriftPendingRef = useRef(false);
 
     useEffect(() => { videoRef.current = videoEl; }, [videoEl]);
     useEffect(() => { hlsRef.current = hls ?? null; }, [hls]);
@@ -309,7 +327,7 @@ export function useSyncPlayback(opts: {
      * comparing its timestamp against this device's clock would fold in their skew.
      */
     const broadcasterMediaTime = (p: SyncParticipantDTO | undefined): number | null =>
-        p && p.mediaTime !== null ? p.mediaTime + p.ageMs : null;
+        p && p.mediaTime !== null && p.ageMs <= MAX_MEDIA_AGE_MS ? p.mediaTime + p.ageMs : null;
 
     useEffect(() => {
         if (!active || !streamKey) return;
@@ -330,9 +348,24 @@ export function useSyncPlayback(opts: {
                     : null;
 
             // With the shared clock a viewer corrects itself continuously, so the players
-            // stay together instead of drifting until someone presses the button.
+            // stay together instead of drifting until someone presses the button. Small
+            // drifts are nudged away every tick (invisible), but a *seek* only fires when
+            // a big gap persists across two ticks and no recent seek is still settling —
+            // otherwise a one-off buffering spike bounces the picture back and forth.
             if (role === 'viewer' && video && drift !== null) {
-                applyDrift(video, drift);
+                const bigDrift = Math.abs(drift) > SEEK_THRESHOLD_S;
+                if (!bigDrift) {
+                    bigDriftPendingRef.current = false;
+                    applyDrift(video, drift);
+                } else if (Date.now() - lastSeekAtRef.current < SEEK_COOLDOWN_MS) {
+                    /* cooling down after a seek: hold, let the buffer settle */
+                } else if (!bigDriftPendingRef.current) {
+                    bigDriftPendingRef.current = true; // wait for a confirming tick
+                } else {
+                    bigDriftPendingRef.current = false;
+                    lastSeekAtRef.current = Date.now();
+                    applyDrift(video, drift);
+                }
             }
 
             // Without it, all we have is the broadcaster's command and its own latency.
@@ -425,6 +458,9 @@ export function useSyncPlayback(opts: {
                 } else if (broadcaster) {
                     seekToLatency(video, broadcaster.latency);
                 }
+                // Let this manual jump settle before the tick loop considers chasing again.
+                lastSeekAtRef.current = Date.now();
+                bigDriftPendingRef.current = false;
             } catch {
                 /* ignore */
             }
