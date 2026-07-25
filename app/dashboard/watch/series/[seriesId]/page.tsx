@@ -511,7 +511,6 @@ export default function WatchSeriesPage() {
                         poster={joinPoster}
                         autoPlay={true}
                         onBack={() => router.back()}
-                        enterFullscreen={true}
                         title={joinTitle}
                         onVideoElement={setVideoEl}
                         onHlsInstance={setHlsInstance}
@@ -654,7 +653,6 @@ export default function WatchSeriesPage() {
                         onPrevious={hasPrevious ? playPrevious : undefined}
                         hasNext={hasNext}
                         hasPrevious={hasPrevious}
-                        enterFullscreen={true}
                         onBack={handleBackFromPlayer}
                         subtitleUrl={subtitleUrl || undefined}
                         title={series.info.name}

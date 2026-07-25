@@ -89,7 +89,6 @@ export default function WatchLivePage() {
                     poster={poster}
                     autoPlay={true}
                     onBack={() => router.back()}
-                    enterFullscreen={true}
                     title={title}
                     onVideoElement={setVideoEl}
                         onHlsInstance={setHlsInstance}

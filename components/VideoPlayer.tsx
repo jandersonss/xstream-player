@@ -126,7 +126,6 @@ interface VideoPlayerProps {
     onPrevious?: () => void;
     hasNext?: boolean;
     hasPrevious?: boolean;
-    enterFullscreen?: boolean;
     onBack?: () => void;
     subtitleUrl?: string;
     topRightSlot?: React.ReactNode;
@@ -173,7 +172,6 @@ export default function VideoPlayer({
     onPrevious,
     hasNext = false,
     hasPrevious = false,
-    enterFullscreen = false,
     onBack,
     subtitleUrl,
     topRightSlot,
@@ -364,15 +362,6 @@ export default function VideoPlayer({
             }
         };
     }, [isCurrentlyFullscreen]);
-
-    // Automatic Fullscreen Trigger
-    useEffect(() => {
-        if (enterFullscreen && containerRef.current && isMetadataLoaded && !isCurrentlyFullscreen()) {
-            console.log('[VideoPlayer] Handling enterFullscreen prop - Programmatic attempt');
-            // Programmatic calls often fail on iOS, so we pass true to fail silently
-            enterFullscreenMode(true);
-        }
-    }, [enterFullscreen, isMetadataLoaded, isCurrentlyFullscreen, enterFullscreenMode]);
 
     const formatTime = (time: number) => {
         if (isNaN(time)) return '00:00';
@@ -1111,7 +1100,7 @@ export default function VideoPlayer({
         >
             <video
                 ref={videoRef}
-                className="w-full h-full object-contain cursor-pointer"
+                className="absolute inset-0 w-full h-full object-contain cursor-pointer"
                 poster={poster}
                 playsInline
                 preload={preloadMode}

@@ -280,7 +280,6 @@ export default function WatchMoviePage() {
                         poster={joinPoster}
                         autoPlay={true}
                         onBack={() => router.back()}
-                        enterFullscreen={true}
                         title={joinTitle}
                         onVideoElement={setVideoEl}
                         onHlsInstance={setHlsInstance}
@@ -380,7 +379,6 @@ export default function WatchMoviePage() {
                         timeOffset={isSharing ? startSeconds : 0}
                         totalDuration={isSharing ? titleDuration : 0}
                         onSeekBeyondWindow={isSharing ? handleBroadcastSeek : undefined}
-                        enterFullscreen={true}
                         onBack={() => setIsPlaying(false)}
                         subtitleUrl={subtitleUrl || undefined}
                         title={movie.info.name}
