@@ -133,7 +133,7 @@ export default function WatchMoviePage() {
         const loadMovieInfo = async () => {
             try {
                 // Try cache first
-                const cached = await getCachedDetail<MovieInfo>(streamId);
+                const cached = await getCachedDetail<MovieInfo>('movie', streamId);
                 if (cached && cached.info && cached.movie_data) {
                     setMovie(cached);
                     setLoading(false);
@@ -154,7 +154,7 @@ export default function WatchMoviePage() {
                 if (data && data.info && data.movie_data) {
                     setMovie(data);
                     // Lazy cache the detail
-                    await saveCachedDetail(streamId, data);
+                    await saveCachedDetail('movie', streamId, data);
                 } else {
                     setError("Detalhes do filme não encontrados.");
                 }

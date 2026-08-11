@@ -44,8 +44,14 @@ interface LibraryRequestBody {
     data?: unknown;
 }
 
+const CONTENT_TYPES: ContentType[] = ['live', 'movie', 'series'];
+
 function jsonData(data: unknown) {
     return NextResponse.json({ data: data ?? null });
+}
+
+function asContentType(value: unknown): ContentType | undefined {
+    return CONTENT_TYPES.find(type => type === value);
 }
 
 export async function POST(request: Request) {
@@ -55,12 +61,23 @@ export async function POST(request: Request) {
     try {
         const body = await request.json() as LibraryRequestBody;
 
+        // The detail cache is keyed per content type: a `series_id` and a `stream_id`
+        // can be the same number and must not read back each other's payload.
+        if (body.action === 'saveDetail' || body.action === 'getDetail') {
+            const detailType = asContentType(body.type);
+            if (!detailType) {
+                return NextResponse.json({ error: 'Tipo de conteúdo inválido' }, { status: 400 });
+            }
+
+            if (body.action === 'getDetail') {
+                return jsonData(library.getDetail(detailType, body.id ?? ''));
+            }
+
+            library.saveDetail(detailType, body.id ?? '', body.data);
+            return NextResponse.json({ success: true });
+        }
+
         switch (body.action) {
-            case 'saveDetail':
-                library.saveDetail(body.id ?? '', body.data);
-                return NextResponse.json({ success: true });
-            case 'getDetail':
-                return jsonData(library.getDetail(body.id ?? ''));
             case 'saveCategories':
                 library.saveCategories(body.categories ?? []);
                 return NextResponse.json({ success: true });
@@ -80,7 +97,7 @@ export async function POST(request: Request) {
             case 'getStreamCount':
                 return jsonData(library.getStreamCount(body.type as ContentType | undefined));
             case 'getStreamsByIds':
-                return jsonData(library.getStreamsByIds(body.ids ?? []));
+                return jsonData(library.getStreamsByIds(body.ids ?? [], asContentType(body.type)));
             case 'saveSyncMetadata':
                 if (body.meta) library.saveSyncMetadata(body.meta);
                 return NextResponse.json({ success: true });

@@ -33,12 +33,12 @@ async function writeCache(action: string, payload: Record<string, unknown> = {})
     }
 }
 
-export const saveDetail = async (id: string | number, data: unknown) => {
-    await writeCache('saveDetail', { id, data });
+export const saveDetail = async (type: ContentType, id: string | number, data: unknown) => {
+    await writeCache('saveDetail', { type, id, data });
 };
 
-export const getDetail = async <T = unknown>(id: string | number): Promise<T | undefined> => {
-    return requestCache<T>('getDetail', { id });
+export const getDetail = async <T = unknown>(type: ContentType, id: string | number): Promise<T | undefined> => {
+    return requestCache<T>('getDetail', { type, id });
 };
 
 export const saveCategories = async (categories: CachedCategory[]) => {
@@ -65,8 +65,8 @@ export const getStreamCount = async (type?: ContentType): Promise<number> => {
     return await requestCache<number>('getStreamCount', { type }) ?? 0;
 };
 
-export const getStreamsByIds = async (ids: (string | number)[]): Promise<CachedStream[]> => {
-    return await requestCache<CachedStream[]>('getStreamsByIds', { ids }) ?? [];
+export const getStreamsByIds = async (ids: (string | number)[], type?: ContentType): Promise<CachedStream[]> => {
+    return await requestCache<CachedStream[]>('getStreamsByIds', { ids, type }) ?? [];
 };
 
 export const saveSyncMetadata = async (meta: SyncMetadata) => {

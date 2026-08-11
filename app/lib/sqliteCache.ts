@@ -11,9 +11,27 @@ const DB_PATH = path.join(DATA_DIR, 'xstream-player.sqlite');
 
 let sqlite: Database.Database | null = null;
 
+/**
+ * How long a cached `get_series_info`/`get_vod_info` payload may be served without
+ * asking the provider again. The catalog `last_modified` is the primary freshness
+ * signal (see `getDetail`), but plenty of providers never fill it, so a series
+ * detail — the payload that carries the episode list — also expires on its own.
+ */
+const DETAIL_TTL_MS: Record<ContentType, number> = {
+    live: 6 * 60 * 60 * 1000,
+    movie: 7 * 24 * 60 * 60 * 1000,
+    series: 12 * 60 * 60 * 1000,
+};
+
 interface StreamRow extends Omit<CachedStream, 'id' | 'backdrop_path'> {
     id: string;
     backdrop_path_json: string | null;
+}
+
+interface DetailRow {
+    data_json: string;
+    source_stamp: string | null;
+    timestamp: number;
 }
 
 function parseJson<T>(value: string | null | undefined, fallback: T): T {
@@ -63,6 +81,70 @@ function toStreamParams(stream: CachedStream) {
     };
 }
 
+// `category_id` and `id` are only unique *within* a content type: Xtream hands out
+// `series_id` from a different sequence than `stream_id`, so a series and a movie
+// routinely share the same number. Keying on the bare id let the series step of the
+// sync overwrite movies — the composite key is what keeps both rows alive.
+const CATEGORIES_TABLE_SQL = (table: string) => `
+    CREATE TABLE IF NOT EXISTS ${table} (
+        category_id TEXT NOT NULL,
+        category_name TEXT NOT NULL,
+        parent_id INTEGER,
+        type TEXT NOT NULL,
+        PRIMARY KEY (category_id, type)
+    );
+`;
+
+const STREAMS_TABLE_SQL = (table: string) => `
+    CREATE TABLE IF NOT EXISTS ${table} (
+        id TEXT NOT NULL,
+        category_id TEXT NOT NULL,
+        name TEXT NOT NULL,
+        type TEXT NOT NULL,
+        icon TEXT,
+        rating TEXT,
+        added TEXT,
+        container_extension TEXT,
+        epg_channel_id TEXT,
+        stream_type TEXT,
+        cover TEXT,
+        plot TEXT,
+        "cast" TEXT,
+        director TEXT,
+        genre TEXT,
+        release_date TEXT,
+        rating_5based TEXT,
+        backdrop_path_json TEXT,
+        last_modified TEXT,
+        search_name TEXT,
+        PRIMARY KEY (id, type)
+    );
+`;
+
+// `source_stamp` holds the catalog `last_modified` the payload was fetched under,
+// which is how a stale episode list is detected after a sync.
+const DETAILS_TABLE_SQL = `
+    CREATE TABLE IF NOT EXISTS details (
+        id TEXT NOT NULL,
+        type TEXT NOT NULL,
+        data_json TEXT NOT NULL,
+        source_stamp TEXT,
+        timestamp INTEGER NOT NULL,
+        PRIMARY KEY (id, type)
+    );
+`;
+
+const CATALOG_INDEXES_SQL = `
+    CREATE INDEX IF NOT EXISTS idx_categories_type
+        ON categories (type);
+    CREATE INDEX IF NOT EXISTS idx_streams_category_id
+        ON streams (category_id);
+    CREATE INDEX IF NOT EXISTS idx_streams_type
+        ON streams (type);
+    CREATE INDEX IF NOT EXISTS idx_streams_type_category
+        ON streams (type, category_id);
+`;
+
 function getConnection() {
     if (sqlite) return sqlite;
 
@@ -76,56 +158,16 @@ function getConnection() {
     sqlite.pragma('foreign_keys = ON');
 
     sqlite.exec(`
-        CREATE TABLE IF NOT EXISTS categories (
-            category_id TEXT PRIMARY KEY,
-            category_name TEXT NOT NULL,
-            parent_id INTEGER,
-            type TEXT NOT NULL
-        );
+        ${CATEGORIES_TABLE_SQL('categories')}
 
-        CREATE INDEX IF NOT EXISTS idx_categories_type
-            ON categories (type);
-
-        CREATE TABLE IF NOT EXISTS streams (
-            id TEXT PRIMARY KEY,
-            category_id TEXT NOT NULL,
-            name TEXT NOT NULL,
-            type TEXT NOT NULL,
-            icon TEXT,
-            rating TEXT,
-            added TEXT,
-            container_extension TEXT,
-            epg_channel_id TEXT,
-            stream_type TEXT,
-            cover TEXT,
-            plot TEXT,
-            "cast" TEXT,
-            director TEXT,
-            genre TEXT,
-            release_date TEXT,
-            rating_5based TEXT,
-            backdrop_path_json TEXT,
-            last_modified TEXT,
-            search_name TEXT
-        );
-
-        CREATE INDEX IF NOT EXISTS idx_streams_category_id
-            ON streams (category_id);
-        CREATE INDEX IF NOT EXISTS idx_streams_type
-            ON streams (type);
-        CREATE INDEX IF NOT EXISTS idx_streams_type_category
-            ON streams (type, category_id);
+        ${STREAMS_TABLE_SQL('streams')}
 
         CREATE TABLE IF NOT EXISTS sync_metadata (
             type TEXT PRIMARY KEY,
             lastSync INTEGER NOT NULL
         );
 
-        CREATE TABLE IF NOT EXISTS details (
-            id TEXT PRIMARY KEY,
-            data_json TEXT NOT NULL,
-            timestamp INTEGER NOT NULL
-        );
+        ${DETAILS_TABLE_SQL}
 
         CREATE TABLE IF NOT EXISTS tmdb_cache (
             key TEXT PRIMARY KEY,
@@ -140,22 +182,54 @@ function getConnection() {
         );
     `);
 
-    migrateStreamsSchema(sqlite);
+    migrateSchema(sqlite);
+
+    // Created after the migration: rebuilding a table drops the indexes with it.
+    sqlite.exec(CATALOG_INDEXES_SQL);
 
     return sqlite;
 }
 
+interface TableColumn {
+    name: string;
+    pk: number;
+}
+
+function tableColumns(db: Database.Database, table: string): TableColumn[] {
+    return db.prepare(`PRAGMA table_info(${table})`).all() as TableColumn[];
+}
+
+function isKeyedBy(columns: TableColumn[], expected: string[]) {
+    const primaryKey = columns.filter(column => column.pk > 0).map(column => column.name).sort();
+    return primaryKey.length === expected.length
+        && expected.slice().sort().every((name, index) => primaryKey[index] === name);
+}
+
 /**
- * Reconcile a database created before `search_name` existed: CREATE TABLE IF NOT
- * EXISTS leaves an existing table untouched, so the column has to be added and
- * the names already stored folded into it — otherwise search returns nothing
- * until the next full catalog sync.
+ * Bring a database created by an older build up to the current schema. CREATE TABLE
+ * IF NOT EXISTS leaves an existing table untouched, so every shape change has to be
+ * applied by hand here.
+ */
+function migrateSchema(db: Database.Database) {
+    migrateStreamsSchema(db);
+    migrateCategoriesSchema(db);
+    migrateDetailsSchema(db);
+}
+
+/**
+ * Two fixes on the streams table:
  *
- * `normalized_name` is dropped in the same pass: it was never written to, so no
- * data is lost.
+ * - `search_name` may be missing (added after the first release); the column is
+ *   created and the names already stored folded into it, otherwise search returns
+ *   nothing until the next full catalog sync. `normalized_name` is dropped in the
+ *   same pass — it was never written to, so no data is lost.
+ * - the primary key may still be the bare `id`, under which the series step of a
+ *   sync silently overwrote every movie sharing its number. The table is rebuilt
+ *   on the composite key and the sync marker cleared, so the app re-syncs on the
+ *   next load and brings back whatever the collisions had eaten.
  */
 function migrateStreamsSchema(db: Database.Database) {
-    const columns = db.prepare('PRAGMA table_info(streams)').all() as { name: string }[];
+    const columns = tableColumns(db, 'streams');
     const hasColumn = (name: string) => columns.some(column => column.name === name);
 
     if (!hasColumn('search_name')) {
@@ -166,18 +240,67 @@ function migrateStreamsSchema(db: Database.Database) {
         db.exec('ALTER TABLE streams DROP COLUMN normalized_name');
     }
 
+    if (!isKeyedBy(columns, ['id', 'type'])) {
+        console.warn('[SqliteCache] Rebuilding streams on the (id, type) key; a re-sync will follow');
+        db.transaction(() => {
+            db.exec(`
+                ${STREAMS_TABLE_SQL('streams_migrated')}
+                INSERT OR IGNORE INTO streams_migrated (${streamInsertColumns})
+                    SELECT ${streamInsertColumns} FROM streams;
+                DROP TABLE streams;
+                ALTER TABLE streams_migrated RENAME TO streams;
+                DELETE FROM sync_metadata;
+            `);
+        })();
+    }
+
     const pending = db
-        .prepare('SELECT id, name FROM streams WHERE search_name IS NULL')
-        .all() as { id: string; name: string }[];
+        .prepare('SELECT id, type, name FROM streams WHERE search_name IS NULL')
+        .all() as { id: string; type: ContentType; name: string }[];
 
     if (pending.length === 0) return;
 
-    const stmt = db.prepare('UPDATE streams SET search_name = ? WHERE id = ?');
+    const stmt = db.prepare('UPDATE streams SET search_name = ? WHERE id = ? AND type = ?');
     db.transaction(() => {
         for (const row of pending) {
-            stmt.run(foldForSearch(row.name || ''), row.id);
+            stmt.run(foldForSearch(row.name || ''), row.id, row.type);
         }
     })();
+}
+
+function migrateCategoriesSchema(db: Database.Database) {
+    if (isKeyedBy(tableColumns(db, 'categories'), ['category_id', 'type'])) return;
+
+    db.transaction(() => {
+        db.exec(`
+            ${CATEGORIES_TABLE_SQL('categories_migrated')}
+            INSERT OR IGNORE INTO categories_migrated (category_id, category_name, parent_id, type)
+                SELECT category_id, category_name, parent_id, type FROM categories;
+            DROP TABLE categories;
+            ALTER TABLE categories_migrated RENAME TO categories;
+            DELETE FROM sync_metadata;
+        `);
+    })();
+}
+
+/**
+ * The old details table was keyed by the bare id and never expired, so a series
+ * kept serving the episode list captured the first time it was opened — new
+ * episodes never showed up — and a movie sharing the id of a series read back the
+ * other one's payload. Nothing is copied over: this is a cache, and its old rows
+ * are exactly the stale ones.
+ */
+function migrateDetailsSchema(db: Database.Database) {
+    const columns = tableColumns(db, 'details');
+    const hasColumn = (name: string) => columns.some(column => column.name === name);
+
+    if (hasColumn('type') && hasColumn('source_stamp')) return;
+
+    console.warn('[SqliteCache] Dropping the legacy detail cache (no content type, no expiry)');
+    db.exec(`
+        DROP TABLE details;
+        ${DETAILS_TABLE_SQL}
+    `);
 }
 
 const streamColumns = `
@@ -197,10 +320,9 @@ export function saveCategories(categories: CachedCategory[]) {
     const stmt = db.prepare(`
         INSERT INTO categories (category_id, category_name, parent_id, type)
         VALUES (@category_id, @category_name, @parent_id, @type)
-        ON CONFLICT(category_id) DO UPDATE SET
+        ON CONFLICT(category_id, type) DO UPDATE SET
             category_name = excluded.category_name,
-            parent_id = excluded.parent_id,
-            type = excluded.type
+            parent_id = excluded.parent_id
     `);
 
     const write = db.transaction((items: CachedCategory[]) => {
@@ -240,10 +362,9 @@ export function saveStreams(streams: CachedStream[]) {
             @release_date, @rating_5based, @backdrop_path_json,
             @last_modified, @search_name
         )
-        ON CONFLICT(id) DO UPDATE SET
+        ON CONFLICT(id, type) DO UPDATE SET
             category_id = excluded.category_id,
             name = excluded.name,
-            type = excluded.type,
             icon = excluded.icon,
             rating = excluded.rating,
             added = excluded.added,
@@ -269,6 +390,54 @@ export function saveStreams(streams: CachedStream[]) {
     });
 
     write(streams);
+}
+
+/**
+ * Fill the temporary `sync_keep` table with the ids a sync step just received, so
+ * the delete below can be expressed as a single NOT IN over an indexed table
+ * instead of a 20k-parameter statement.
+ */
+function loadKeepIds(db: Database.Database, ids: (string | number)[]) {
+    db.exec('CREATE TEMP TABLE IF NOT EXISTS sync_keep (id TEXT PRIMARY KEY)');
+    db.prepare('DELETE FROM sync_keep').run();
+
+    const insert = db.prepare('INSERT OR IGNORE INTO sync_keep (id) VALUES (?)');
+    for (const id of ids) {
+        insert.run(String(id));
+    }
+}
+
+/**
+ * Drop the streams of a type that the provider no longer lists, plus their cached
+ * details. An empty list is ignored: it means the sync step brought nothing back,
+ * and wiping the whole type on a bad provider response is worse than keeping a
+ * stale row around until the next run.
+ */
+export function pruneStreams(type: ContentType, keepIds: (string | number)[]): number {
+    if (keepIds.length === 0) return 0;
+
+    const db = getConnection();
+
+    return db.transaction(() => {
+        loadKeepIds(db, keepIds);
+        db.prepare('DELETE FROM details WHERE type = ? AND id NOT IN (SELECT id FROM sync_keep)').run(type);
+        return db
+            .prepare('DELETE FROM streams WHERE type = ? AND id NOT IN (SELECT id FROM sync_keep)')
+            .run(type).changes;
+    })();
+}
+
+export function pruneCategories(type: ContentType, keepIds: (string | number)[]): number {
+    if (keepIds.length === 0) return 0;
+
+    const db = getConnection();
+
+    return db.transaction(() => {
+        loadKeepIds(db, keepIds);
+        return db
+            .prepare('DELETE FROM categories WHERE type = ? AND category_id NOT IN (SELECT id FROM sync_keep)')
+            .run(type).changes;
+    })();
 }
 
 export function getStreams(categoryId: string, type: ContentType): CachedStream[] {
@@ -341,15 +510,20 @@ export function getStreamCount(type?: ContentType): number {
     return row.total;
 }
 
-export function getStreamsByIds(ids: (string | number)[]): CachedStream[] {
+export function getStreamsByIds(ids: (string | number)[], type?: ContentType): CachedStream[] {
     if (ids.length === 0) return [];
 
-    const stmt = getConnection().prepare(`SELECT ${streamColumns} FROM streams WHERE id = ?`);
+    // Without a type the same id can match one row per content type, so every match
+    // is returned and the caller disambiguates.
+    const stmt = getConnection().prepare(`
+        SELECT ${streamColumns} FROM streams
+        WHERE id = @id AND (@type IS NULL OR type = @type)
+    `);
     const streams: CachedStream[] = [];
 
     for (const id of ids) {
-        const row = stmt.get(String(id)) as StreamRow | undefined;
-        if (row) streams.push(rowToStream(row));
+        const rows = stmt.all({ id: String(id), type: type ?? null }) as StreamRow[];
+        streams.push(...rows.map(rowToStream));
     }
 
     return streams;
@@ -371,24 +545,56 @@ export function getSyncMetadata(type: string): SyncMetadata | undefined {
         .get(type) as SyncMetadata | undefined;
 }
 
-export function saveDetail(id: string | number, data: unknown) {
-    getConnection()
-        .prepare(`
-            INSERT INTO details (id, data_json, timestamp)
-            VALUES (?, ?, ?)
-            ON CONFLICT(id) DO UPDATE SET
-                data_json = excluded.data_json,
-                timestamp = excluded.timestamp
-        `)
-        .run(String(id), JSON.stringify(data), Date.now());
+/**
+ * The catalog `last_modified` of a title, or `null` when it is not in the catalog
+ * yet — which is not the same thing: a missing row means the stamp cannot be
+ * compared, an empty one means the provider simply does not publish it.
+ */
+function catalogStamp(db: Database.Database, type: ContentType, id: string | number): string | null {
+    const row = db
+        .prepare('SELECT last_modified FROM streams WHERE id = ? AND type = ?')
+        .get(String(id), type) as { last_modified: string | null } | undefined;
+
+    return row ? row.last_modified ?? '' : null;
 }
 
-export function getDetail(id: string | number): unknown | undefined {
-    const row = getConnection()
-        .prepare('SELECT data_json FROM details WHERE id = ?')
-        .get(String(id)) as { data_json: string } | undefined;
+export function saveDetail(type: ContentType, id: string | number, data: unknown) {
+    const db = getConnection();
 
-    return row ? parseJson<unknown>(row.data_json, undefined) : undefined;
+    db.prepare(`
+        INSERT INTO details (id, type, data_json, source_stamp, timestamp)
+        VALUES (?, ?, ?, ?, ?)
+        ON CONFLICT(id, type) DO UPDATE SET
+            data_json = excluded.data_json,
+            source_stamp = excluded.source_stamp,
+            timestamp = excluded.timestamp
+    `).run(String(id), type, JSON.stringify(data), catalogStamp(db, type, id), Date.now());
+}
+
+/**
+ * Serve a cached provider payload only while it can still be trusted. A series
+ * detail carries the episode list, so holding it forever is what kept new episodes
+ * from ever appearing: it is dropped as soon as the catalog `last_modified` moves
+ * (the provider bumps it when episodes are added) or the type's TTL runs out.
+ */
+export function getDetail(type: ContentType, id: string | number): unknown | undefined {
+    const db = getConnection();
+    const row = db
+        .prepare('SELECT data_json, source_stamp, timestamp FROM details WHERE id = ? AND type = ?')
+        .get(String(id), type) as DetailRow | undefined;
+
+    if (!row) return undefined;
+
+    const stamp = catalogStamp(db, type, id);
+    const changedUpstream = stamp !== null && stamp !== (row.source_stamp ?? '');
+    const expired = Date.now() - row.timestamp > DETAIL_TTL_MS[type];
+
+    if (changedUpstream || expired) {
+        db.prepare('DELETE FROM details WHERE id = ? AND type = ?').run(String(id), type);
+        return undefined;
+    }
+
+    return parseJson<unknown>(row.data_json, undefined);
 }
 
 export function clearCache() {

@@ -152,8 +152,13 @@ export async function syncXtreamToSqlite(
             type: step.type,
         });
 
-        const categories = await fetchXtreamArray(credentials, step.categoryAction, signal);
-        sqlite.saveCategories(categories.map(item => mapCategory(item, step.type)));
+        const rawCategories = await fetchXtreamArray(credentials, step.categoryAction, signal);
+        const categories = rawCategories
+            .map(item => mapCategory(item, step.type))
+            .filter(category => category.category_id);
+
+        sqlite.saveCategories(categories);
+        sqlite.pruneCategories(step.type, categories.map(category => category.category_id));
 
         onProgress({
             progress: step.progressStart,
@@ -164,6 +169,7 @@ export async function syncXtreamToSqlite(
         const rawStreams = await fetchXtreamArray(credentials, step.streamAction, signal);
         const total = rawStreams.length;
         let processed = 0;
+        const keepIds: string[] = [];
 
         for (let index = 0; index < total; index += SQLITE_BATCH_SIZE) {
             if (signal.aborted) throw new DOMException('Aborted', 'AbortError');
@@ -174,6 +180,7 @@ export async function syncXtreamToSqlite(
                 .filter(stream => stream.id && stream.category_id && stream.name);
 
             sqlite.saveStreams(batch);
+            keepIds.push(...batch.map(stream => String(stream.id)));
             processed += batch.length;
 
             const fraction = total > 0 ? Math.min(1, processed / total) : 1;
@@ -186,6 +193,13 @@ export async function syncXtreamToSqlite(
             });
 
             await yieldToEventLoop();
+        }
+
+        // Only after the whole listing arrived, so a half-finished step never
+        // deletes content the provider still has.
+        const removed = sqlite.pruneStreams(step.type, keepIds);
+        if (removed > 0) {
+            console.log(`[ServerSync] Removed ${removed} ${step.type} entries no longer offered by the provider`);
         }
     }
 

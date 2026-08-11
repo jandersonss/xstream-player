@@ -174,8 +174,8 @@ export default function WatchSeriesPage() {
         const loadSeriesInfo = async () => {
             try {
                 // Try cache first
-                const cached = await getCachedDetail<SeriesInfo>(seriesId);
-                if (cached) {
+                const cached = await getCachedDetail<SeriesInfo>('series', seriesId);
+                if (cached && cached.info && cached.episodes) {
                     setSeries(cached);
                     // Set initial season if available
                     const seasons = Object.keys(cached.episodes || {});
@@ -200,7 +200,7 @@ export default function WatchSeriesPage() {
                 if (data && data.info) {
                     setSeries(data);
                     // Lazy cache the detail
-                    await saveCachedDetail(seriesId, data);
+                    await saveCachedDetail('series', seriesId, data);
 
                     const seasons = Object.keys(data.episodes || {});
                     if (seasons.length > 0) {

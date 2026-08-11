@@ -13,8 +13,8 @@ interface DataContextType {
     getCachedCategories: (type: 'live' | 'movie' | 'series') => Promise<db.CachedCategory[]>;
     getCachedStreams: (categoryId: string, type: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
     searchCachedStreams: (query: string, type?: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
-    getCachedDetail: <T = Record<string, unknown>>(id: string | number) => Promise<T | undefined>;
-    saveCachedDetail: (id: string | number, data: unknown) => Promise<void>;
+    getCachedDetail: <T = Record<string, unknown>>(type: db.ContentType, id: string | number) => Promise<T | undefined>;
+    saveCachedDetail: (type: db.ContentType, id: string | number, data: unknown) => Promise<void>;
 }
 
 const DataContext = createContext<DataContextType | undefined>(undefined);
@@ -174,12 +174,12 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return db.searchStreams(query, type);
     }, []);
 
-    const getCachedDetail = useCallback(async <T = Record<string, unknown>,>(id: string | number) => {
-        return db.getDetail<T>(id);
+    const getCachedDetail = useCallback(async <T = Record<string, unknown>,>(type: db.ContentType, id: string | number) => {
+        return db.getDetail<T>(type, id);
     }, []);
 
-    const saveCachedDetail = useCallback(async (id: string | number, data: unknown) => {
-        await db.saveDetail(id, data);
+    const saveCachedDetail = useCallback(async (type: db.ContentType, id: string | number, data: unknown) => {
+        await db.saveDetail(type, id, data);
     }, []);
 
     return (
