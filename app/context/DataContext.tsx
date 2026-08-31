@@ -12,7 +12,7 @@ interface DataContextType {
     cancelSync: () => void;
     getCachedCategories: (type: 'live' | 'movie' | 'series') => Promise<db.CachedCategory[]>;
     getCachedStreams: (categoryId: string, type: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
-    searchCachedStreams: (query: string, type?: 'live' | 'movie' | 'series') => Promise<db.CachedStream[]>;
+    searchCachedStreams: (query: string, type?: 'live' | 'movie' | 'series', limit?: number) => Promise<db.CachedStream[]>;
     getCachedDetail: <T = Record<string, unknown>>(type: db.ContentType, id: string | number) => Promise<T | undefined>;
     saveCachedDetail: (type: db.ContentType, id: string | number, data: unknown) => Promise<void>;
 }
@@ -170,8 +170,8 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         return db.getStreams(categoryId, type);
     }, []);
 
-    const searchCachedStreams = useCallback(async (query: string, type?: 'live' | 'movie' | 'series') => {
-        return db.searchStreams(query, type);
+    const searchCachedStreams = useCallback(async (query: string, type?: 'live' | 'movie' | 'series', limit?: number) => {
+        return db.searchStreams(query, type, limit);
     }, []);
 
     const getCachedDetail = useCallback(async <T = Record<string, unknown>,>(type: db.ContentType, id: string | number) => {
