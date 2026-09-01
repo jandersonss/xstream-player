@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
 import { createPairingCode, normalizePlatform } from '@/app/lib/deviceStore';
+import { buildPairingApprovalUrl, buildPairingQrDataUri } from '@/app/lib/pairingQr';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -26,6 +27,19 @@ const attemptsByIp = new Map<string, number[]>();
 function getClientIp(request: Request): string {
     const forwarded = request.headers.get('x-forwarded-for');
     return forwarded?.split(',')[0]?.trim() || request.headers.get('x-real-ip') || 'unknown';
+}
+
+/**
+ * The origin the TV used to reach us, straight from the request it just made — so
+ * the QR points a phone at the same server on the same LAN. `Host` carries what
+ * the client dialled (`192.168.0.10:3000`); a reverse proxy overrides it with
+ * `x-forwarded-*`.
+ */
+function getRequestOrigin(request: Request): string | null {
+    const host = request.headers.get('x-forwarded-host') || request.headers.get('host');
+    if (!host || !/^[a-z0-9.:\-\[\]]+$/i.test(host)) return null;
+    const proto = request.headers.get('x-forwarded-proto')?.split(',')[0]?.trim() || 'http';
+    return `${proto}://${host}`;
 }
 
 function consumeRateLimit(request: Request): boolean {
@@ -68,7 +82,13 @@ export async function POST(request: Request) {
         const body = await request.json().catch(() => ({})) as PairStartRequestBody;
         const deviceName = body.deviceName?.trim().slice(0, MAX_NAME_LENGTH) || 'TV';
 
-        return NextResponse.json(createPairingCode(deviceName, normalizePlatform(body.platform)));
+        const pairing = createPairingCode(deviceName, normalizePlatform(body.platform));
+
+        const origin = getRequestOrigin(request);
+        const approvalUrl = origin ? buildPairingApprovalUrl(origin, pairing.code) : null;
+        const qr = approvalUrl ? buildPairingQrDataUri(approvalUrl) : null;
+
+        return NextResponse.json({ ...pairing, approvalUrl, qr });
     } catch (error) {
         console.error('[Devices] Failed to start pairing', error);
         return NextResponse.json({ error: 'Falha ao iniciar o pareamento' }, { status: 500 });

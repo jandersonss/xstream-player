@@ -126,10 +126,29 @@ h1 {
     background: #262626;
 }
 
+.pair-body {
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    -webkit-flex-wrap: wrap;
+    flex-wrap: wrap;
+    margin-bottom: 32px;
+}
+
+.pair-code-col,
+.pair-qr-col {
+    margin: 12px 24px;
+}
+
 .code-box {
     display: inline-block;
     padding: 40px 64px;
-    margin-bottom: 32px;
     background: #262626;
     border: 3px solid #404040;
     border-radius: 20px;
@@ -141,6 +160,23 @@ h1 {
     font-weight: 700;
     letter-spacing: 16px;
     color: #e50914;
+}
+
+.pair-qr-frame {
+    display: inline-block;
+    padding: 16px;
+    background: #ffffff;
+    border-radius: 20px;
+}
+
+.pair-qr-frame img {
+    display: block;
+    width: 240px;
+    height: 240px;
+}
+
+.pair-qr-col .hint {
+    margin-top: 12px;
 }
 
 .hint {

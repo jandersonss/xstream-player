@@ -138,6 +138,22 @@ export default function DevicesPage() {
     const [profileId, setProfileId] = useState('');
     const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
     const [isBusy, setIsBusy] = useState(false);
+    const [codeFromQr, setCodeFromQr] = useState(false);
+
+    // A phone that scanned the TV's QR lands here with `?code=…`. Pre-fill the
+    // field so approving is one tap, then drop the param so a refresh after
+    // approval starts clean.
+    useEffect(() => {
+        const fromUrl = new URLSearchParams(window.location.search).get('code');
+        const normalized = fromUrl?.trim().toUpperCase().slice(0, CODE_LENGTH) ?? '';
+        if (normalized.length === CODE_LENGTH) {
+            setCode(normalized);
+            setCodeFromQr(true);
+        }
+        if (fromUrl) {
+            window.history.replaceState(null, '', window.location.pathname);
+        }
+    }, []);
 
     const loadDevices = useCallback(async () => {
         try {
@@ -194,6 +210,7 @@ export default function DevicesPage() {
 
             setMessage({ type: 'success', text: `Aparelho "${payload.device.name}" pareado.` });
             setCode('');
+            setCodeFromQr(false);
             setName('');
             setProfileId('');
             await loadDevices();
@@ -235,7 +252,7 @@ export default function DevicesPage() {
             <header className="mb-8">
                 <h1 className="text-2xl font-bold text-white">Aparelhos</h1>
                 <p className="mt-1 text-sm text-gray-400">
-                    Aprove a TV digitando o código de {CODE_LENGTH} caracteres que ela mostra na tela.
+                    Escaneie o QR code que a TV mostra, ou digite o código de {CODE_LENGTH} caracteres.
                     O código vale por 5 minutos e só pode ser usado uma vez.
                 </p>
             </header>
@@ -243,12 +260,21 @@ export default function DevicesPage() {
             <section className="mb-10 rounded-2xl border border-white/10 bg-white/5 p-5">
                 <h2 className="mb-4 text-lg font-semibold text-white">Parear novo aparelho</h2>
 
+                {codeFromQr && (
+                    <p className="mb-4 text-sm text-emerald-400">
+                        Código preenchido pela TV. Confira o nome e o perfil e toque em Aprovar.
+                    </p>
+                )}
+
                 <div className="flex flex-col space-y-3 md:flex-row md:items-end md:space-y-0 md:space-x-3">
                     <label className="flex flex-col text-xs text-gray-400">
                         Código
                         <input
                             value={code}
-                            onChange={(event) => setCode(event.target.value.toUpperCase().slice(0, CODE_LENGTH))}
+                            onChange={(event) => {
+                                setCode(event.target.value.toUpperCase().slice(0, CODE_LENGTH));
+                                setCodeFromQr(false);
+                            }}
                             onKeyDown={(event) => { if (event.key === 'Enter') void approve(); }}
                             placeholder="ABC234"
                             maxLength={CODE_LENGTH}

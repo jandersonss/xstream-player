@@ -106,6 +106,22 @@
         $(id).appendChild(document.createTextNode(text));
     }
 
+    /**
+     * Shows the scan-to-approve QR next to the code, when the server sent one.
+     * Older servers (or a reverse proxy that hides the host) omit it — then the
+     * typed code is the only path and the column stays hidden.
+     */
+    function showPairingQr(dataUri) {
+        var col = $('pair-qr-col');
+        if (dataUri && typeof dataUri === 'string' && dataUri.indexOf('data:image/') === 0) {
+            $('pair-qr').src = dataUri;
+            col.className = 'pair-qr-col';
+        } else {
+            $('pair-qr').src = '';
+            col.className = 'pair-qr-col hidden';
+        }
+    }
+
     // --- server url --------------------------------------------------------
 
     /**
@@ -383,6 +399,7 @@
                 pairingId = data.pairingId;
                 codeExpiresAt = data.expiresAt || 0;
                 setText('pair-code', data.code);
+                showPairingQr(data.qr);
                 show('screen-pair');
                 startPolling();
             });
