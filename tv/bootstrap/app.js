@@ -319,8 +319,15 @@
         // one is the cheapest.
         request('GET', serverUrl + '/api/config', null, function (status) {
             if (status === 401 || status === 403) {
+                // The device was revoked — usually because the owner chose "trocar
+                // servidor" on the server. Land on setup (not straight into a new
+                // code) with the current address filled in, so re-pairing here or
+                // pointing at another server are both one step away.
                 write(STORAGE_TOKEN, '');
-                beginPairing();
+                $('host-input').value = serverUrl;
+                setText('setup-note', 'Este aparelho foi desconectado. Confirme o servidor para parear de novo, ou informe outro endereço.');
+                $('setup-note').className = 'note';
+                show('screen-setup');
                 return;
             }
 
@@ -502,6 +509,7 @@
         write(STORAGE_TOKEN, '');
         $('host-input').value = '';
         $('setup-error').className = 'error hidden';
+        $('setup-note').className = 'note hidden';
         show('screen-setup');
     }
 

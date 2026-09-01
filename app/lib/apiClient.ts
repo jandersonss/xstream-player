@@ -144,10 +144,13 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
     }
 
     const request: RequestInit = { ...init, headers };
-    // Cross-origin requests from the TV client must not try to send cookies:
-    // the server answers CORS without Allow-Credentials.
-    if (base && !request.credentials) {
-        request.credentials = 'omit';
+    if (!request.credentials) {
+        // Cross-origin requests from the TV client must not try to send cookies:
+        // the server answers CORS without Allow-Credentials. Same-origin requests
+        // must send them explicitly — `fetch` on webOS 4's Chromium 53 still
+        // defaults to `credentials: 'omit'` (the default only became 'same-origin'
+        // in Chrome 61), so the device-session cookie would never reach the server.
+        request.credentials = base ? 'omit' : 'same-origin';
     }
 
     return fetch(apiUrl(path), request).then((response) => {

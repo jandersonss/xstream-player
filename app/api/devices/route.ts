@@ -1,8 +1,11 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceRemoteAccessForApi, getCookieValue } from '@/app/lib/remoteAccess';
 import { getRequestDevice } from '@/app/lib/apiAuth';
 import { listDevices, revokeDevice, updateDevice } from '@/app/lib/deviceStore';
 import { listProfiles } from '@/app/lib/userStore';
+
+/** Set by /api/devices/session when the tab belongs to a paired TV. */
+const DEVICE_SESSION_COOKIE_NAME = 'xstream_device';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -37,7 +40,8 @@ export async function GET(request: Request) {
     if (denied) return denied;
 
     try {
-        return NextResponse.json({ data: listDevices() });
+        const currentDeviceId = getCookieValue(request.headers.get('cookie'), DEVICE_SESSION_COOKIE_NAME) ?? null;
+        return NextResponse.json({ data: listDevices(), currentDeviceId });
     } catch (error) {
         console.error('[Devices] Failed to list devices', error);
         return NextResponse.json({ error: 'Falha ao carregar aparelhos' }, { status: 500 });

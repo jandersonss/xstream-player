@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { Check, MonitorSmartphone, Pencil, Plus, Trash2, X } from 'lucide-react';
+import { Check, LogOut, MonitorSmartphone, Pencil, Plus, Trash2, Tv, X } from 'lucide-react';
 import { apiFetch } from '@/app/lib/apiClient';
 
 interface Device {
@@ -36,11 +36,13 @@ function formatMoment(timestamp: number): string {
 function DeviceRow({
     device,
     profiles,
+    isCurrent,
     onRename,
     onRevoke
 }: {
     device: Device;
     profiles: Profile[];
+    isCurrent: boolean;
     onRename: (id: string, name: string) => Promise<void>;
     onRevoke: (id: string) => Promise<void>;
 }) {
@@ -90,7 +92,10 @@ function DeviceRow({
                             </button>
                         </div>
                     ) : (
-                        <p className="truncate font-semibold text-white">{device.name}</p>
+                        <p className="truncate font-semibold text-white">
+                            {device.name}
+                            {isCurrent && <span className="ml-2 text-xs font-normal text-sky-400">· este aparelho</span>}
+                        </p>
                     )}
                     <p className="mt-1 truncate text-xs text-gray-400">
                         {PLATFORM_LABEL[device.platform] ?? PLATFORM_LABEL.unknown}
@@ -139,6 +144,9 @@ export default function DevicesPage() {
     const [message, setMessage] = useState<{ type: 'error' | 'success'; text: string } | null>(null);
     const [isBusy, setIsBusy] = useState(false);
     const [codeFromQr, setCodeFromQr] = useState(false);
+    const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
+    const [disconnecting, setDisconnecting] = useState(false);
+    const [disconnected, setDisconnected] = useState(false);
 
     // A phone that scanned the TV's QR lands here with `?code=…`. Pre-fill the
     // field so approving is one tap, then drop the param so a refresh after
@@ -160,10 +168,48 @@ export default function DevicesPage() {
             const response = await apiFetch('/api/devices');
             const payload = await response.json();
             setDevices(response.ok ? payload.data ?? [] : []);
+            setCurrentDeviceId(response.ok ? payload.currentDeviceId ?? null : null);
         } catch {
             setMessage({ type: 'error', text: 'Não foi possível carregar os aparelhos.' });
         }
     }, []);
+
+    // Best effort: close the packaged TV app after disconnecting, so relaunching
+    // it drops straight onto the setup screen.
+    const attemptCloseTvApp = () => {
+        try {
+            const w = window as unknown as {
+                webOS?: { platformBack?: () => void };
+                tizen?: { application?: { getCurrentApplication: () => { exit: () => void } } };
+            };
+            if (w.webOS?.platformBack) return w.webOS.platformBack();
+            if (w.tizen?.application) return w.tizen.application.getCurrentApplication().exit();
+            window.close();
+        } catch {
+            /* the instruction on screen covers the manual path */
+        }
+    };
+
+    const disconnectThisDevice = async () => {
+        if (!window.confirm('Desconectar esta TV? Você vai precisar parear de novo (e poderá escolher outro servidor).')) {
+            return;
+        }
+        setDisconnecting(true);
+        try {
+            const response = await apiFetch('/api/devices/session', { method: 'DELETE' });
+            if (!response.ok) {
+                const payload = await response.json().catch(() => ({}));
+                setMessage({ type: 'error', text: payload.error ?? 'Falha ao desconectar.' });
+                return;
+            }
+            setDisconnected(true);
+            setTimeout(attemptCloseTvApp, 1500);
+        } catch {
+            setMessage({ type: 'error', text: 'Falha ao desconectar.' });
+        } finally {
+            setDisconnecting(false);
+        }
+    };
 
     useEffect(() => {
         void loadDevices();
@@ -247,6 +293,19 @@ export default function DevicesPage() {
         }
     };
 
+    if (disconnected) {
+        return (
+            <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
+                <Tv size={48} className="mb-4 text-sky-400" />
+                <h1 className="text-2xl font-bold text-white">Aparelho desconectado</h1>
+                <p className="mt-2 max-w-md text-sm text-gray-400">
+                    Feche e abra o app na TV de novo. Ele vai voltar para a tela de conexão, onde você
+                    pode confirmar o mesmo servidor ou informar outro.
+                </p>
+            </div>
+        );
+    }
+
     return (
         <div className="p-6 lg:p-10">
             <header className="mb-8">
@@ -256,6 +315,30 @@ export default function DevicesPage() {
                     O código vale por 5 minutos e só pode ser usado uma vez.
                 </p>
             </header>
+
+            {currentDeviceId && (
+                <section className="mb-8 flex flex-col justify-between rounded-2xl border border-sky-400/30 bg-sky-400/10 p-5 md:flex-row md:items-center">
+                    <div className="flex items-start space-x-3">
+                        <Tv size={20} className="mt-0.5 flex-shrink-0 text-sky-400" />
+                        <div>
+                            <p className="font-semibold text-white">Você está vendo esta tela pela TV</p>
+                            <p className="mt-1 text-sm text-gray-300">
+                                Para apontar esta TV para outro servidor (ex.: alternar entre dev e prod),
+                                desconecte e pareie de novo.
+                            </p>
+                        </div>
+                    </div>
+                    <button
+                        onClick={() => void disconnectThisDevice()}
+                        disabled={disconnecting}
+                        data-focusable="true"
+                        className="mt-4 flex flex-shrink-0 items-center justify-center space-x-2 rounded-lg border border-sky-400/40 px-4 py-2 font-semibold text-sky-300 transition-colors hover:bg-sky-400/10 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-sky-500 md:mt-0 md:ml-4"
+                    >
+                        <LogOut size={18} />
+                        <span>{disconnecting ? 'Desconectando...' : 'Desconectar e trocar servidor'}</span>
+                    </button>
+                </section>
+            )}
 
             <section className="mb-10 rounded-2xl border border-white/10 bg-white/5 p-5">
                 <h2 className="mb-4 text-lg font-semibold text-white">Parear novo aparelho</h2>
@@ -339,6 +422,7 @@ export default function DevicesPage() {
                                 key={device.id}
                                 device={device}
                                 profiles={profiles}
+                                isCurrent={device.id === currentDeviceId}
                                 onRename={rename}
                                 onRevoke={revoke}
                             />
