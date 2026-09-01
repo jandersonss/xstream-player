@@ -21,6 +21,13 @@ const nextConfig: NextConfig = {
   outputFileTracingExcludes: {
     '*': ['data/**'],
   },
+  // Next 16.1.6's tracer misses the `require("../../../lib/metadata/…")` in
+  // `server/lib/router-utils/filesystem.js`, so `node server.js` from the
+  // standalone build crashes with MODULE_NOT_FOUND for `get-metadata-route`.
+  // Force those two (tiny) modules into the trace.
+  outputFileTracingIncludes: {
+    '*': ['./node_modules/next/dist/lib/metadata/**'],
+  },
 };
 
 export default nextConfig;
