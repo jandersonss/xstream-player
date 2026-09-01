@@ -10,10 +10,16 @@ código e entrega a navegação ao servidor. A arquitetura e o porquê estão em
 1. Abre o app na TV.
 2. Digita o IP ou host do servidor (ex.: `192.168.0.10:3000`). O app testa a conexão antes de
    seguir.
-3. A TV mostra um código de 6 caracteres.
-4. No computador, o dono abre o XStream Player → **Dispositivos**, digita o código e aprova,
-   dando um nome ao aparelho e escolhendo o perfil padrão.
+3. A TV mostra um código de 6 caracteres **e um QR code**.
+4. O dono aprova de um dos dois jeitos:
+   - **Celular:** aponta a câmera para o QR code → abre **Dispositivos** com o código já
+     preenchido; confere nome/perfil e toca em **Aprovar**.
+   - **Computador:** abre o XStream Player → **Dispositivos** e digita o código.
+   Em ambos os casos ele escolhe um nome e o perfil padrão do aparelho.
 5. A TV entra no app. Nas próximas vezes, entra direto.
+
+O QR aponta para o mesmo servidor que a TV usou (`Host` da requisição); se o servidor não
+souber determinar o host, o QR é omitido e o código digitado continua funcionando.
 
 Para desautorizar uma TV, basta revogar o aparelho na mesma tela **Dispositivos**.
 
