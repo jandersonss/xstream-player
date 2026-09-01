@@ -1177,7 +1177,9 @@ export default function VideoPlayer({
             {showNextEpisodePrompt && (
                 <div
                     ref={nextEpisodePromptRef}
-                    className="absolute bottom-24 right-6 z-20 flex items-center space-x-1 rounded-lg border border-white/10 bg-black/70 p-1.5 shadow-2xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300"
+                    /* bg-black/90 (not /70): webOS 5/6 lack backdrop-filter, so the
+                       prompt must stay legible on the un-blurred fallback. */
+                    className="absolute bottom-24 right-6 z-20 flex items-center space-x-1 rounded-lg border border-white/10 bg-black/90 p-1.5 shadow-2xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300"
                 >
                     <button
                         ref={nextEpisodeButtonRef}

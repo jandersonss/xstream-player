@@ -67,13 +67,18 @@ function SessionCard({ session, onSelect }: { session: ShareSession; onSelect: (
             data-focusable="true"
             className="text-left rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 hover:scale-[1.02] cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-red-500"
         >
-            <div className="aspect-video bg-black/40 relative flex items-center justify-center">
-                {session.poster ? (
-                    // eslint-disable-next-line @next/next/no-img-element
-                    <img src={session.poster} alt="" className="w-full h-full object-cover" />
-                ) : (
-                    <Icon size={40} className="text-gray-600" />
-                )}
+            {/* 16:9 box via padding-ratio: `aspect-video` (Chrome 88) and its
+                globals.css float fallback both misbehave inside a flex parent on
+                the webOS TV engines. */}
+            <div className="relative bg-black/40 pt-[56.25%]">
+                <div className="absolute inset-0 flex items-center justify-center">
+                    {session.poster ? (
+                        // eslint-disable-next-line @next/next/no-img-element
+                        <img src={session.poster} alt="" className="w-full h-full object-cover" />
+                    ) : (
+                        <Icon size={40} className="text-gray-600" />
+                    )}
+                </div>
                 <span className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">
                     <Radio size={12} className="animate-pulse" /> {session.contentType === 'live' ? 'AO VIVO' : 'TRANSMITINDO'}
                 </span>

@@ -2,6 +2,38 @@
 @tailwind components;
 @tailwind utilities;
 
+/*
+  RESET DE <button> PARA WEBOS 5/6 (Chromium 68/79)
+
+  O preflight do Tailwind zera o estilo nativo de botão com a lista de seletores
+  `button, input:where([type='button']), ...`. `:where()` só existe no Chromium 88+;
+  nesses engines o seletor inteiro é um erro de parse e o navegador **descarta a
+  regra toda** — inclusive a parte `button`. Resultado: todo <button> volta ao
+  desenho nativo da TV (retângulo cinza opaco) e esconde o próprio conteúdo
+  (pílula de perfil, TMDb/Legendas, "Transmitir sempre", indicadores do hero).
+  Reafirmamos o reset sem `:where()`.
+*/
+button,
+[type="button"],
+[type="reset"],
+[type="submit"] {
+    -webkit-appearance: none;
+    appearance: none;
+    background-color: transparent;
+    background-image: none;
+    border-radius: 0;
+    color: inherit;
+    font: inherit;
+}
+
+/*
+  Outros resets do preflight que o Tailwind entrega com `:where()` (Chromium 88+)
+  e que a webOS 5/6 descarta. Reafirmados sem `:where()`.
+*/
+[hidden] {
+    display: none;
+}
+
 /* 
   FALLBACKS CRÍTICOS PARA WEBOS 4 (CHROME 60)
   Garante que o fundo seja preto mesmo se o processamento falhar.
