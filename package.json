@@ -13,7 +13,11 @@
     "lint": "eslint",
     "tv:assets": "python3 scripts/gen-tv-assets.py",
     "package:webos": "node scripts/package-tv.mjs webos",
-    "package:tizen": "node scripts/package-tv.mjs tizen"
+    "package:webos:dev": "node scripts/package-tv.mjs webos dev",
+    "package:tizen": "node scripts/package-tv.mjs tizen",
+    "package:tizen:dev": "node scripts/package-tv.mjs tizen dev",
+    "install:tv": "node scripts/install-tv.mjs",
+    "install:tv:dev": "node scripts/install-tv.mjs dev"
   },
   "dependencies": {
     "better-sqlite3": "^12.11.1",

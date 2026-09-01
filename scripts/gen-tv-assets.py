@@ -14,6 +14,9 @@ from PIL import Image, ImageDraw
 
 BACKGROUND = (10, 10, 10)
 BRAND = (229, 9, 20)
+# Dev builds get an amber mark so the two apps are impossible to confuse on the
+# TV home screen.
+BRAND_DEV = (245, 158, 11)
 WHITE = (255, 255, 255)
 
 OUT_DIR = Path(__file__).resolve().parent.parent / "tv" / "assets"
@@ -37,12 +40,12 @@ def play_triangle(draw, center, size, fill):
     )
 
 
-def build_icon(size=400):
+def build_icon(size=400, brand=BRAND):
     image = Image.new("RGB", (size, size), BACKGROUND)
     draw = ImageDraw.Draw(image)
 
     margin = size * 0.12
-    rounded_rect(draw, (margin, margin, size - margin, size - margin), size * 0.14, BRAND)
+    rounded_rect(draw, (margin, margin, size - margin, size - margin), size * 0.14, brand)
     play_triangle(draw, (size / 2, size / 2), size * 0.34, WHITE)
 
     return image
@@ -78,6 +81,9 @@ def main():
     build_icon().save(OUT_DIR / "icon.png")
     build_icon(80).save(OUT_DIR / "icon-small.png")
     build_splash().save(OUT_DIR / "splash.png")
+
+    build_icon(brand=BRAND_DEV).save(OUT_DIR / "icon-dev.png")
+    build_icon(80, brand=BRAND_DEV).save(OUT_DIR / "icon-small-dev.png")
 
     print(f"wrote assets to {OUT_DIR}")
 
