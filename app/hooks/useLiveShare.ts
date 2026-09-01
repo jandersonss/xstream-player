@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type Hls from 'hls.js';
 import { getDeviceId, getDeviceName, detectLocalIp } from '@/app/lib/device';
+import { apiFetch, apiUrl } from '@/app/lib/apiClient';
 
 /** Intervalo de heartbeat (menor que o TTL de 45s do servidor). */
 const HEARTBEAT_MS = 20 * 1000;
@@ -48,12 +49,12 @@ export function relaySrc(info: {
     start?: number;
 }): string {
     if (info.contentType === 'live') {
-        return `/api/relay?type=live&streamId=${encodeURIComponent(info.streamId)}`;
+        return apiUrl(`/api/relay?type=live&streamId=${encodeURIComponent(info.streamId)}`);
     }
     const ext = info.ext || 'mp4';
     const start = Math.max(0, Math.floor(info.start ?? 0));
     const startParam = start > 0 ? `&start=${start}` : '';
-    return `/api/relay/vod/index.m3u8?type=${info.contentType}&streamId=${encodeURIComponent(info.streamId)}&ext=${encodeURIComponent(ext)}${startParam}`;
+    return apiUrl(`/api/relay/vod/index.m3u8?type=${info.contentType}&streamId=${encodeURIComponent(info.streamId)}&ext=${encodeURIComponent(ext)}${startParam}`);
 }
 
 /** App route to JOIN a broadcast (TV Mode / limit modal). */
@@ -109,7 +110,7 @@ export function useShareBroadcast(enabled: boolean, info: BroadcastInfo | null, 
         // would resurrect itself seconds later.
         const beat = async (resume = false) => {
             try {
-                const res = await fetch('/api/live-sessions', {
+                const res = await apiFetch('/api/live-sessions', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ deviceId, deviceName, ip: ipRef.current ?? undefined, resume, ...info }),
@@ -130,7 +131,7 @@ export function useShareBroadcast(enabled: boolean, info: BroadcastInfo | null, 
         return () => {
             cancelled = true;
             clearInterval(interval);
-            fetch(`/api/live-sessions?deviceId=${encodeURIComponent(deviceId)}`, {
+            apiFetch(`/api/live-sessions?deviceId=${encodeURIComponent(deviceId)}`, {
                 method: 'DELETE',
                 keepalive: true,
             }).catch(() => {});
@@ -146,7 +147,7 @@ export function useLiveSessions(pollMs = 10 * 1000) {
 
     const refresh = useCallback(async () => {
         try {
-            const res = await fetch('/api/live-sessions');
+            const res = await apiFetch('/api/live-sessions');
             const data = await res.json();
             setSessions(Array.isArray(data.sessions) ? data.sessions : []);
         } catch {
@@ -408,7 +409,7 @@ export function useSyncPlayback(opts: {
             const myLatency = measureLatency(videoRef.current);
             const myMediaTime = measureMediaTime(hlsRef.current);
             try {
-                const res = await fetch('/api/live-sync', {
+                const res = await apiFetch('/api/live-sync', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -447,7 +448,7 @@ export function useSyncPlayback(opts: {
         if (role === 'viewer') {
             // Pull to where the broadcaster is (fetch the freshest state).
             try {
-                const res = await fetch(`/api/live-sync?streamKey=${encodeURIComponent(streamKey)}`);
+                const res = await apiFetch(`/api/live-sync?streamKey=${encodeURIComponent(streamKey)}`);
                 const state = (await res.json()) as SyncStateDTO;
                 const broadcaster = state.participants?.find((p) => p.role === 'broadcaster');
                 const targetMediaTime = broadcasterMediaTime(broadcaster);
@@ -468,7 +469,7 @@ export function useSyncPlayback(opts: {
             // Broadcaster: publish a command for viewers without the shared clock.
             const myLatency = measureLatency(video);
             if (myLatency === null) return;
-            fetch('/api/live-sync', {
+            apiFetch('/api/live-sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

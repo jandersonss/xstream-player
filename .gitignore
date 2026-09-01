@@ -21,6 +21,10 @@
 /build
 .legacy-tmp/
 
+# tv client packaging
+.tv-pkg/
+tv/dist/
+
 # misc
 .DS_Store
 *.pem

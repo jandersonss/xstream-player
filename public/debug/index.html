@@ -5,64 +5,209 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Diagnóstico do Navegador</title>
     <style>
-        html, body { background: #111; color: #fff; margin: 0; padding: 0; font-family: sans-serif; }
-        .container { max-width: 1000px; margin: 0 auto; padding: 24px 20px; }
-        .btn-back { color: #fca5a5; text-decoration: underline; font-weight: 600; cursor: pointer; background: transparent; border: none; padding: 0; font-size: 16px; }
-        h1 { font-size: 28px; font-weight: 700; margin: 16px 0 8px; }
-        p { margin: 0 0 16px; color: #d1d5db; }
-        .debug-card { border: 1px solid rgba(255,255,255,0.1); background: rgba(0,0,0,0.3); border-radius: 12px; padding: 16px; margin-bottom: 12px; }
-        .debug-card-header { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
-        .debug-card-header h3 { font-size: 18px; font-weight: 600; margin: 0; }
-        .debug-detail { margin-top: 8px; font-size: 14px; color: #d1d5db; word-break: break-word; }
-        .debug-pill { display: inline-block; width: fit-content; border-radius: 999px; border: 1px solid; padding: 4px 12px; font-size: 12px; font-weight: 700; }
-        .debug-ok { color: #6ee7b7; background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.3); }
-        .debug-warn { color: #fef08a; background: rgba(234,179,8,0.15); border-color: rgba(234,179,8,0.3); }
-        .debug-fail { color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.3); }
-        #browser-info { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; font-size: 14px; }
-        #browser-info p { margin: 0; word-break: break-word; }
-        .section-box { border-radius: 12px; border: 1px solid rgba(255,255,255,0.1); padding: 16px; margin-bottom: 24px; background: rgba(0,0,0,0.2); }
-        .summary-box { border-color: rgba(234,179,8,0.5); background: rgba(234,179,8,0.1); border-radius: 12px; border: 1px solid rgba(234,179,8,0.3); padding: 16px; margin-bottom: 24px; }
-        @media (max-width: 700px) { #browser-info { grid-template-columns: 1fr; } .debug-card-header { align-items: flex-start; flex-direction: column; } }
+        /*
+         * This page exists to be read on the browsers that are too old for the app,
+         * so it may not use anything they lack. On a webOS 4 TV that means Chromium
+         * 53: no CSS grid (57+), no flex `gap` (84+), no custom properties. Columns
+         * are inline-block, and every size is set for a screen watched from a couch.
+         */
+        html, body {
+            background: #0f0f10;
+            color: #fff;
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            font-size: 18px;
+        }
+
+        .container { padding: 24px 40px 96px 40px; }
+
+        .topbar { margin-bottom: 20px; }
+
+        .btn-back {
+            color: #fca5a5;
+            font-weight: 600;
+            font-size: 20px;
+            background: transparent;
+            border: 2px solid transparent;
+            border-radius: 8px;
+            padding: 6px 10px;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .btn-back:focus { outline: none; border-color: #fff; background: #262626; }
+
+        h1 { font-size: 36px; font-weight: 700; margin: 12px 0 6px; }
+        .lead { margin: 0; color: #a3a3a3; font-size: 19px; }
+
+        /* --- summary ------------------------------------------------------ */
+
+        .summary-box {
+            border-radius: 14px;
+            padding: 20px 24px;
+            margin: 22px 0;
+            border: 2px solid rgba(234,179,8,0.45);
+            background: rgba(234,179,8,0.10);
+        }
+        .summary-box.is-ok { border-color: rgba(16,185,129,0.45); background: rgba(16,185,129,0.10); }
+        .summary-box.is-fail { border-color: rgba(239,68,68,0.5); background: rgba(239,68,68,0.12); }
+        .summary-box h2 { margin: 0 0 6px; font-size: 26px; }
+        .summary-box p { margin: 0; font-size: 19px; color: #e5e5e5; }
+
+        /* --- generic panel ------------------------------------------------ */
+
+        .panel {
+            border-radius: 14px;
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(0,0,0,0.28);
+            padding: 20px 24px;
+            margin-bottom: 20px;
+        }
+        .panel h2 { margin: 0 0 14px; font-size: 24px; }
+
+        /* --- columns (inline-block: grid does not exist on these TVs) ------ */
+
+        .cols { font-size: 0; margin: 0 -8px; }
+        .col {
+            display: inline-block;
+            vertical-align: top;
+            font-size: 18px;
+            padding: 0 8px;
+            box-sizing: border-box;
+            width: 50%;
+        }
+        .col-third { width: 33.33%; }
+
+        #browser-info .row {
+            margin: 0 0 8px;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+        #browser-info .row b { color: #a3a3a3; font-weight: 600; }
+        #browser-info .row.wide { width: 100%; }
+
+        /* --- check cards --------------------------------------------------- */
+
+        .debug-card {
+            border: 1px solid rgba(255,255,255,0.12);
+            background: rgba(0,0,0,0.3);
+            border-radius: 12px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+        }
+        .debug-card.is-fail { border-color: rgba(239,68,68,0.55); background: rgba(239,68,68,0.10); }
+        .debug-card.is-warn { border-color: rgba(234,179,8,0.5); background: rgba(234,179,8,0.08); }
+
+        .debug-card h3 {
+            font-size: 20px;
+            font-weight: 600;
+            margin: 0 0 6px;
+            padding-right: 96px;
+        }
+        .debug-card .debug-detail {
+            margin: 0;
+            font-size: 17px;
+            color: #b8b8b8;
+            word-wrap: break-word;
+            overflow-wrap: break-word;
+        }
+
+        .card-head { position: relative; }
+        .debug-pill {
+            position: absolute;
+            top: 0;
+            right: 0;
+            display: inline-block;
+            border-radius: 999px;
+            border: 1px solid;
+            padding: 3px 12px;
+            font-size: 14px;
+            font-weight: 700;
+            letter-spacing: 0.04em;
+        }
+        .debug-ok { color: #6ee7b7; background: rgba(16,185,129,0.15); border-color: rgba(16,185,129,0.35); }
+        .debug-warn { color: #fde047; background: rgba(234,179,8,0.15); border-color: rgba(234,179,8,0.35); }
+        .debug-fail { color: #fca5a5; background: rgba(239,68,68,0.15); border-color: rgba(239,68,68,0.35); }
+
+        .mono { font-family: "Courier New", monospace; font-size: 17px; color: #d4d4d4; }
+
+        /* --- scroll hint ---------------------------------------------------- */
+
+        .scrollbar {
+            position: fixed;
+            right: 10px;
+            top: 0;
+            width: 6px;
+            background: #e50914;
+            border-radius: 3px;
+        }
+        .hintbar {
+            position: fixed;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            padding: 12px 40px;
+            background: #000;
+            border-top: 1px solid rgba(255,255,255,0.15);
+            color: #a3a3a3;
+            font-size: 17px;
+        }
+        .hintbar b { color: #fff; }
+
+        /* A narrow screen (phone, or the app in a window) gets a single column. */
+        @media (max-width: 900px) {
+            .col, .col-third { width: 100%; }
+            .container { padding: 20px 16px 96px 16px; }
+        }
     </style>
 </head>
 <body>
     <div class="container">
-        <div class="mb-6">
-            <button onclick="window.location.href='/legacy/index.html'" class="btn-back">
-                Voltar ao app legacy
-            </button>
+        <div class="topbar">
+            <button id="back" class="btn-back" data-focusable="true">Voltar ao app legacy</button>
             <h1>Diagnóstico do Navegador</h1>
-            <p>Checklist independente de React/Next.js para TVs e browsers antigos.</p>
+            <p class="lead">Checklist independente de React/Next.js para TVs e browsers antigos.</p>
         </div>
 
-        <section class="summary-box">
-            <h2 id="summary-title" style="margin:0 0 8px; font-size:20px;">Aguardando diagnóstico...</h2>
-            <p id="summary-detail" style="margin:0; font-size:14px;">
+        <section id="summary" class="summary-box">
+            <h2 id="summary-title">Aguardando diagnóstico&hellip;</h2>
+            <p id="summary-detail">
                 Se esta mensagem não mudar, o JavaScript básico também não executou neste navegador.
             </p>
         </section>
 
-        <section class="section-box">
-            <h2 style="margin:0 0 12px; font-size:20px;">Informações do Browser</h2>
-            <div id="browser-info">
-                <p>Aguardando script de diagnóstico...</p>
+        <section class="panel">
+            <h2>Informações do Browser</h2>
+            <div id="browser-info" class="cols">
+                <p class="col">Aguardando script de diagnóstico&hellip;</p>
             </div>
         </section>
 
-        <section class="section-box">
-            <h2 style="margin:0 0 12px; font-size:20px;">Último Erro JavaScript Capturado</h2>
-            <p id="last-error" style="margin:0; font-size:14px; font-family:monospace;">Aguardando script de diagnóstico...</p>
+        <section class="panel">
+            <h2>Último Erro JavaScript Capturado</h2>
+            <p id="last-error" class="mono" style="margin:0;">Aguardando script de diagnóstico&hellip;</p>
         </section>
 
-        <section id="checks">
-            <div class="debug-card">
-                <div class="debug-card-header">
-                    <h3>Script de diagnóstico</h3>
-                    <span class="debug-pill debug-warn">AGUARDANDO</span>
+        <section class="panel">
+            <h2>Verificações</h2>
+            <div id="checks" class="cols">
+                <div class="col col-third">
+                    <div class="debug-card">
+                        <div class="card-head">
+                            <h3>Script de diagnóstico</h3>
+                            <span class="debug-pill debug-warn">AGUARDANDO</span>
+                        </div>
+                        <p class="debug-detail">Aguardando execução do script de diagnóstico&hellip;</p>
+                    </div>
                 </div>
-                <p class="debug-detail">Aguardando execução do script de diagnóstico...</p>
             </div>
         </section>
+    </div>
+
+    <div class="scrollbar" id="scrollbar"></div>
+
+    <div class="hintbar">
+        <b>▲ ▼</b> rolar &nbsp;·&nbsp; <b>◀ ▶</b> página &nbsp;·&nbsp; <b>Voltar</b> sai do diagnóstico
     </div>
 
     <script>
@@ -110,27 +255,41 @@
         return 'debug-pill debug-ok';
       }
 
-      function addInfo(label, value) {
+      function addInfo(label, value, wide) {
         var container = byId('browser-info');
         if (!container) return;
 
+        var column = document.createElement('div');
+        column.className = 'col';
+
+        // The user agent is a long single string; giving it the full width keeps it
+        // from wrapping into an unreadable sliver next to the short fields.
+        if (wide) column.style.width = '100%';
+
         var item = document.createElement('p');
-        var strong = document.createElement('strong');
+        item.className = 'row';
+
+        var strong = document.createElement('b');
         strong.textContent = label + ': ';
         item.appendChild(strong);
         item.appendChild(document.createTextNode(value || 'indisponível'));
-        container.appendChild(item);
+
+        column.appendChild(item);
+        container.appendChild(column);
       }
 
       function addCheck(name, status, detail) {
         var container = byId('checks');
         if (!container) return;
 
-        var card = document.createElement('div');
-        card.className = 'debug-card';
+        var column = document.createElement('div');
+        column.className = 'col col-third';
 
-        var header = document.createElement('div');
-        header.className = 'debug-card-header';
+        var card = document.createElement('div');
+        card.className = 'debug-card' + (status === 'fail' ? ' is-fail' : status === 'warn' ? ' is-warn' : '');
+
+        var head = document.createElement('div');
+        head.className = 'card-head';
 
         var title = document.createElement('h3');
         title.textContent = name;
@@ -143,11 +302,12 @@
         description.className = 'debug-detail';
         description.textContent = detail;
 
-        header.appendChild(title);
-        header.appendChild(pill);
-        card.appendChild(header);
+        head.appendChild(title);
+        head.appendChild(pill);
+        card.appendChild(head);
         card.appendChild(description);
-        container.appendChild(card);
+        column.appendChild(card);
+        container.appendChild(column);
       }
 
       function buildChecks() {
@@ -163,6 +323,8 @@
         var blobUrl = 'Blob' in window && 'URL' in window && typeof URL.createObjectURL === 'function';
         var localStorageOk = canUseLocalStorage();
         var hasAuth = !!localStorageValue('xstream_auth');
+        var cssGrid = safe(function () { return window.CSS && CSS.supports && CSS.supports('display', 'grid'); }, false);
+        var flexGap = safe(function () { return window.CSS && CSS.supports && CSS.supports('row-gap', '1px') && CSS.supports('display', 'flex'); }, false);
 
         return [
           ['Script de debug', 'ok', 'Este script simples executou no navegador.'],
@@ -181,13 +343,23 @@
           ['MediaSource/HLS.js', mediaSource && sourceBuffer ? 'ok' : nativeHls ? 'warn' : 'fail', mediaSource && sourceBuffer ? 'MSE e SourceBuffer disponíveis' : nativeHls ? 'Sem MSE, mas HLS nativo pode tocar' : 'MSE indisponível'],
           ['MP4 H.264/AAC', mp4H264 ? 'ok' : 'warn', mp4H264 ? 'MP4 H.264/AAC suportado' : 'Codec MP4 não confirmado pelo navegador'],
           ['Fullscreen', document.fullscreenEnabled || 'webkitFullscreenEnabled' in document ? 'ok' : 'warn', document.fullscreenEnabled ? 'Fullscreen padrão disponível' : 'Pode depender de fullscreen nativo da TV'],
-          ['Legendas HTML5', 'textTracks' in video ? 'ok' : 'warn', 'textTracks' in video ? 'TextTracks disponível' : 'TextTracks não identificado']
+          ['Legendas HTML5', 'textTracks' in video ? 'ok' : 'warn', 'textTracks' in video ? 'TextTracks disponível' : 'TextTracks não identificado'],
+          // Layout support decides whether the modern app can even render here, so
+          // it belongs in the same report as the media checks.
+          ['CSS Grid', cssGrid ? 'ok' : 'fail', cssGrid ? 'display:grid suportado' : 'Sem display:grid — o app moderno não renderiza (Chromium < 57)'],
+          ['Flex/grid gap', flexGap ? 'ok' : 'warn', flexGap ? 'Propriedade gap suportada' : 'Sem gap — espaçamentos precisam de margin']
         ];
       }
 
-      window.onerror = function (message, source, lineno, colno) {
+      window.onerror = function (message, source, lineno) {
         text('last-error', String(message || 'Erro desconhecido') + ' em ' + String(source || '-') + ':' + String(lineno || '-'));
       };
+
+      /** Failures first, then warnings: on a TV the top of the page is the cheapest place to read. */
+      function bySeverity(a, b) {
+        var weight = { fail: 0, warn: 1, ok: 2 };
+        return weight[a[1]] - weight[b[1]];
+      }
 
       function runDebug() {
         var info = byId('browser-info');
@@ -204,27 +376,124 @@
         addInfo('Viewport', String(window.innerWidth) + 'x' + String(window.innerHeight));
         addInfo('Memória', navigator.deviceMemory ? String(navigator.deviceMemory) + ' GB' : 'indisponível');
         addInfo('CPU', navigator.hardwareConcurrency ? String(navigator.hardwareConcurrency) : 'indisponível');
-        addInfo('User-Agent', navigator.userAgent || 'indisponível');
+        addInfo('User-Agent', navigator.userAgent || 'indisponível', true);
         text('last-error', 'Nenhum erro capturado nesta página.');
 
         var checks = buildChecks();
         var failures = 0;
         var warnings = 0;
-        for (var i = 0; i < checks.length; i++) {
+        var i;
+
+        for (i = 0; i < checks.length; i++) {
           if (checks[i][1] === 'fail') failures++;
           if (checks[i][1] === 'warn') warnings++;
+        }
+
+        checks.sort(bySeverity);
+
+        for (i = 0; i < checks.length; i++) {
           addCheck(checks[i][0], checks[i][1], checks[i][2]);
         }
 
-        var summary = failures > 0 ? 'Há falhas de compatibilidade' : warnings > 0 ? 'Há avisos de compatibilidade' : 'Compatibilidade principal OK';
+        var box = byId('summary');
+        var summary;
+
+        if (failures > 0) {
+          summary = 'Há falhas de compatibilidade';
+          box.className = 'summary-box is-fail';
+        } else if (warnings > 0) {
+          summary = 'Há avisos de compatibilidade';
+          box.className = 'summary-box';
+        } else {
+          summary = 'Compatibilidade principal OK';
+          box.className = 'summary-box is-ok';
+        }
+
         text('summary-title', summary);
-        text('summary-detail', 'Checks executados: ' + checks.length + '. Falhas: ' + failures + '. Avisos: ' + warnings + '.');
+        text('summary-detail', 'Checks executados: ' + checks.length + '. Falhas: ' + failures + '. Avisos: ' + warnings + '. Ordenados: problemas primeiro.');
+        updateScrollbar();
+      }
+
+      // --- remote control ---------------------------------------------------
+
+      /*
+       * A TV remote has no wheel and no pointer, and this page has nothing
+       * focusable to tab through, so the browser will not scroll it on its own:
+       * the arrow keys have to move the viewport by hand.
+       */
+      var STEP = 140;
+
+      function scrollBy(amount) {
+        if (window.scrollBy) {
+          window.scrollBy(0, amount);
+        } else {
+          window.scrollTo(0, (window.pageYOffset || 0) + amount);
+        }
+        updateScrollbar();
+      }
+
+      function updateScrollbar() {
+        var bar = byId('scrollbar');
+        if (!bar) return;
+
+        var doc = document.documentElement;
+        var total = Math.max(doc.scrollHeight, document.body.scrollHeight);
+        var view = window.innerHeight;
+
+        if (total <= view) {
+          bar.style.display = 'none';
+          return;
+        }
+
+        var ratio = view / total;
+        var height = Math.max(40, Math.floor(view * ratio));
+        var offset = Math.floor(((window.pageYOffset || doc.scrollTop || 0) / (total - view)) * (view - height));
+
+        bar.style.display = 'block';
+        bar.style.height = height + 'px';
+        bar.style.top = offset + 'px';
+      }
+
+      function onKeyDown(event) {
+        var code = event.keyCode;
+
+        // Back (webOS/Tizen 461, Android TV 4) leaves the diagnostics.
+        if (code === 461 || code === 4 || code === 27) {
+          event.preventDefault();
+          goBack();
+          return;
+        }
+
+        if (code === 38) { event.preventDefault(); scrollBy(-STEP); return; }        // up
+        if (code === 40) { event.preventDefault(); scrollBy(STEP); return; }         // down
+        if (code === 37 || code === 33) { event.preventDefault(); scrollBy(-window.innerHeight + 80); return; }
+        if (code === 39 || code === 34) { event.preventDefault(); scrollBy(window.innerHeight - 80); return; }
+        if (code === 36) { event.preventDefault(); window.scrollTo(0, 0); updateScrollbar(); return; }
+        if (code === 35) { event.preventDefault(); window.scrollTo(0, document.body.scrollHeight); updateScrollbar(); return; }
+        if (code === 13) { goBack(); }
+      }
+
+      function goBack() {
+        window.location.href = '/legacy/index.html';
+      }
+
+      function init() {
+        var back = byId('back');
+        if (back) {
+          back.onclick = goBack;
+          try { back.focus(); } catch (e) { /* ignore */ }
+        }
+
+        document.addEventListener('keydown', onKeyDown, false);
+        if (window.addEventListener) window.addEventListener('scroll', updateScrollbar, false);
+
+        runDebug();
       }
 
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', runDebug);
+        document.addEventListener('DOMContentLoaded', init);
       } else {
-        runDebug();
+        init();
       }
     })();
     </script>

@@ -9,6 +9,7 @@ import type Hls from 'hls.js';
 import SyncButton from '@/components/SyncButton';
 import { useShareBroadcast, useSyncPlayback, syncKey } from '@/app/hooks/useLiveShare';
 import { getAutoBroadcast } from '@/app/lib/device';
+import { apiUrl } from '@/app/lib/apiClient';
 
 export default function WatchLivePage() {
     const { credentials } = useAuth();
@@ -45,7 +46,7 @@ export default function WatchLivePage() {
         // Chrome, which lack native HLS) is blocked when it fetches directly.
         // The relay does the cross-origin fetch server-side, rewrites the
         // playlist, and coalesces viewers into ~1 upstream connection.
-        return `/api/relay?type=live&streamId=${encodeURIComponent(streamId)}`;
+        return apiUrl(`/api/relay?type=live&streamId=${encodeURIComponent(streamId)}`);
     }, [credentials, streamId]);
 
     const broadcastInfo = useMemo(

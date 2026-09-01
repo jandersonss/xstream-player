@@ -3,6 +3,7 @@
 import { useFavorites } from '@/app/context/FavoritesContext';
 import { Bookmark, Play, Tv, Film, Layers, AlertCircle } from 'lucide-react';
 import Link from 'next/link';
+import CardGrid from '@/components/CardGrid';
 
 export default function FavoritesPage() {
     const { favorites, removeFavorite } = useFavorites();
@@ -22,7 +23,7 @@ export default function FavoritesPage() {
             {items.length === 0 ? (
                 <div className="text-gray-500 italic py-8">{emptyMsg}</div>
             ) : (
-                <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+                <CardGrid base={2} md={4} lg={5} xl={6} gap={6}>
                     {items.map((item) => (
                         <div key={`${item.type}-${item.id}`} className="group relative bg-[#1f1f1f] rounded-xl overflow-hidden shadow-lg border border-white/5 hover:border-red-500/30 transition-all hover:-translate-y-1">
                             <Link href={`/dashboard/watch/${item.type}/${item.id}`} data-focusable="true" tabIndex={0} className="block focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10 rounded-xl">
@@ -35,7 +36,7 @@ export default function FavoritesPage() {
                                             <Bookmark size={40} />
                                         </div>
                                     )}
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-">
+                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
                                         <Play className="text-white fill-current w-12 h-12 scale-0 group-hover:scale-110 transition-transform duration-300" />
                                     </div>
                                 </div>
@@ -56,7 +57,7 @@ export default function FavoritesPage() {
                             </div>
                         </div>
                     ))}
-                </div>
+                </CardGrid>
             )}
         </div>
     );

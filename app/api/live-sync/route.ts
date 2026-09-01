@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import {
     reportParticipant,
     setSyncCommand,
@@ -29,8 +29,8 @@ function sanitizeMediaTime(value: unknown): number | null {
 }
 
 export async function GET(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const { searchParams } = new URL(request.url);
     const streamKey = searchParams.get('streamKey');
@@ -41,8 +41,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const body = await request.json().catch(() => null);
     if (!body || typeof body.streamKey !== 'string') {

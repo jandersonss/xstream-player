@@ -23,6 +23,7 @@ interface Series {
 
 import { useData } from '../../../context/DataContext';
 import SortControls, { SortOption } from '@/components/SortControls';
+import CardGrid from '@/components/CardGrid';
 import { useSortPreference } from '@/app/hooks/useSortPreference';
 
 export default function SeriesList() {
@@ -115,7 +116,7 @@ export default function SeriesList() {
                 {seriesList.length === 0 && !error ? (
                     <p className="text-gray-500">Nenhuma série encontrada nesta categoria.</p>
                 ) : (
-                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                    <CardGrid base={2} md={3} lg={4} xl={5} gap={6}>
                         {sortedSeries.map((item) => (
                             <Link
                                 key={item.series_id}
@@ -147,7 +148,7 @@ export default function SeriesList() {
                                     </div>
 
                                     {item.rating && (
-                                        <div className="absolute top-2 right-2 bg-black/60 backdrop- px-2 py-1 rounded text-xs font-bold text-yellow-500 flex items-center space-x-1">
+                                        <div className="absolute top-2 right-2 bg-black/60 px-2 py-1 rounded text-xs font-bold text-yellow-500 flex items-center space-x-1">
                                             <Star size={10} fill="currentColor" /> {item.rating}
                                         </div>
                                     )}
@@ -166,7 +167,7 @@ export default function SeriesList() {
                                 </div>
                             </Link>
                         ))}
-                    </div>
+                    </CardGrid>
                 )}
             </div>
         </div>

@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNavigationContext } from '@/app/context/NavigationContext';
+import { isBackKey } from '@/app/lib/platform/keys';
 
 export const useTvNavigation = () => {
     const router = useRouter();
@@ -15,13 +16,15 @@ export const useTvNavigation = () => {
 
             if (isInput) return;
 
+            const isBack = isBackKey(e);
+
             // Only handle navigation keys
-            if (!['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter', 'Backspace', 'Escape'].includes(e.key)) {
+            if (!isBack && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) {
                 return;
             }
 
             // Back Navigation
-            if (e.key === 'Backspace' || e.key === 'Escape') {
+            if (isBack) {
                 e.preventDefault();
                 if (document.fullscreenElement) {
                     return;

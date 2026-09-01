@@ -1,0 +1,65 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>XStream Player</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div id="screen-loading" class="screen">
+        <div class="spinner"></div>
+    </div>
+
+    <div id="screen-setup" class="screen hidden">
+        <div class="panel">
+            <div class="badge"></div>
+            <h1>Conectar ao servidor</h1>
+            <p class="lead">Informe o IP ou endereço do servidor do XStream Player na sua rede.</p>
+
+            <input id="host-input" type="text" class="field" placeholder="192.168.0.10:3000"
+                   autocomplete="off" autocorrect="off" spellcheck="false" data-focusable="true">
+
+            <p id="setup-error" class="error hidden"></p>
+
+            <button id="host-submit" class="button" data-focusable="true">Continuar</button>
+
+            <p class="hint">
+                O endereço aparece na barra do navegador quando você abre o XStream Player
+                no computador.
+            </p>
+        </div>
+    </div>
+
+    <div id="screen-pair" class="screen hidden">
+        <div class="panel">
+            <h1>Autorize esta TV</h1>
+            <p class="lead">
+                No servidor, abra <strong>Dispositivos</strong> e digite o código abaixo.
+            </p>
+
+            <div class="code-box"><span id="pair-code"></span></div>
+
+            <p id="pair-status" class="hint">Aguardando aprovação&hellip;</p>
+
+            <button id="pair-change" class="button button-ghost" data-focusable="true">
+                Mudar o endereço do servidor
+            </button>
+        </div>
+    </div>
+
+    <div id="screen-error" class="screen hidden">
+        <div class="panel">
+            <h1 id="error-title">Servidor fora do ar</h1>
+            <p id="error-message" class="lead"></p>
+
+            <button id="error-retry" class="button" data-focusable="true">Tentar de novo</button>
+            <button id="error-change" class="button button-ghost" data-focusable="true">
+                Mudar o endereço do servidor
+            </button>
+        </div>
+    </div>
+
+    <script src="app.js"></script>
+</body>
+</html>

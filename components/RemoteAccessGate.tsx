@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from 'react';
 import { Lock, ShieldCheck, AlertCircle } from 'lucide-react';
+import { apiFetch } from '@/app/lib/apiClient';
 
 const PIN_RULE_MESSAGE = 'Use 4 a 64 caracteres, com letras e números, sem símbolos.';
 
@@ -34,7 +35,7 @@ export default function RemoteAccessGate({ mode }: RemoteAccessGateProps) {
         setIsSubmitting(true);
 
         try {
-            const response = await fetch('/api/remote-access', {
+            const response = await apiFetch('/api/remote-access', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ pin }),

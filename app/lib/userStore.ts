@@ -5,6 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import { randomUUID } from 'crypto';
 import { getCookieValue } from './remoteAccess';
+import { getRequestDeviceProfileId } from './apiAuth';
 
 /**
  * User-owned data: profiles, favorites and watch progress.
@@ -15,6 +16,8 @@ import { getCookieValue } from './remoteAccess';
  */
 
 export const PROFILE_COOKIE_NAME = 'xstream_profile';
+/** How the TV client states its profile: it has no cookie on its own origin. */
+export const PROFILE_HEADER_NAME = 'X-Xstream-Profile';
 
 const DATA_DIR = path.join(process.cwd(), 'data');
 const DB_PATH = path.join(DATA_DIR, 'user-data.sqlite');
@@ -252,14 +255,26 @@ export function deleteProfile(id: string): boolean {
 }
 
 /**
- * Resolves the profile a request belongs to, falling back to the first profile
- * when the cookie is missing or points at a profile that no longer exists.
+ * Resolves the profile a request belongs to, falling back to the first profile when
+ * nothing points at a profile that still exists.
+ *
+ * The header comes first because the TV client has no usable cookie on its foreign
+ * origin; the device's own default profile follows, so a paired TV lands on the right
+ * profile without sending anything. The cookie — the web app's only signal — is
+ * untouched by both, so its behaviour does not change.
  */
 export function resolveProfileId(request: Request): string {
     const profiles = listProfiles();
+    const headerId = request.headers.get(PROFILE_HEADER_NAME);
+    const deviceId = headerId ? null : getRequestDeviceProfileId(request);
     const cookieId = getCookieValue(request.headers.get('cookie'), PROFILE_COOKIE_NAME);
 
-    return profiles.find(p => p.id === cookieId)?.id ?? profiles[0].id;
+    return (
+        profiles.find(p => p.id === headerId)?.id ??
+        profiles.find(p => p.id === deviceId)?.id ??
+        profiles.find(p => p.id === cookieId)?.id ??
+        profiles[0].id
+    );
 }
 
 // --- Favorites ---

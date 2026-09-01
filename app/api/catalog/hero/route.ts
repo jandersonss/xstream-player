@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import { getBackendHeroItems } from '@/app/lib/catalogServer';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const { searchParams } = new URL(request.url);

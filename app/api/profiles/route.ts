@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import { listProfiles, createProfile, updateProfile, deleteProfile, ProfilePrefs } from '@/app/lib/userStore';
 
 export const runtime = 'nodejs';
@@ -15,8 +15,8 @@ interface ProfilesRequestBody {
 }
 
 export async function GET(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         return NextResponse.json({ data: listProfiles() });
@@ -27,8 +27,8 @@ export async function GET(request: Request) {
 }
 
 export async function POST(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const body = await request.json() as ProfilesRequestBody;

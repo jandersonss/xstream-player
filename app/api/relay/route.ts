@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import { buildUpstreamLiveUrl, getAllowedOrigin } from '@/app/lib/liveShare';
 
 export const runtime = 'nodejs';
@@ -163,8 +163,8 @@ async function resolveTarget(request: Request): Promise<{ url: string } | { erro
 }
 
 export async function GET(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const resolved = await resolveTarget(request);
     if ('error' in resolved) return resolved.error;

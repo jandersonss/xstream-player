@@ -6,6 +6,8 @@ import { useNavigationOverride } from '@/app/context/NavigationContext';
 import { Radio, Tv, Film, Layers, Pencil, Check, PowerOff, Play } from 'lucide-react';
 import { useLiveSessions, excludeSelf, joinHref, type ShareSession } from '@/app/hooks/useLiveShare';
 import { getDeviceName, setDeviceName } from '@/app/lib/device';
+import { apiFetch } from '@/app/lib/apiClient';
+import CardGrid from '@/components/CardGrid';
 
 const TYPE_ICON = { live: Tv, movie: Film, series: Layers } as const;
 const TYPE_LABEL = { live: 'Canal ao vivo', movie: 'Filme', series: 'Série' } as const;
@@ -197,7 +199,7 @@ export default function ModoTvPage() {
             streamId: selected.streamId,
         });
         try {
-            await fetch(`/api/relay/vod?${query.toString()}`, { method: 'DELETE' });
+            await apiFetch(`/api/relay/vod?${query.toString()}`, { method: 'DELETE' });
         } catch {
             /* the list refresh below shows whether it actually ended */
         }
@@ -230,11 +232,11 @@ export default function ModoTvPage() {
                     <p className="text-sm mt-1">Abra um canal e ligue “Transmitir” para aparecer aqui.</p>
                 </div>
             ) : (
-                <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
+                <CardGrid base={2} sm={3} lg={4} gap={4}>
                     {visible.map((s) => (
                         <SessionCard key={s.deviceId} session={s} onSelect={setSelected} />
                     ))}
-                </div>
+                </CardGrid>
             )}
 
             {selected && (

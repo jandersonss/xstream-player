@@ -2,6 +2,7 @@
 
 import { useCallback } from 'react';
 import { useAuth } from '@/app/context/AuthContext';
+import { apiFetch } from '@/app/lib/apiClient';
 
 /**
  * Queries Xtream (user_info) to check whether the simultaneous-connection limit
@@ -14,7 +15,7 @@ export function useConnectionLimit() {
     return useCallback(async (): Promise<boolean> => {
         if (!credentials) return false;
         try {
-            const res = await fetch('/api/proxy', {
+            const res = await apiFetch('/api/proxy', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...credentials, action: '' }),

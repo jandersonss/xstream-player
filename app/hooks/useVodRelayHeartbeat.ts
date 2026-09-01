@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from 'react';
 import { getDeviceId } from '@/app/lib/device';
+import { apiFetch } from '@/app/lib/apiClient';
 
 /**
  * How often each device reports playback. It also bounds how soon a viewer notices a
@@ -73,7 +74,7 @@ export function useVodRelayHeartbeat(opts: {
         };
 
         const post = (state: ConsumerState, keepalive = false) =>
-            fetch('/api/relay/vod/heartbeat', {
+            apiFetch('/api/relay/vod/heartbeat', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ key, deviceId, state }),

@@ -8,6 +8,7 @@ import { Layers, PlayCircle } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SortControls, { SortOption } from '@/components/SortControls';
 import { useSortPreference } from '@/app/hooks/useSortPreference';
+import CardGrid from '@/components/CardGrid';
 
 import HeroSection from '@/components/HeroSection';
 
@@ -70,7 +71,7 @@ export default function SeriesCategories() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
+                <CardGrid base={2} md={3} xl={5} gap={4}>
                     {sortedCategories.map((cat) => (
                         <Link
                             key={cat.category_id}
@@ -97,7 +98,7 @@ export default function SeriesCategories() {
                             </div>
                         </Link>
                     ))}
-                </div>
+                </CardGrid>
             </div>
         </div>
     );

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import { getProgressDetail, saveProgress, resolveProfileId, WatchProgress } from '@/app/lib/userStore';
 
 export const runtime = 'nodejs';
@@ -9,8 +9,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ type: string; id: string }> }
 ) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const { type, id } = await params;
@@ -29,8 +29,8 @@ export async function POST(
     request: Request,
     { params }: { params: Promise<{ type: string; id: string }> }
 ) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         await params;

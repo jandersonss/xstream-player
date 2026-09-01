@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import { killBroadcast, restartVodBroadcast, type VodType } from '@/app/lib/vodBroadcast';
 import { stopDevice } from '@/app/lib/tvModeStore';
 
@@ -24,8 +24,8 @@ interface SeekRequestBody {
  * player asks for the new playlist.
  */
 export async function POST(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const body = (await request.json()) as SeekRequestBody;
@@ -66,8 +66,8 @@ export async function POST(request: Request) {
  * device left paused and forgotten.
  */
 export async function DELETE(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const { searchParams } = new URL(request.url);

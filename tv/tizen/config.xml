@@ -1,0 +1,40 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+    Tizen manifest for the TV client.
+
+    Same bootstrap payload as the webOS package: the id and the privileges are the
+    only real differences. `network.public` is what lets the app reach the user's
+    server over plain HTTP on the LAN, which is the whole point of this client.
+-->
+<widget xmlns="http://www.w3.org/ns/widgets"
+        xmlns:tizen="http://tizen.org/ns/widgets"
+        id="http://xstreamplayer.com/tv"
+        version="0.0.0"
+        viewmodes="maximized">
+
+    <name>XStream Player</name>
+    <description>Cliente de TV do XStream Player</description>
+
+    <author email="jsolemos@gmail.com">Janderson Lemos</author>
+
+    <content src="index.html"/>
+    <icon src="icon.png"/>
+
+    <tizen:application id="XstrmPlyr0.XStreamPlayer"
+                       package="XstrmPlyr0"
+                       required_version="6.0"/>
+
+    <tizen:profile name="tv"/>
+
+    <tizen:privilege name="http://tizen.org/privilege/internet"/>
+    <tizen:privilege name="http://tizen.org/privilege/tv.inputdevice"/>
+    <tizen:privilege name="http://tizen.org/privilege/application.launch"/>
+
+    <tizen:setting screen-orientation="landscape"
+                   background-support="disable"
+                   encryption="disable"
+                   hwkey-event="enable"/>
+
+    <access origin="*" subdomains="true"/>
+    <tizen:allow-navigation>*</tizen:allow-navigation>
+</widget>

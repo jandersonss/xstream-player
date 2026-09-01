@@ -59,6 +59,16 @@ export async function getRemoteAccessConfigStatus() {
     return { configured: Boolean(config.pinHash) };
 }
 
+/**
+ * The PIN hash doubles as the signing key of a remote-access session. Server-side only:
+ * the device-session route needs it to mint a session for a TV that authenticated with a
+ * device token instead of the PIN.
+ */
+export async function getRemoteAccessPinHash(): Promise<string | null> {
+    const config = await readRemoteAccessConfig();
+    return config.pinHash ?? null;
+}
+
 export async function setupRemoteAccessPin(pin: string) {
     const pinHash = hashPin(pin);
     await writeRemoteAccessConfig({ pinHash });

@@ -12,6 +12,9 @@ const eslintConfig = defineConfig([
     "out/**",
     "build/**",
     "next-env.d.ts",
+    // The TV bootstrap is a standalone ES5 bundle for old TV browsers, like
+    // legacy/: the Next/TypeScript rules here do not describe it.
+    "tv/**",
   ]),
 ]);
 

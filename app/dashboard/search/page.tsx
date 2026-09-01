@@ -8,6 +8,7 @@ import { useData } from '../../context/DataContext';
 import { useInfiniteScroll } from '@/app/hooks/useInfiniteScroll';
 import { getDeviceProfile, type DeviceTier } from '@/app/lib/deviceProfile';
 import Loader from '@/components/Loader';
+import CardGrid from '@/components/CardGrid';
 
 type SearchCategory = 'all' | 'live' | 'movie' | 'series';
 
@@ -151,11 +152,11 @@ const SearchResultsGrid = memo(function SearchResultsGrid({
 }) {
     return (
         <>
-            <div className="grid grid-cols-2 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6 gap-6">
+            <CardGrid base={2} md={4} lg={5} xl={6} gap={6}>
                 {items.map((item) => (
                     <SearchResultCard key={`${item.type}-${item.id}`} item={item} />
                 ))}
-            </div>
+            </CardGrid>
             {hasMore && (
                 <div ref={sentinelRef} className="h-20 flex items-center justify-center p-4">
                     <Loader size="small" />

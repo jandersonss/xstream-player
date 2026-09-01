@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useRouter } from 'next/navigation';
 import * as db from '../lib/db';
+import { apiFetch } from '../lib/apiClient';
 
 interface UserInfo {
     username: string;
@@ -69,7 +70,7 @@ async function fetchJsonWithTimeout<T>(url: string, timeoutMs = 6000): Promise<T
 
     try {
         const response = await Promise.race([
-            fetch(url),
+            apiFetch(url),
             new Promise<never>((_, reject) => {
                 timeoutId = window.setTimeout(() => reject(new Error('Request timeout')), timeoutMs);
             })
@@ -146,7 +147,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const login = async (hostUrl: string, username: string, password: string) => {
         setIsLoading(true);
         try {
-            const res = await fetch('/api/auth/login', {
+            const res = await apiFetch('/api/auth/login', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -189,7 +190,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const logout = async () => {
         try {
             await Promise.all([
-                fetch('/api/config', {
+                apiFetch('/api/config', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({})

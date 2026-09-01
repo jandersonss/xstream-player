@@ -3,7 +3,7 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-import { Home, Tv, Film, Layers, LogOut, Search, Bookmark, RefreshCw, Radio, User, ChevronDown } from 'lucide-react';
+import { Home, Tv, Film, Layers, LogOut, Search, Bookmark, RefreshCw, Radio, User, ChevronDown, MonitorSmartphone } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useData } from '../app/context/DataContext';
 import { useProfile } from '../app/context/ProfileContext';
@@ -18,6 +18,7 @@ const menuItems = [
     { name: 'Filmes', icon: Film, path: '/dashboard/movies' },
     { name: 'Séries', icon: Layers, path: '/dashboard/series' },
     { name: 'Modo TV', icon: Radio, path: '/dashboard/tv' },
+    { name: 'Aparelhos', icon: MonitorSmartphone, path: '/dashboard/devices' },
 ];
 
 export default function Sidebar() {

@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import { syncXtreamToSqlite, type SyncProgressUpdate, type XtreamCredentials } from '@/app/lib/xtreamSync';
 
 export const runtime = 'nodejs';
@@ -100,8 +100,8 @@ async function runJob(job: SyncJob, credentials: XtreamCredentials) {
 }
 
 export async function POST(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const body = await request.json() as Partial<XtreamCredentials>;
@@ -127,8 +127,8 @@ export async function POST(request: Request) {
 }
 
 export async function GET(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');
@@ -142,8 +142,8 @@ export async function GET(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const { searchParams } = new URL(request.url);
     const jobId = searchParams.get('jobId');

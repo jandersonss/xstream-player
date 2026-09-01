@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 import { SavedSubtitle } from '../lib/db';
 import { useProfile } from './ProfileContext';
+import { apiFetch } from '../lib/apiClient';
 
 interface SubtitleConfig {
     apiKey: string;
@@ -135,7 +136,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
         const loadConfig = async () => {
             setIsLoading(true);
             try {
-                const response = await fetch('/api/subtitles/config');
+                const response = await apiFetch('/api/subtitles/config');
                 if (response.ok) {
                     const data = await response.json();
                     if (data.apiKey) {
@@ -157,7 +158,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
     const saveConfigHandler = useCallback(async (apiKey: string): Promise<boolean> => {
         try {
             // Save to backend (which validates the key)
-            const response = await fetch('/api/subtitles/config', {
+            const response = await apiFetch('/api/subtitles/config', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -182,7 +183,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
 
     const clearConfigHandler = useCallback(async () => {
         try {
-            await fetch('/api/subtitles/config', {
+            await apiFetch('/api/subtitles/config', {
                 method: 'DELETE',
             });
             applyConfig(null);
@@ -212,7 +213,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
         }
 
         try {
-            const response = await fetch('/api/subtitles', {
+            const response = await apiFetch('/api/subtitles', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -252,7 +253,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
         if (!activeConfig) return { ok: false };
 
         try {
-            const response = await fetch('/api/subtitles', {
+            const response = await apiFetch('/api/subtitles', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
@@ -286,7 +287,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
 
             // Save for persistence to server
             try {
-                await fetch('/api/subtitles/user', {
+                await apiFetch('/api/subtitles/user', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ streamId: String(streamId), vtt, language })
@@ -318,7 +319,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
 
     const getSavedSubtitle = useCallback(async (streamId: string) => {
         try {
-            const response = await fetch(
+            const response = await apiFetch(
                 `/api/subtitles/user?streamId=${streamId}&language=${encodeURIComponent(profileLanguage)}`
             );
             if (response.ok) {
@@ -332,7 +333,7 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
 
     const clearSavedSubtitle = useCallback(async (streamId: string) => {
         try {
-            await fetch(
+            await apiFetch(
                 `/api/subtitles/user?streamId=${streamId}&language=${encodeURIComponent(profileLanguage)}`,
                 { method: 'DELETE' }
             );

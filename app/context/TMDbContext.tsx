@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback } from 'react';
 import { TMDbGenre, TMDbMovie, TMDbTVShow, generateCacheKey, cleanSearchQuery, extractYear } from '../lib/tmdb';
 import * as db from '../lib/db';
+import { apiFetch } from '../lib/apiClient';
 
 interface TMDbConfig {
     apiKey: string;
@@ -38,7 +39,7 @@ export const TMDbProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const loadConfig = async () => {
             try {
-                const response = await fetch('/api/tmdb/config');
+                const response = await apiFetch('/api/tmdb/config');
                 if (response.ok) {
                     const data = await response.json();
                     if (data.apiKey) {
@@ -59,7 +60,7 @@ export const TMDbProvider = ({ children }: { children: ReactNode }) => {
     const saveConfig = async (apiKey: string): Promise<boolean> => {
         try {
             // Save to backend (which validates the key)
-            const response = await fetch('/api/tmdb/config', {
+            const response = await apiFetch('/api/tmdb/config', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -86,7 +87,7 @@ export const TMDbProvider = ({ children }: { children: ReactNode }) => {
 
     const clearConfig = async () => {
         try {
-            await fetch('/api/tmdb/config', {
+            await apiFetch('/api/tmdb/config', {
                 method: 'DELETE',
             });
         } catch (error) {
@@ -112,7 +113,7 @@ export const TMDbProvider = ({ children }: { children: ReactNode }) => {
 
         // Fetch from API
         try {
-            const response = await fetch('/api/tmdb', {
+            const response = await apiFetch('/api/tmdb', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({

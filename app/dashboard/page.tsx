@@ -11,9 +11,11 @@ import { Play, Tv, Film, Layers, Clock, Calendar, User, Settings, Star, Trending
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useAccountStatus } from '@/app/hooks/useAccountStatus';
 import ContentCarousel from '@/components/ContentCarousel';
+import { apiFetch } from '@/app/lib/apiClient';
 import HeroSection from '@/components/HeroSection';
 import TMDbSettingsModal from '@/components/TMDbSettingsModal';
 import SubtitleSettingsModal from '@/components/SubtitleSettingsModal';
+import CardGrid from '@/components/CardGrid';
 
 interface CarouselItemData {
     id: string | number;
@@ -108,7 +110,7 @@ export default function Dashboard() {
         const loadCarousels = async () => {
             setIsLoadingCarousels(true);
             try {
-                const response = await fetch('/api/catalog/carousels');
+                const response = await apiFetch('/api/catalog/carousels');
                 if (!response.ok) throw new Error('Failed to fetch carousels');
                 const result = await response.json();
                 setCarouselData(result.data || []);
@@ -239,73 +241,77 @@ export default function Dashboard() {
                 }
 
                 {/* Main Categories Cards */}
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mt-6 mb-6">
-                    <Link
-                        href="/dashboard/live"
-                        data-focusable="true"
-                        tabIndex={0}
-                        className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                {/* The outer div keeps mt-6/mb-6 off CardGrid, whose own negative
+                    gutter margins would collide with them */}
+                <div className="mt-6 mb-6">
+                    <CardGrid base={1} md={3} gap={6}>
+                        <Link
+                            href="/dashboard/live"
+                            data-focusable="true"
+                            tabIndex={0}
+                            className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
+                            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1593359677879-a4bb92f829d1?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
 
-                        <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="p-3 bg-red-600 rounded-full group-hover:scale-110 transition-transform">
-                                    <Tv size={24} className="text-white" />
+                            <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="p-3 bg-red-600 rounded-full group-hover:scale-110 transition-transform">
+                                        <Tv size={24} className="text-white" />
+                                    </div>
+                                    <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">Transmissão ao Vivo</span>
                                 </div>
-                                <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">Transmissão ao Vivo</span>
+                                <h3 className="text-2xl font-bold text-white mb-1">TV ao Vivo</h3>
+                                <p className="text-gray-300 text-sm line-clamp-1">Assista seus canais favoritos ao vivo.</p>
                             </div>
-                            <h3 className="text-2xl font-bold text-white mb-1">TV ao Vivo</h3>
-                            <p className="text-gray-300 text-sm line-clamp-1">Assista seus canais favoritos ao vivo.</p>
-                        </div>
-                    </Link>
+                        </Link>
 
-                    <Link
-                        href="/dashboard/movies"
-                        data-focusable="true"
-                        tabIndex={0}
-                        className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                        <Link
+                            href="/dashboard/movies"
+                            data-focusable="true"
+                            tabIndex={0}
+                            className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
+                            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1536440136628-849c177e76a1?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
 
-                        <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="p-3 bg-blue-600 rounded-full group-hover:scale-110 transition-transform">
-                                    <Film size={24} className="text-white" />
+                            <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="p-3 bg-blue-600 rounded-full group-hover:scale-110 transition-transform">
+                                        <Film size={24} className="text-white" />
+                                    </div>
+                                    <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">On Demand</span>
                                 </div>
-                                <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">On Demand</span>
+                                <h3 className="text-2xl font-bold text-white mb-1">Filmes</h3>
+                                <p className="text-gray-300 text-sm line-clamp-1">Últimos lançamentos e clássicos.</p>
                             </div>
-                            <h3 className="text-2xl font-bold text-white mb-1">Filmes</h3>
-                            <p className="text-gray-300 text-sm line-clamp-1">Últimos lançamentos e clássicos.</p>
-                        </div>
-                    </Link>
+                        </Link>
 
-                    <Link
-                        href="/dashboard/series"
-                        data-focusable="true"
-                        tabIndex={0}
-                        className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
-                    >
-                        <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
-                        <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
+                        <Link
+                            href="/dashboard/series"
+                            data-focusable="true"
+                            tabIndex={0}
+                            className="group relative h-64 rounded-2xl overflow-hidden cursor-pointer border border-[#333] hover:border-red-600 transition-all shadow-xl hover:shadow-red-900/20 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10"
+                        >
+                            <div className="absolute inset-0 bg-gradient-to-t from-black via-black/50 to-transparent z-10"></div>
+                            <div className="absolute inset-0 bg-[url('https://images.unsplash.com/photo-1574375927938-d5a98e8ffe85?q=80&w=640&auto=format&fit=crop')] bg-cover bg-center transition-transform duration-700 group-hover:scale-110"></div>
 
-                        <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
-                            <div className="flex items-center justify-between mb-2">
-                                <div className="p-3 bg-purple-600 rounded-full group-hover:scale-110 transition-transform">
-                                    <Layers size={24} className="text-white" />
+                            <div className="absolute bottom-0 left-0 p-6 z-20 w-full">
+                                <div className="flex items-center justify-between mb-2">
+                                    <div className="p-3 bg-purple-600 rounded-full group-hover:scale-110 transition-transform">
+                                        <Layers size={24} className="text-white" />
+                                    </div>
+                                    <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">Maratonar</span>
                                 </div>
-                                <span className="text-xs font-bold bg-white/20  px-2 py-1 rounded text-white uppercase tracking-wider">Maratonar</span>
+                                <h3 className="text-2xl font-bold text-white mb-1">Séries</h3>
+                                <p className="text-gray-300 text-sm line-clamp-1">Programas de TV e episódios.</p>
                             </div>
-                            <h3 className="text-2xl font-bold text-white mb-1">Séries</h3>
-                            <p className="text-gray-300 text-sm line-clamp-1">Programas de TV e episódios.</p>
-                        </div>
-                    </Link>
+                        </Link>
+                    </CardGrid>
                 </div>
 
                 {/* Account Details */}
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <CardGrid base={1} lg={2} gap={6}>
                     <div className="bg-[#1a1a1a] rounded-xl p-6 border border-[#333]">
                         <h3 className="text-lg font-bold text-white mb-4 flex items-center space-x-2">
                             <Clock size={18} className="text-gray-400" />
@@ -356,7 +362,7 @@ export default function Dashboard() {
                             </button>
                         )}
                     </div>
-                </div>
+                </CardGrid>
 
                 {/* TMDb Settings Modal */}
                 <TMDbSettingsModal isOpen={showSettings} onClose={() => setShowSettings(false)} />

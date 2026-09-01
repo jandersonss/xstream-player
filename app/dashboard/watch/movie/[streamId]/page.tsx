@@ -11,6 +11,7 @@ import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles, Radio } fr
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import LimitReachedModal from '@/components/LimitReachedModal';
+import { apiFetch } from '@/app/lib/apiClient';
 import BroadcastStartModal from '@/components/BroadcastStartModal';
 import { useConnectionLimit } from '@/app/hooks/useConnectionLimit';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
@@ -140,7 +141,7 @@ export default function WatchMoviePage() {
                     return;
                 }
 
-                const res = await fetch('/api/proxy', {
+                const res = await apiFetch('/api/proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -324,7 +325,7 @@ export default function WatchMoviePage() {
         const handleBroadcastSeek = async (absolute: number) => {
             const start = Math.floor(absolute);
             try {
-                const res = await fetch('/api/relay/vod', {
+                const res = await apiFetch('/api/relay/vod', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ action: 'seek', contentType: 'movie', streamId, ext: extension, start }),

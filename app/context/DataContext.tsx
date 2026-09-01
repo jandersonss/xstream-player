@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import * as db from '../lib/db';
+import { apiFetch } from '../lib/apiClient';
 
 interface DataContextType {
     isSyncing: boolean;
@@ -43,7 +44,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
         const jobId = activeJobIdRef.current;
 
         if (jobId) {
-            fetch(`/api/sync?jobId=${encodeURIComponent(jobId)}`, { method: 'DELETE' })
+            apiFetch(`/api/sync?jobId=${encodeURIComponent(jobId)}`, { method: 'DELETE' })
                 .catch(error => console.error('Failed to cancel server sync', error));
         }
 
@@ -64,7 +65,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
 
         try {
             console.log('[DataContext] Starting server-side sync via /api/sync');
-            const startResponse = await fetch('/api/sync', {
+            const startResponse = await apiFetch('/api/sync', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(credentials),
@@ -79,7 +80,7 @@ export function DataProvider({ children }: { children: React.ReactNode }) {
             setSyncProgress(startBody.job.progress);
 
             while (!cancelPollingRef.current && activeJobIdRef.current) {
-                const statusResponse = await fetch(`/api/sync?jobId=${encodeURIComponent(activeJobIdRef.current)}`);
+                const statusResponse = await apiFetch(`/api/sync?jobId=${encodeURIComponent(activeJobIdRef.current)}`);
                 if (!statusResponse.ok) {
                     throw new Error('Falha ao consultar sincronizacao no servidor');
                 }

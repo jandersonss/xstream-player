@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback, ReactNode } from 'react';
+import { apiFetch } from '../lib/apiClient';
 
 export interface ProfilePrefs {
     subtitleLanguage: string;
@@ -32,9 +33,16 @@ export const PROFILE_COOKIE_NAME = 'xstream_profile';
 
 // The API routes read the active profile from this cookie, so every request
 // already carries it — no client code needs to pass a profile id around.
+// The localStorage mirror exists for origins where cookies do not survive
+// (the packaged TV client), where apiFetch sends it as X-Xstream-Profile.
 function writeProfileCookie(id: string) {
     const oneYear = 60 * 60 * 24 * 365;
     document.cookie = `${PROFILE_COOKIE_NAME}=${id}; path=/; max-age=${oneYear}; SameSite=Lax`;
+    try {
+        localStorage.setItem(PROFILE_COOKIE_NAME, id);
+    } catch {
+        /* storage unavailable — the cookie alone is enough on the web */
+    }
 }
 
 function readProfileCookie(): string | null {
@@ -51,7 +59,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const load = async () => {
             try {
-                const res = await fetch('/api/profiles');
+                const res = await apiFetch('/api/profiles');
                 if (res.ok) {
                     const { data } = await res.json() as { data: Profile[] };
                     setProfiles(data);
@@ -80,7 +88,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const createProfile = useCallback(async (name: string) => {
-        const res = await fetch('/api/profiles', {
+        const res = await apiFetch('/api/profiles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'create', name })
@@ -91,7 +99,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const renameProfile = useCallback(async (id: string, name: string) => {
-        const res = await fetch('/api/profiles', {
+        const res = await apiFetch('/api/profiles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'update', id, name })
@@ -102,7 +110,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
     }, []);
 
     const deleteProfile = useCallback(async (id: string): Promise<string | null> => {
-        const res = await fetch('/api/profiles', {
+        const res = await apiFetch('/api/profiles', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ action: 'delete', id })
@@ -130,7 +138,7 @@ export const ProfileProvider = ({ children }: { children: ReactNode }) => {
         )));
 
         try {
-            await fetch('/api/profiles', {
+            await apiFetch('/api/profiles', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ action: 'update', id: activeId, prefs })

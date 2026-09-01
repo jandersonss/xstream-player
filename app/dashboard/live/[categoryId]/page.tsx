@@ -7,6 +7,7 @@ import VideoPlayer from '@/components/VideoPlayer';
 import Loader from '@/components/Loader';
 import { ArrowLeft, Wifi } from 'lucide-react';
 import Link from 'next/link';
+import CardGrid from '@/components/CardGrid';
 
 interface Stream {
     stream_id: string | number;
@@ -115,7 +116,7 @@ export default function LiveStreams() {
                     <p className="text-gray-500">Nenhum canal encontrado nesta categoria.</p>
                 ) : (
                     <>
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+                        <CardGrid base={1} md={2} lg={3} xl={4} gap={4}>
                             {(visibleItems as Stream[]).map((stream) => (
                                 <Link
                                     key={stream.stream_id}
@@ -139,7 +140,7 @@ export default function LiveStreams() {
                                     </div>
                                 </Link>
                             ))}
-                        </div>
+                        </CardGrid>
                         {hasMore && (
                             <div ref={sentinelRef} className="h-20 flex items-center justify-center p-4">
                                 <Loader size="small" />

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useMemo } from 'react';
 import { getDeviceProfile } from '@/app/lib/deviceProfile';
+import { apiFetch } from '@/app/lib/apiClient';
 
 export interface WatchProgress {
     streamId: string | number;
@@ -70,7 +71,7 @@ export const WatchProgressProvider = ({ children }: { children: ReactNode }) => 
     useEffect(() => {
         const loadProgress = async () => {
             try {
-                const res = await fetch('/api/watch-progress');
+                const res = await apiFetch('/api/watch-progress');
                 if (res.ok) {
                     const data = await res.json();
                     setProgressMap(data);
@@ -90,7 +91,7 @@ export const WatchProgressProvider = ({ children }: { children: ReactNode }) => 
         setLoadingDetails(prev => ({ ...prev, [key]: true }));
 
         try {
-            const res = await fetch(`/api/watch-progress/${type}/${id}`);
+            const res = await apiFetch(`/api/watch-progress/${type}/${id}`);
             if (res.ok) {
                 const data = await res.json();
                 setDetailedProgressMap(prev => {
@@ -153,7 +154,7 @@ export const WatchProgressProvider = ({ children }: { children: ReactNode }) => 
                 const type = progress.type;
                 const id = contentId;
 
-                fetch(`/api/watch-progress/${type}/${id}`, {
+                apiFetch(`/api/watch-progress/${type}/${id}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify(updatedProgress)

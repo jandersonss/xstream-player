@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, KeyboardEvent, TouchEvent } f
 import { useRouter } from 'next/navigation';
 import { Volume2, VolumeX } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
+import { apiFetch } from '../app/lib/apiClient';
 
 interface HeroItem {
     id: string;
@@ -138,7 +139,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
 
         try {
             setIsLoading(true);
-            const response = await fetch(`/api/catalog/hero?type=${type}`);
+            const response = await apiFetch(`/api/catalog/hero?type=${type}`);
             if (!response.ok) throw new Error('Failed to fetch hero highlights');
             const result = await response.json();
             setHeroItems(result.data || []);

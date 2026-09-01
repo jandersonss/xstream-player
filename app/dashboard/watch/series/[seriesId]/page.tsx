@@ -11,6 +11,7 @@ import { ArrowLeft, Play, Calendar, Star, Clock, List, Bookmark, Subtitles, Radi
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import SyncButton from '@/components/SyncButton';
+import { apiFetch } from '@/app/lib/apiClient';
 import BroadcastStartModal from '@/components/BroadcastStartModal';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
 import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
@@ -186,7 +187,7 @@ export default function WatchSeriesPage() {
                     return;
                 }
 
-                const res = await fetch('/api/proxy', {
+                const res = await apiFetch('/api/proxy', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -244,7 +245,7 @@ export default function WatchSeriesPage() {
 
         const markDownloaded = async () => {
             try {
-                const res = await fetch(
+                const res = await apiFetch(
                     `/api/subtitles/user/list?language=${encodeURIComponent(batchLanguage)}`
                 );
                 if (!res.ok) return;
@@ -558,7 +559,7 @@ export default function WatchSeriesPage() {
         const handleBroadcastSeek = async (absolute: number) => {
             const start = Math.floor(absolute);
             try {
-                const res = await fetch('/api/relay/vod', {
+                const res = await apiFetch('/api/relay/vod', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({
@@ -880,7 +881,9 @@ export default function WatchSeriesPage() {
                         ))}
                     </div>
 
-                    <div className="grid gap-4">
+                    {/* Single-column stack: CSS grid (Chrome 57+) and flex gap (84+) are
+                        both missing on WebOS TVs, so a flex column with space-y does it */}
+                    <div className="flex flex-col space-y-4">
                         {currentEpisodes.map((ep) => {
                             const progress = getProgress(ep.id);
                             const duration = progress?.duration || 0;

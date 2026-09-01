@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import fs from 'fs/promises';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import { DEFAULT_SUBTITLE_LANGUAGE, subtitleLanguageDir } from '@/app/lib/subtitleStore';
 
 export const runtime = 'nodejs';
@@ -9,8 +9,8 @@ export const dynamic = 'force-dynamic';
 // Lists the streamIds that already have a saved subtitle in the requested
 // language, so episodes can be marked in a single pass (no request per episode).
 export async function GET(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const { searchParams } = new URL(request.url);

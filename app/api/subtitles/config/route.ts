@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { promises as fs } from 'fs';
 import path from 'path';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 
 const CONFIG_DIR = path.join(process.cwd(), 'data');
 const CONFIG_FILE = path.join(CONFIG_DIR, 'opensubtitles-config.json');
@@ -22,8 +22,8 @@ async function ensureConfigDir() {
 
 // GET - Read OpenSubtitles configuration
 export async function GET(request: NextRequest) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const data = await fs.readFile(CONFIG_FILE, 'utf-8');
@@ -41,8 +41,8 @@ export async function GET(request: NextRequest) {
 
 // POST - Save OpenSubtitles configuration
 export async function POST(request: NextRequest) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         const body = await request.json();
@@ -95,8 +95,8 @@ export async function POST(request: NextRequest) {
 
 // DELETE - Remove OpenSubtitles configuration
 export async function DELETE(request: NextRequest) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     try {
         await fs.unlink(CONFIG_FILE);

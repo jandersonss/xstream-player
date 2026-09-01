@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import {
     ensureVodBroadcast,
     waitForPlaylist,
@@ -59,8 +59,8 @@ export async function GET(
     request: Request,
     { params }: { params: Promise<{ file: string }> }
 ) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const { file } = await params;
     const { searchParams } = new URL(request.url);

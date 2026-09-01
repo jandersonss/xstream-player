@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
+import { apiFetch } from '@/app/lib/apiClient';
 
 /** Conexões em uso / limite da conta, relidas do provedor em intervalo fixo. */
 export interface AccountStatus {
@@ -22,7 +23,7 @@ export function useAccountStatus(): AccountStatus | null {
 
         const load = async () => {
             try {
-                const res = await fetch('/api/account');
+                const res = await apiFetch('/api/account');
                 if (!res.ok) return;
                 const { data } = await res.json() as { data: { active_cons?: string | number; max_connections?: string | number } };
                 if (cancelled) return;

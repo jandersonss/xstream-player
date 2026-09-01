@@ -1,0 +1,17 @@
+{
+    "id": "com.xstreamplayer.tv",
+    "version": "0.0.0",
+    "vendor": "Janderson Lemos",
+    "type": "web",
+    "main": "index.html",
+    "title": "XStream Player",
+    "appDescription": "Cliente de TV do XStream Player",
+    "icon": "icon.png",
+    "largeIcon": "icon.png",
+    "splashBackground": "splash.png",
+    "bgColor": "#0a0a0a",
+    "iconColor": "#e50914",
+    "supportPortraitMode": false,
+    "disableBackHistoryAPI": true,
+    "handlesRelaunch": true
+}

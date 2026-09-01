@@ -18,6 +18,7 @@ interface Movie {
 
 import { useData } from '../../../context/DataContext';
 import SortControls, { SortOption } from '@/components/SortControls';
+import CardGrid from '@/components/CardGrid';
 import { useSortPreference } from '@/app/hooks/useSortPreference';
 import { useInfiniteScroll } from '@/app/hooks/useInfiniteScroll';
 import { useMemo } from 'react';
@@ -107,7 +108,7 @@ export default function MovieList() {
                     <p className="text-gray-500">Nenhum filme encontrado nesta categoria.</p>
                 ) : (
                     <>
-                        <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6">
+                        <CardGrid base={2} md={3} lg={4} xl={5} gap={6}>
                             {(visibleItems as Movie[]).map((movie) => (
                                 <Link
                                     key={movie.stream_id}
@@ -139,7 +140,7 @@ export default function MovieList() {
                                         </div>
 
                                         {movie.rating && (
-                                            <div className="absolute top-2 right-2 bg-black/60 backdrop- px-2 py-1 rounded text-xs font-bold text-yellow-500 flex items-center space-x-1">
+                                            <div className="absolute top-2 right-2 bg-black/60 px-2 py-1 rounded text-xs font-bold text-yellow-500 flex items-center space-x-1">
                                                 <Star size={10} fill="currentColor" /> {movie.rating}
                                             </div>
                                         )}
@@ -156,7 +157,7 @@ export default function MovieList() {
                                     </div>
                                 </Link>
                             ))}
-                        </div>
+                        </CardGrid>
                         {hasMore && (
                             <div ref={sentinelRef} className="h-20 flex items-center justify-center p-4">
                                 <Loader size="small" />

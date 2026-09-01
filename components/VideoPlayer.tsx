@@ -6,6 +6,7 @@ import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, Arrow
 import { useNavigationOverride } from '@/app/context/NavigationContext';
 import { useProfile } from '@/app/context/ProfileContext';
 import { getDeviceProfile } from '@/app/lib/deviceProfile';
+import { getDeviceToken, getServerBaseUrl } from '@/app/lib/apiClient';
 
 type VideoPreloadMode = 'auto' | 'metadata' | 'none';
 
@@ -826,6 +827,15 @@ export default function VideoPlayer({
                 abrBandWidthUpFactor: playbackProfile.hls.abrBandWidthUpFactor,
                 maxStarvationDelay: playbackProfile.hls.maxStarvationDelay,
                 maxLoadingDelay: playbackProfile.hls.maxLoadingDelay,
+                // The packaged TV client plays through a cross-origin relay that
+                // authenticates by device token. No token (web build) = no-op.
+                xhrSetup: (xhr: XMLHttpRequest, url: string) => {
+                    const token = getDeviceToken();
+                    const base = getServerBaseUrl();
+                    if (token && base && url.indexOf(base) === 0) {
+                        xhr.setRequestHeader('Authorization', `Bearer ${token}`);
+                    }
+                },
                 ...(isLiveHls
                     ? {
                           liveDurationInfinity: true,
@@ -1200,7 +1210,7 @@ export default function VideoPlayer({
 
             {/* Error Overlay */}
             {error && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/90 backdrop- z-30">
+                <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30">
                     <div className="text-center text-red-400 max-w-md mx-auto px-6">
                         <AlertTriangle size={64} className="mx-auto mb-4 drop-shadow-lg" />
                         <p className="text-lg font-medium">{error}</p>
@@ -1249,7 +1259,7 @@ export default function VideoPlayer({
                 )}
 
                 {/* Bottom Controls */}
-                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent px-4 py-2 backdrop-">
+                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent px-4 py-2">
                     {/* Barra de fundo + buffer (sempre); posição/seek só em VOD */}
                     <div className="mb-1 group/progress">
                         <div className="relative h-1 flex items-center">
@@ -1332,7 +1342,7 @@ export default function VideoPlayer({
                                 onClick={togglePlay}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 bg-white/10 backdrop-"
+                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 bg-white/10"
                                 aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
                             >
                                 {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}

@@ -1,6 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useRef, ReactNode } from 'react';
+import { apiFetch } from '../lib/apiClient';
 
 // Simplified Item for Favorites (storing just enough to render a card)
 export interface FavoriteItem {
@@ -32,7 +33,7 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
     useEffect(() => {
         const loadFavorites = async () => {
             try {
-                const res = await fetch('/api/favorites');
+                const res = await apiFetch('/api/favorites');
                 if (res.ok) {
                     const data = await res.json();
                     setFavorites(data);
@@ -71,7 +72,7 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
         if (isLoaded && hasUserChangeRef.current) {
             const syncFavorites = async () => {
                 try {
-                    await fetch('/api/favorites', {
+                    await apiFetch('/api/favorites', {
                         method: 'POST',
                         headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify(favorites)

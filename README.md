@@ -54,6 +54,23 @@ IPTV accounts have a limit of simultaneous connections. **TV Mode** lets several
 
 > **Requirements:** sharing movies/series (VOD) needs **ffmpeg** installed on the server. The provided Docker image already includes it. Shared state lives in the `data/` folder (`tv-mode.sqlite`), so it works even across multiple app instances that share that folder.
 
+## 📱 Installable TV Client (webOS / Tizen)
+
+Besides opening the app in the TV's browser, there is an **installable client** for LG webOS and Samsung Tizen. It holds no catalog and no credentials: it finds your server on the network, gets authorized, and hands over to it — so it has every feature the web app has.
+
+*   **Server address:** on first run the TV asks for the server's IP or host (e.g. `192.168.0.10:3000`) and tests the connection before continuing.
+*   **Pairing by code:** the TV shows a 6-character code. On your computer, open **Dispositivos** in the app, type the code and approve it, naming the device and picking its default profile. Nothing else is typed on the remote.
+*   **Revocable:** every paired device is listed with its last access and can be renamed or revoked at any time. A revoked TV loses access immediately.
+*   **Replicable:** the same payload ships as a `.ipk` (webOS), a `.wgt` (Tizen), or inside an Android TV WebView — only the manifest differs.
+
+```bash
+npm run tv:assets       # icon + splash
+npm run package:webos   # → tv/dist/*.ipk
+npm run package:tizen   # → tv/dist/*.wgt
+```
+
+See [`docs/tv-client.md`](docs/tv-client.md) for installing over Developer Mode and what publishing to the LG Content Store actually requires.
+
 ## 🚀 How to Install and Run
 
 ### Prerequisites

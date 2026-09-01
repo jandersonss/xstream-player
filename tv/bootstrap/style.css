@@ -1,0 +1,179 @@
+/*
+ * Styles for the TV bootstrap.
+ *
+ * This runs before anything else on the TV, on firmware as old as webOS 5
+ * (Chromium 68), so it stays on plain flexbox with margins — no `gap`, no custom
+ * properties, no `:focus-visible`. Sizes are absolute because a TV sits across
+ * the room: nothing here is smaller than 24px.
+ */
+
+* {
+    box-sizing: border-box;
+}
+
+html,
+body {
+    margin: 0;
+    padding: 0;
+    height: 100%;
+    background: #0a0a0a;
+    color: #ffffff;
+    font-family: -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    overflow: hidden;
+}
+
+.screen {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    display: -webkit-box;
+    display: -webkit-flex;
+    display: flex;
+    -webkit-box-align: center;
+    -webkit-align-items: center;
+    align-items: center;
+    -webkit-box-pack: center;
+    -webkit-justify-content: center;
+    justify-content: center;
+    padding: 48px;
+}
+
+.hidden {
+    display: none !important;
+}
+
+.panel {
+    width: 100%;
+    max-width: 900px;
+    text-align: center;
+}
+
+.badge {
+    width: 96px;
+    height: 96px;
+    margin: 0 auto 32px auto;
+    border-radius: 20px;
+    background: #e50914;
+}
+
+h1 {
+    margin: 0 0 16px 0;
+    font-size: 48px;
+    font-weight: 700;
+}
+
+.lead {
+    margin: 0 0 40px 0;
+    font-size: 26px;
+    line-height: 1.4;
+    color: #a3a3a3;
+}
+
+.field {
+    display: block;
+    width: 100%;
+    padding: 24px;
+    font-size: 34px;
+    color: #ffffff;
+    background: #262626;
+    border: 3px solid #404040;
+    border-radius: 14px;
+    outline: none;
+}
+
+.field::-webkit-input-placeholder {
+    color: #737373;
+}
+
+.field:focus {
+    border-color: #e50914;
+}
+
+.button {
+    display: block;
+    width: 100%;
+    margin-top: 28px;
+    padding: 22px;
+    font-size: 30px;
+    font-weight: 600;
+    color: #ffffff;
+    background: #e50914;
+    border: 3px solid transparent;
+    border-radius: 14px;
+    cursor: pointer;
+    outline: none;
+}
+
+.button:focus {
+    border-color: #ffffff;
+    background: #f40612;
+}
+
+.button[disabled] {
+    opacity: 0.6;
+}
+
+.button-ghost {
+    background: transparent;
+    color: #d4d4d4;
+    font-size: 24px;
+    font-weight: 400;
+}
+
+.button-ghost:focus {
+    background: #262626;
+}
+
+.code-box {
+    display: inline-block;
+    padding: 40px 64px;
+    margin-bottom: 32px;
+    background: #262626;
+    border: 3px solid #404040;
+    border-radius: 20px;
+}
+
+.code-box span {
+    font-family: "Courier New", monospace;
+    font-size: 110px;
+    font-weight: 700;
+    letter-spacing: 16px;
+    color: #e50914;
+}
+
+.hint {
+    margin: 0;
+    font-size: 22px;
+    color: #737373;
+}
+
+.error {
+    margin: 24px 0 0 0;
+    padding: 20px;
+    font-size: 24px;
+    color: #fecaca;
+    background: #450a0a;
+    border: 2px solid #991b1b;
+    border-radius: 12px;
+    text-align: left;
+}
+
+.spinner {
+    width: 64px;
+    height: 64px;
+    border: 6px solid #262626;
+    border-top-color: #e50914;
+    border-radius: 50%;
+    -webkit-animation: spin 900ms linear infinite;
+    animation: spin 900ms linear infinite;
+}
+
+@-webkit-keyframes spin {
+    to { -webkit-transform: rotate(360deg); }
+}
+
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}

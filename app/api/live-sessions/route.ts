@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { enforceRemoteAccessForApi } from '@/app/lib/remoteAccess';
+import { enforceApiAccess } from '@/app/lib/apiAuth';
 import {
     clearDeviceStop,
     endSession,
@@ -25,16 +25,16 @@ function sanitizeIp(value: unknown): string | undefined {
 }
 
 export async function GET(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const sessions = listActiveSessions();
     return NextResponse.json({ sessions, heartbeatMs: HEARTBEAT_MS });
 }
 
 export async function POST(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const body = await request.json().catch(() => null);
     if (!body) {
@@ -78,8 +78,8 @@ export async function POST(request: Request) {
 }
 
 export async function DELETE(request: Request) {
-    const remoteAccessResponse = await enforceRemoteAccessForApi(request);
-    if (remoteAccessResponse) return remoteAccessResponse;
+    const accessResponse = await enforceApiAccess(request);
+    if (accessResponse) return accessResponse;
 
     const { searchParams } = new URL(request.url);
     const deviceId = searchParams.get('deviceId');

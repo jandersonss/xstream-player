@@ -1,4 +1,5 @@
 import type { CachedCategory, CachedStream, ContentType, SavedSubtitle, SyncMetadata } from './dbTypes';
+import { apiFetch } from './apiClient';
 
 export type { CachedCategory, CachedStream, ContentType, SavedSubtitle, SyncMetadata };
 
@@ -7,7 +8,7 @@ interface CacheResponse<T> {
 }
 
 async function requestCache<T>(action: string, payload: Record<string, unknown> = {}): Promise<T | undefined> {
-    const response = await fetch('/api/library', {
+    const response = await apiFetch('/api/library', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...payload }),
@@ -22,7 +23,7 @@ async function requestCache<T>(action: string, payload: Record<string, unknown> 
 }
 
 async function writeCache(action: string, payload: Record<string, unknown> = {}) {
-    const response = await fetch('/api/library', {
+    const response = await apiFetch('/api/library', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ action, ...payload }),
