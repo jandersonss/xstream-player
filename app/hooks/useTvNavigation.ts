@@ -21,13 +21,20 @@ export const useTvNavigation = () => {
                 return;
             }
 
-            // A focused field owns the keys that do something inside it: the
-            // horizontal arrows move the caret, change a range value or pick a
-            // select option, and Enter submits. The vertical arrows never belong
-            // to it — a remote has no Tab key and no pointer, so a field that
-            // swallows them is a dead end the user cannot leave.
+            // A focused field keeps only the keys that still do something inside
+            // it. The vertical arrows never belong to it: a remote has no Tab key
+            // and no pointer, so a field that swallows them is a dead end. The
+            // horizontal arrows belong to a text field only while the caret has
+            // somewhere left to go; at the edge they pass to the navigation,
+            // which is what lets a remote cross a row of fields such as the
+            // pairing form's code, name, profile and confirm button.
             if (isFormControl && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
-                return;
+                // Enter belongs to the field: it submits, or opens a select.
+                if (e.key === 'Enter') return;
+                // A range is adjusted with the horizontal arrows and is never a
+                // trap, since the vertical ones still move focus out of it.
+                if (activeElement instanceof HTMLInputElement && activeElement.type === 'range') return;
+                if (isTextEntry(activeElement) && !isCaretAtEdge(activeElement, e.key)) return;
             }
 
             // Back Navigation
@@ -66,6 +73,37 @@ export const useTvNavigation = () => {
         return () => window.removeEventListener('keydown', handleKeyDown);
     }, [router, getActiveBackHandler]);
 };
+
+const TEXT_ENTRY_INPUT_TYPES = ['text', 'search', 'password', 'email', 'url', 'tel', 'number'];
+
+/** A field where the horizontal arrows drive a caret, unlike a range or a select. */
+function isTextEntry(el: Element | null): el is HTMLInputElement | HTMLTextAreaElement {
+    if (el instanceof HTMLTextAreaElement) return true;
+    return el instanceof HTMLInputElement && TEXT_ENTRY_INPUT_TYPES.indexOf(el.type) !== -1;
+}
+
+/**
+ * True when the caret has nowhere left to go, so the key press belongs to the
+ * navigation. Types that expose no selection (number, email) report null or
+ * throw; treating those as "at the edge" keeps the field crossable instead of
+ * trapping the cursor inside it.
+ */
+function isCaretAtEdge(el: HTMLInputElement | HTMLTextAreaElement, key: string): boolean {
+    let start: number | null;
+    let end: number | null;
+    try {
+        start = el.selectionStart;
+        end = el.selectionEnd;
+    } catch {
+        return true;
+    }
+
+    if (start === null || end === null) return true;
+    // A range selection still has somewhere to collapse to.
+    if (start !== end) return false;
+
+    return key === 'ArrowLeft' ? start === 0 : start === el.value.length;
+}
 
 // Holding a directional key on a TV remote fires a burst of auto-repeat
 // keydown events, and each one triggers a full querySelectorAll +
