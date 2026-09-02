@@ -9,17 +9,24 @@ export const useTvNavigation = () => {
 
     useEffect(() => {
         const handleKeyDown = (e: KeyboardEvent) => {
-            // Skip navigation logic if the user is typing in an input or textarea
             const activeElement = document.activeElement;
-            const isInput = activeElement instanceof HTMLInputElement ||
-                activeElement instanceof HTMLTextAreaElement;
-
-            if (isInput) return;
+            const isFormControl = activeElement instanceof HTMLInputElement ||
+                activeElement instanceof HTMLTextAreaElement ||
+                activeElement instanceof HTMLSelectElement;
 
             const isBack = isBackKey(e);
 
             // Only handle navigation keys
             if (!isBack && !['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Enter'].includes(e.key)) {
+                return;
+            }
+
+            // A focused field owns the keys that do something inside it: the
+            // horizontal arrows move the caret, change a range value or pick a
+            // select option, and Enter submits. The vertical arrows never belong
+            // to it — a remote has no Tab key and no pointer, so a field that
+            // swallows them is a dead end the user cannot leave.
+            if (isFormControl && e.key !== 'ArrowUp' && e.key !== 'ArrowDown') {
                 return;
             }
 
@@ -82,10 +89,16 @@ function handleDirectionalNav(direction: string, isAutoRepeat: boolean) {
 
 function runDirectionalNav(direction: string) {
     const focusableElements = Array.from(document.querySelectorAll('[data-focusable="true"]')) as HTMLElement[];
-    const activeElement = document.activeElement as HTMLElement;
+    const activeElement = document.activeElement as HTMLElement | null;
 
-    if (!activeElement || !focusableElements.includes(activeElement)) {
-        // If nothing focused, focus the first visible focusable element
+    // The origin only has to be *somewhere on screen*, not a registered target.
+    // A field that never got `data-focusable` is still a real position to move
+    // away from, and jumping to the first element of the page instead would
+    // throw the cursor across the screen when the user simply pressed up.
+    const hasOrigin = activeElement instanceof HTMLElement && activeElement !== document.body;
+
+    if (!hasOrigin) {
+        // Nothing focused yet — start at the first focusable element.
         if (focusableElements.length > 0) {
             focusableElements[0].focus();
         }
