@@ -94,9 +94,14 @@ export default function NavRail() {
             ].join(' ')}
         >
             {/* Brand — not focusable, decorative only. */}
-            <div className="flex items-center px-4 pt-6 pb-4 flex-shrink-0">
+            <div className="flex items-center px-4 pt-6 pb-4 flex-shrink-0 overflow-hidden whitespace-nowrap">
                 <span className="text-xl font-black text-brand tracking-tighter leading-none">X</span>
-                <span className="text-xl font-black text-ink tracking-tighter leading-none">stream</span>
+                {/* "Xstream" is far wider than the 76px collapsed rail, so the
+                    wordmark would be clipped mid-letter. Collapsed, the X alone
+                    carries the brand. */}
+                {isExpanded && (
+                    <span className="text-xl font-black text-ink tracking-tighter leading-none">stream</span>
+                )}
             </div>
 
             {/* Profile */}

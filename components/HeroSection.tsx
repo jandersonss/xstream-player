@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, TouchEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Bookmark } from 'lucide-react';
+import { Play, Bookmark, Star } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useFavorites } from '../app/context/FavoritesContext';
 import { apiFetch } from '../app/lib/apiClient';
@@ -209,12 +209,20 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     className={`transition-all duration-700 transform ${showLogo ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
                 >
                     {/* Metadata Tags */}
+                    {/* Block-level wrappers, not inline spans: an inline flex item
+                        keeps its baseline descender space, which made the badge
+                        carrying the monospace rating sit higher than its siblings. */}
                     <div className="flex items-center mb-3">
                         <Badge tone="neutral">{currentItem.type === 'movie' ? 'Filme' : 'Série'}</Badge>
-                        <span className="ml-2">
+                        <div className="ml-2">
                             <Badge tone="neutral">{currentItem.year}</Badge>
-                        </span>
-                        <span className="ml-2 text-sm text-ink-2 tnum">{currentItem.rating.toFixed(1)}</span>
+                        </div>
+                        <div className="ml-2">
+                            <Badge tone="neutral">
+                                <Star size={12} className="mr-1 flex-shrink-0" />
+                                <span className="tnum leading-none">{currentItem.rating.toFixed(1)}</span>
+                            </Badge>
+                        </div>
                     </div>
 
                     {/* Title */}

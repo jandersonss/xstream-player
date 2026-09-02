@@ -106,13 +106,28 @@ function runDirectionalNav(direction: string) {
     }
 
     const currentRect = activeElement.getBoundingClientRect();
-    let bestCandidate: HTMLElement | null = null;
-    let minDistance = Infinity;
+    const isVertical = direction === 'ArrowUp' || direction === 'ArrowDown';
+
+    // Candidates that share the current element's span on the cross axis are in
+    // the same column (going up/down) or the same row (going left/right), and
+    // always win over one that merely happens to be close. Weighted distance
+    // alone is not enough: from a button in the settings column, a nav rail item
+    // slightly below but far to the left could beat the next setting further
+    // down the same column, so the cursor jumped back into the menu.
+    let bestAligned: HTMLElement | null = null;
+    let bestAlignedDistance = Infinity;
+    let bestLoose: HTMLElement | null = null;
+    let bestLooseDistance = Infinity;
 
     focusableElements.forEach((el) => {
         if (el === activeElement) return;
 
         const rect = el.getBoundingClientRect();
+
+        // A hidden element reports a zero rect at the origin, which would make it
+        // the nearest thing above and to the left of everything.
+        if (rect.width === 0 && rect.height === 0) return;
+
         const threshold = 5; // 5px threshold for overlap/alignment
 
         // Filter based on direction relative to current element
@@ -132,31 +147,37 @@ function runDirectionalNav(direction: string) {
                 break;
         }
 
-        if (isValid) {
-            const currentCenter = { x: currentRect.left + currentRect.width / 2, y: currentRect.top + currentRect.height / 2 };
-            const candidateCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+        if (!isValid) return;
 
-            // Weighted distance: prioritize items aligned in the direction of movement
-            const dx = Math.abs(candidateCenter.x - currentCenter.x);
-            const dy = Math.abs(candidateCenter.y - currentCenter.y);
+        const currentCenter = { x: currentRect.left + currentRect.width / 2, y: currentRect.top + currentRect.height / 2 };
+        const candidateCenter = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
 
-            let distance;
-            if (direction === 'ArrowUp' || direction === 'ArrowDown') {
-                // Focus on Y distance, but penalize X deviation heavily
-                distance = dy + (dx * 2);
-            } else {
-                // Focus on X distance, but penalize Y deviation heavily
-                distance = dx + (dy * 2);
+        const dx = Math.abs(candidateCenter.x - currentCenter.x);
+        const dy = Math.abs(candidateCenter.y - currentCenter.y);
+
+        // Primary axis first, cross-axis deviation as a penalty.
+        const distance = isVertical ? dy + (dx * 2) : dx + (dy * 2);
+
+        const isAligned = isVertical
+            ? rect.left < currentRect.right && rect.right > currentRect.left
+            : rect.top < currentRect.bottom && rect.bottom > currentRect.top;
+
+        if (isAligned) {
+            if (distance < bestAlignedDistance) {
+                bestAlignedDistance = distance;
+                bestAligned = el;
             }
-
-            if (distance < minDistance) {
-                minDistance = distance;
-                bestCandidate = el;
-            }
+        } else if (distance < bestLooseDistance) {
+            bestLooseDistance = distance;
+            bestLoose = el;
         }
     });
 
-    if (bestCandidate) {
-        (bestCandidate as HTMLElement).focus();
+    // Only leave the current column/row when nothing in it lies ahead.
+    // The cast mirrors the original code: TypeScript narrows both to `never`
+    // because it cannot see the assignments made inside the forEach closure.
+    const target = (bestAligned ?? bestLoose) as HTMLElement | null;
+    if (target) {
+        target.focus();
     }
 }
