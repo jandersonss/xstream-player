@@ -2,7 +2,7 @@
 
 import React from 'react';
 
-export type BadgeTone = 'neutral' | 'live' | 'ok' | 'warn';
+export type BadgeTone = 'neutral' | 'live' | 'ok' | 'warn' | 'rating';
 
 export interface BadgeProps {
     children: React.ReactNode;
@@ -17,6 +17,9 @@ const TONE_CLASSNAME: Record<BadgeTone, string> = {
     live: 'bg-brand-soft text-brand border border-brand',
     ok: 'bg-surface-2 text-ok border border-line',
     warn: 'bg-surface-2 text-warn border border-line',
+    // `rating` borrows the warn hue but is not a warning: the coloured border is
+    // what sets a score apart from the neutral facts beside it (type, year).
+    rating: 'bg-surface-2 text-warn border border-warn',
 };
 
 const DOT_CLASSNAME: Record<BadgeTone, string> = {
@@ -24,6 +27,7 @@ const DOT_CLASSNAME: Record<BadgeTone, string> = {
     live: 'bg-brand',
     ok: 'bg-ok',
     warn: 'bg-warn',
+    rating: 'bg-warn',
 };
 
 export default function Badge({ children, tone = 'neutral', dot = false }: BadgeProps) {
