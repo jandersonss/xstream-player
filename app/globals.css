@@ -34,90 +34,214 @@ button,
     display: none;
 }
 
-/* 
-  FALLBACKS CRÍTICOS PARA WEBOS 4 (CHROME 60)
-  Garante que o fundo seja preto mesmo se o processamento falhar.
-*/
+/* ==========================================================================
+   TOKENS — docs/redesign/00-design-system.md §3
+   Valores literais: `color-mix`, `oklch` e `clamp` não existem no Chromium 53.
+   ========================================================================== */
 :root {
-  --background: #0a0a0a;
-  --foreground: #ededed;
-  --primary: #e50914;
-  --secondary: #262626;
-  --accent: #404040;
-  --text-muted: #a3a3a3;
-  --card-bg: #171717;
-  --glass-bg: rgba(23, 23, 23, 0.8);
-  --font-main: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    /* superfícies */
+    --bg: #0b0b0c;
+    --surface: #141416;
+    --surface-2: #1c1c1f;
+    --surface-3: #26262a;
+
+    /* traços */
+    --line: rgba(255, 255, 255, 0.08);
+    --line-strong: rgba(255, 255, 255, 0.16);
+
+    /* texto */
+    --text: #f4f4f5;
+    --text-2: #a8a8b0;
+    --text-3: #71717a;
+
+    /* semântica: branco é o cursor, vermelho é marca + no ar. Nada mais. */
+    --focus: #ffffff;
+    --brand: #e50914;
+    --brand-soft: rgba(229, 9, 20, 0.14);
+    --ok: #34d399;
+    --warn: #fbbf24;
+
+    /* tipografia — nenhuma webfont é baixada: TV com rede ruim não pode depender disso */
+    --font-ui: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+    --font-mono: ui-monospace, SFMono-Regular, Menlo, Consolas, "Liberation Mono", monospace;
+
+    /* Legado: mantidos porque `video::cue` e o VideoPlayer os referenciam. */
+    --background: #0b0b0c;
+    --foreground: #f4f4f5;
+    --font-main: var(--font-ui);
 }
 
 body {
-  margin: 0;
-  padding: 0;
-  background-color: #0a0a0a !important;
-  color: #ededed !important;
-  font-family: var(--font-main);
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+    margin: 0;
+    padding: 0;
+    /* !important porque a webOS pinta o fundo do <body> antes do CSS resolver. */
+    background-color: #0b0b0c !important;
+    color: #f4f4f5 !important;
+    font-family: var(--font-ui);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
 html,
 body {
-  height: 100%;
-  width: 100%;
-  overflow-x: hidden;
+    height: 100%;
+    width: 100%;
+    overflow-x: hidden;
 }
 
-/* TV Focus Styles */
+/* ==========================================================================
+   FOCO — docs/redesign/00-design-system.md §4
+   Contrato único da app. Componentes NÃO escrevem `focus:ring-*`/`focus:outline-*`.
+   ========================================================================== */
+
+/*
+  Anel via box-shadow, não outline: no Chromium < 94 o `outline` ignora
+  `border-radius` e desenha um retângulo em volta de um card arredondado.
+  `box-shadow` acompanha o raio em todos os engines-alvo.
+*/
+[data-focusable="true"] {
+    outline: none;
+    transition: transform 180ms ease, opacity 180ms ease, box-shadow 180ms ease;
+}
+
 [data-focusable="true"]:focus {
-  outline: 4px solid #e50914 !important;
-  outline-offset: 4px !important;
-  transform: scale(1.05) !important;
-  z-index: 50 !important;
-  box-shadow: 0 0 20px rgba(229, 9, 20, 0.8) !important;
+    box-shadow: 0 0 0 3px var(--focus), 0 18px 40px rgba(0, 0, 0, 0.7);
+    transform: scale(1.04);
+    opacity: 1;
+    z-index: 30;
+    position: relative;
 }
 
-/* Scrollbar para navegadores antigos baseados em WebKit (Chrome 60) */
+/* Cards de pôster grandes: o anel fino some a 3 m, a escala compensa. */
+[data-focusable="true"].focus-lift-lg:focus {
+    transform: scale(1.06);
+}
+
+/* Controles densos (barra do player, linhas de lista): escalar desalinha o vizinho. */
+[data-focusable="true"].focus-flat:focus {
+    transform: none;
+    box-shadow: 0 0 0 3px var(--focus);
+}
+
+/*
+  Spotlight (§4.1): a linha inteira recua e o item focado avança.
+  `:focus` puro porque `:focus-within` só existe a partir do Chromium 60.
+*/
+.spotlight-item {
+    opacity: 0.78;
+}
+
+.spotlight-item:focus,
+.spotlight-item:hover {
+    opacity: 1;
+}
+
+/* ==========================================================================
+   CAIXAS DE PROPORÇÃO — §5.1
+   Substituem `aspect-ratio` (Chrome 88) e todo tamanho fixo em px.
+   ========================================================================== */
+.ratio {
+    position: relative;
+    width: 100%;
+}
+
+.ratio > .ratio-fill {
+    position: absolute;
+    top: 0;
+    right: 0;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+}
+
+.ratio-poster {
+    padding-top: 150%;
+}
+
+.ratio-wide {
+    padding-top: 56.25%;
+}
+
+.ratio-square {
+    padding-top: 100%;
+}
+
+/* ==========================================================================
+   UTILITÁRIOS
+   ========================================================================== */
+
+/* Números que mudam (duração, relógio, contadores) não devem dançar. */
+.tnum {
+    font-family: var(--font-mono);
+    -webkit-font-feature-settings: "tnum";
+    font-feature-settings: "tnum";
+    font-variant-numeric: tabular-nums;
+}
+
+/*
+  Scroller horizontal de linha de conteúdo. A folga interna existe porque o anel
+  de foco (3px) mais a escala (1.04) de um card focado seriam cortados pelo
+  overflow do contêiner.
+*/
+.row-scroller {
+    overflow-x: auto;
+    overflow-y: hidden;
+    -webkit-overflow-scrolling: touch;
+    padding: 24px 4px;
+    margin: -24px -4px;
+}
+
+.row-scroller::-webkit-scrollbar {
+    height: 0;
+    display: none;
+}
+
+/* Scrollbar para navegadores antigos baseados em WebKit. */
 ::-webkit-scrollbar {
-  width: 8px;
+    width: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #0a0a0a;
+    background: var(--bg);
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #262626;
-  border-radius: 4px;
+    background: var(--surface-3);
+    border-radius: 4px;
 }
 
-/* Chrome < 88 (WebOS 5/6 TVs) lacks aspect-ratio: a ratio-sized pseudo-element
-   props .aspect-video containers open (float in blocks, extra item in flex) */
+/* Chrome < 88 (WebOS 5/6) não tem aspect-ratio: um pseudo-elemento dimensionado
+   por proporção mantém o container .aspect-video aberto. Preferir `.ratio-wide`
+   em código novo; isto cobre o que ainda usa a classe do Tailwind. */
 @supports not (aspect-ratio: 16 / 9) {
-  .aspect-video::before {
-    content: "";
-    float: left;
-    padding-top: 56.25%;
-  }
+    .aspect-video::before {
+        content: "";
+        float: left;
+        padding-top: 56.25%;
+    }
 
-  .aspect-video::after {
-    content: "";
-    display: block;
-    clear: both;
-  }
+    .aspect-video::after {
+        content: "";
+        display: block;
+        clear: both;
+    }
 }
 
-/* Subtitle Styling */
+/* ==========================================================================
+   LEGENDAS
+   ========================================================================== */
 video::cue {
-  background-color: rgba(0, 0, 0, 0.7) !important;
-  color: #ffffff !important;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 1) !important;
-  font-family: var(--font-main) !important;
-  font-size: var(--subtitle-font-size, 1.2rem) !important;
-  line-height: 0 !important;
-  /* Raises the subtitle by increasing the line box height */
+    background-color: rgba(0, 0, 0, 0.7) !important;
+    color: #ffffff !important;
+    text-shadow: 0 0 4px rgba(0, 0, 0, 1) !important;
+    font-family: var(--font-ui) !important;
+    font-size: var(--subtitle-font-size, 1.2rem) !important;
+    line-height: 0 !important;
+    /* Raises the subtitle by increasing the line box height */
 }
 
 /* Chrome/Webkit specific position adjustment if supported */
 video::-webkit-media-text-track-display {
-  padding-bottom: 5% !important;
+    padding-bottom: 5% !important;
 }
