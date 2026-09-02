@@ -961,7 +961,16 @@ export default function WatchSeriesPage() {
                                             onClick={() => setSelectedEpisode(ep)}
                                             data-focusable="true"
                                             tabIndex={0}
-                                            className="flex-1 min-w-0 flex items-start text-left"
+                                            // A dense list row (bare content beside a sibling
+                                            // IconButton, inside an already-rounded card): the
+                                            // default ring picks up the button's own border-radius,
+                                            // which is none, and the default scale can push the
+                                            // row past the card's padding. `focus-flat` draws the
+                                            // ring flush with no scale — the same treatment as
+                                            // every other list row in the app (spec 00 §4) — and
+                                            // rounded-lg keeps that ring from reading as a sharp
+                                            // square inside the card's rounded-xl border.
+                                            className="focus-flat flex-1 min-w-0 flex items-start text-left rounded-lg"
                                         >
                                             <div className="w-32 md:w-40 flex-shrink-0 mr-4">
                                                 <div className="ratio ratio-wide rounded-lg overflow-hidden bg-surface-2">
