@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, LogOut, MonitorSmartphone, Pencil, Plus, Trash2, Tv, X } from 'lucide-react';
 import { apiFetch } from '@/app/lib/apiClient';
 import SectionHeader from '@/components/ui/SectionHeader';
@@ -54,6 +54,18 @@ function DeviceRow({
 }) {
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(device.name);
+    const rowRef = useRef<HTMLLIElement>(null);
+    const wasEditingRef = useRef(false);
+
+    // The rename input unmounts on save/cancel, dropping focus to `body` —
+    // the next D-pad press would then jump to the first focusable element on
+    // the whole page (app/hooks/useTvNavigation.ts) instead of staying here.
+    useEffect(() => {
+        if (wasEditingRef.current && !editing) {
+            rowRef.current?.querySelector<HTMLElement>('[data-focusable="true"]')?.focus();
+        }
+        wasEditingRef.current = editing;
+    }, [editing]);
 
     const profileName = profiles.find(profile => profile.id === device.profileId)?.name;
 
@@ -66,7 +78,7 @@ function DeviceRow({
     };
 
     return (
-        <li className="flex items-center justify-between bg-surface border border-line rounded-xl p-4">
+        <li ref={rowRef} className="flex items-center justify-between bg-surface border border-line rounded-xl p-4">
             <div className="flex items-center min-w-0 space-x-3">
                 <MonitorSmartphone size={20} className="flex-shrink-0 text-ink-2" />
                 <div className="min-w-0">
@@ -78,6 +90,7 @@ function DeviceRow({
                                 onChange={(event) => setDraft(event.target.value)}
                                 onKeyDown={(event) => { if (event.key === 'Enter') void save(); }}
                                 data-focusable="true"
+                                tabIndex={0}
                                 className={inputClassName}
                             />
                             <IconButton icon={Check} label="Salvar nome" onClick={() => void save()} />

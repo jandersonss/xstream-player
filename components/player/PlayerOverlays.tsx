@@ -26,7 +26,12 @@ export default function PlayerOverlays({ isBuffering, showBufferingHelp, centerP
                         {showBufferingHelp && (
                             <div className="mt-4 text-ink text-sm pointer-events-auto">
                                 <p className="mb-2">O carregamento está demorando.</p>
-                                <a href={DEBUG_PATH} className="text-ink-2 underline font-semibold">
+                                <a
+                                    href={DEBUG_PATH}
+                                    data-focusable="true"
+                                    tabIndex={0}
+                                    className="text-ink-2 underline font-semibold"
+                                >
                                     Abrir diagnóstico
                                 </a>
                             </div>

@@ -27,7 +27,9 @@ interface HeroSectionProps {
     type?: 'all' | 'movie' | 'series';
 }
 
-const NEXT_DELAY = 30000;
+const NEXT_DELAY = 35000;
+/** How long the backdrop image shows before the trailer takes over. */
+const VIDEO_START_DELAY = 5000;
 
 export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const { user } = useAuth();
@@ -130,7 +132,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     if (!isTV) {
                         setShowVideo(true);
                     }
-                }, 2000);
+                }, VIDEO_START_DELAY);
             }
         }
 
@@ -141,6 +143,27 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
             clearTimeout(logoTimer);
         };
     }, [currentIndex, heroItems, isTV]);
+
+    // Browsers block a cross-origin iframe from *starting* playback with sound
+    // (Chrome/Firefox autoplay policy) — requesting `mute=0` up front leaves the
+    // embed stuck showing YouTube's own paused/play overlay, which the viewer
+    // can never dismiss since the iframe is `pointer-events-none`. Muted
+    // autoplay is always allowed, so the embed always starts muted (below); the
+    // policy only restricts *starting* audio, not unmuting already-playing
+    // media, so a postMessage `unMute` command shortly after works reliably —
+    // no reload, no visible control, no stuck overlay.
+    useEffect(() => {
+        if (isTV || !videoKey || !showVideo) return;
+
+        const timer = setTimeout(() => {
+            iframeRef.current?.contentWindow?.postMessage(
+                JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+                '*'
+            );
+        }, 1200);
+
+        return () => clearTimeout(timer);
+    }, [videoKey, showVideo, isTV]);
 
     const fetchHeroContent = useCallback(async () => {
         if (!user) return;
@@ -183,13 +206,16 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         style={{ backgroundImage: `url(${currentItem.backdrop})` }}
                     />
 
-                    {/* Video Player */}
-                    {!isTV && videoKey && (
-                        <div className={`absolute w-full h-full inset-0 transition-opacity duration-1000 ${showVideo ? 'opacity-100' : 'opacity-0'}`}>
+                    {/* Video Player — only mounted once `showVideo` flips (after
+                        VIDEO_START_DELAY), so `autoplay=1` doesn't start the
+                        trailer (with sound) while it's still hidden behind the
+                        backdrop image. */}
+                    {!isTV && videoKey && showVideo && (
+                        <div className="absolute w-full h-full inset-0">
                             <iframe
                                 ref={iframeRef}
                                 className="w-full h-full scale-150 pointer-events-none"
-                                src={`https://www.youtube.com/embed/${videoKey}?autoplay=1&mute=0&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&enablejsapi=1&loop=1&playlist=${videoKey}&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
+                                src={`https://www.youtube.com/embed/${videoKey}?autoplay=1&mute=1&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&enablejsapi=1&loop=1&playlist=${videoKey}&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                                 title="Trailer"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
                             />
@@ -262,8 +288,11 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                 </div>
             </div>
 
-            {/* Pagination / Indicators */}
-            <div className="absolute bottom-4 left-1/2 -translate-x-1/2 z-40 flex flex-row items-center">
+            {/* Pagination / Indicators — aligned under the action buttons (not
+                centered on the viewport) so ArrowDown from "Assistir"/"Minha
+                lista" lands geometrically on the content below the hero, not
+                on these, per useTvNavigation's alignment-first candidate rule. */}
+            <div className="absolute bottom-4 left-6 md:left-16 z-40 flex flex-row items-center">
                 {heroItems.map((_, idx) => (
                     <button
                         key={idx}

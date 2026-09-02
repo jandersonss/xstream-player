@@ -75,6 +75,7 @@ export default function ProfileSelector() {
                             }}
                             placeholder="Nome do perfil"
                             data-focusable="true"
+                            tabIndex={0}
                             className={`${inputClassName} w-32 text-center`}
                         />
                     </div>

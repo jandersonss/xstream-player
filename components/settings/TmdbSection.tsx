@@ -61,8 +61,8 @@ export default function TmdbSection() {
                     onChange={(e) => setApiKey(e.target.value)}
                     disabled={isSaving}
                     placeholder="Digite sua chave de API do TMDb"
-                    data-focusable="true"
-                    tabIndex={0}
+                    data-focusable={isSaving ? undefined : 'true'}
+                    tabIndex={isSaving ? undefined : 0}
                     className={inputClassName}
                 />
             </Field>

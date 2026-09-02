@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
 import { Radio, Tv, Film, Layers, Pencil, Check, PowerOff, Play } from 'lucide-react';
@@ -34,6 +34,18 @@ function DeviceNameEditor() {
     const [name, setName] = useState(() => getDeviceName());
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState('');
+    const editButtonRef = useRef<HTMLButtonElement>(null);
+    const wasEditingRef = useRef(false);
+
+    // The input unmounts on save, dropping focus to `body` — the next D-pad
+    // press would otherwise jump to the first focusable element on the whole
+    // page (app/hooks/useTvNavigation.ts) instead of staying near this control.
+    useEffect(() => {
+        if (wasEditingRef.current && !editing) {
+            editButtonRef.current?.focus();
+        }
+        wasEditingRef.current = editing;
+    }, [editing]);
 
     const save = () => {
         const trimmed = draft.trim();
@@ -74,6 +86,7 @@ function DeviceNameEditor() {
             <span>Este aparelho:</span>
             <span className="text-ink font-semibold">{name}</span>
             <button
+                ref={editButtonRef}
                 onClick={() => { setDraft(name); setEditing(true); }}
                 data-focusable="true"
                 tabIndex={0}

@@ -98,8 +98,8 @@ export default function SubtitlesSection() {
                         onChange={(e) => setApiKey(e.target.value)}
                         disabled={isSaving}
                         placeholder="Digite sua chave de API do OpenSubtitles"
-                        data-focusable="true"
-                        tabIndex={0}
+                        data-focusable={isSaving ? undefined : 'true'}
+                        tabIndex={isSaving ? undefined : 0}
                         className={inputClassName}
                     />
                 </Field>

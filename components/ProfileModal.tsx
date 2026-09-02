@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { useProfile } from '@/app/context/ProfileContext';
 import Modal from '@/components/ui/Modal';
@@ -24,6 +24,20 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     // LimitReachedModal) did.
     const [deletingId, setDeletingId] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const prevEditingIdRef = useRef<string | null>(null);
+
+    // The rename input unmounts back to the "select profile" button when
+    // editing ends, dropping focus to `body` — the next D-pad press would
+    // otherwise jump to the first focusable element on the whole page
+    // (app/hooks/useTvNavigation.ts) instead of staying on this row.
+    useEffect(() => {
+        if (prevEditingIdRef.current && prevEditingIdRef.current !== editingId) {
+            document
+                .querySelector<HTMLElement>(`[data-profile-select="${prevEditingIdRef.current}"]`)
+                ?.focus();
+        }
+        prevEditingIdRef.current = editingId;
+    }, [editingId]);
 
     const handleCreate = async () => {
         const trimmed = newName.trim();
@@ -100,12 +114,14 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                             }}
                                             onBlur={() => handleRename(profile.id)}
                                             data-focusable="true"
+                                            tabIndex={0}
                                             className={`flex-1 ${inputClassName} h-9`}
                                         />
                                     ) : (
                                         <button
                                             onClick={() => selectProfile(profile.id)}
                                             data-focusable="true"
+                                            data-profile-select={profile.id}
                                             tabIndex={0}
                                             className="flex-1 text-left text-sm font-medium text-ink"
                                         >
@@ -146,6 +162,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                         onKeyDown={e => e.key === 'Enter' && handleCreate()}
                         placeholder="Nome do perfil"
                         data-focusable="true"
+                        tabIndex={0}
                         className={inputClassName}
                     />
                 </Field>

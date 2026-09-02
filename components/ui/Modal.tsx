@@ -31,6 +31,10 @@ export default function Modal({
     size = 'md',
 }: ModalProps) {
     const cardRef = useRef<HTMLDivElement>(null);
+    // Whatever opened the modal (a poster, an icon button…) — restored on
+    // close so the D-pad cursor doesn't fall back to `body` and jump to the
+    // first focusable element on the entire page (app/hooks/useTvNavigation.ts).
+    const triggerRef = useRef<HTMLElement | null>(null);
 
     // A single z-index for every modal in the app (spec 00 fixes the stacking
     // mess where ad hoc modals fought over z-index).
@@ -62,8 +66,13 @@ export default function Modal({
     }, [isOpen, onClose]);
 
     useEffect(() => {
-        if (!isOpen) return;
+        if (!isOpen) {
+            triggerRef.current?.focus();
+            triggerRef.current = null;
+            return;
+        }
 
+        triggerRef.current = document.activeElement instanceof HTMLElement ? document.activeElement : null;
         const firstFocusable = cardRef.current?.querySelector<HTMLElement>('[data-focusable="true"]');
         firstFocusable?.focus();
     }, [isOpen]);

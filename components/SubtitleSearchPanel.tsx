@@ -230,7 +230,8 @@ export default function SubtitleSearchPanel({
                             key={result.id}
                             onClick={() => handleDownload(fileId)}
                             disabled={isDownloading !== null}
-                            data-focusable="true"
+                            data-focusable={isDownloading !== null ? undefined : 'true'}
+                            tabIndex={isDownloading !== null ? undefined : 0}
                             className="w-full text-left p-3 bg-surface border border-line rounded-xl disabled:opacity-50"
                         >
                             <div className="flex items-center justify-between">

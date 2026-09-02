@@ -866,8 +866,8 @@ export default function WatchSeriesPage() {
                                                 value={batchLanguage}
                                                 onChange={(e) => setBatchLanguage(e.target.value)}
                                                 disabled={isBatchBusy}
-                                                data-focusable="true"
-                                                tabIndex={0}
+                                                data-focusable={isBatchBusy ? undefined : 'true'}
+                                                tabIndex={isBatchBusy ? undefined : 0}
                                                 className={inputClassName}
                                             >
                                                 {BATCH_LANGUAGES.map(lang => (

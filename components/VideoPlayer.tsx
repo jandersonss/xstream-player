@@ -624,6 +624,16 @@ export default function VideoPlayer({
                 if (activeElement instanceof Element && activeElement.closest('[data-player-controls]')) {
                     return;
                 }
+                // Up/Down inside the next-episode prompt must escape to the D-pad
+                // navigator instead of adjusting volume — the prompt only
+                // intercepts Left/Right itself (moveNextEpisodePromptFocus, below).
+                if (
+                    (key === 'arrowup' || key === 'arrowdown') &&
+                    activeElement instanceof Node &&
+                    nextEpisodePromptRef.current?.contains(activeElement)
+                ) {
+                    return;
+                }
             }
 
             switch (key) {
@@ -1151,8 +1161,12 @@ export default function VideoPlayer({
             style={containerStyle}
             onMouseMove={handleInteraction}
             onMouseLeave={() => isPlaying && setShowControls(false)}
-
             onTouchStart={handleInteraction}
+            // A D-pad focus move (useTvNavigation) fires a native `focus` event
+            // that bubbles here — without this, the auto-hidden control bar
+            // stays invisible while the D-pad cursor keeps moving/activating
+            // its (invisible) buttons.
+            onFocusCapture={handleInteraction}
         >
             <video
                 ref={videoRef}

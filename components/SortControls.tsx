@@ -23,13 +23,17 @@ export default function SortControls({ value, onChange, options }: SortControlsP
                 return (
                     <button
                         key={option}
-                        type="button"
                         onClick={() => onChange(option)}
                         data-focusable="true"
                         tabIndex={0}
+                        aria-pressed={isActive}
                         className={[
-                            'mr-2 mb-2 h-9 px-3 rounded-lg text-sm font-medium transition-colors',
-                            isActive ? 'bg-surface-3 text-ink' : 'text-ink-2 border border-line',
+                            // `rounded-full` matches the other chip-style controls
+                            // (search tabs, home shortcuts). `border-2` on both states
+                            // (only the color changes) so the active button doesn't
+                            // grow and shift its neighbors.
+                            'mr-2 mb-2 h-9 px-3 rounded-full text-sm font-medium border-2 transition-colors',
+                            isActive ? 'border-ink text-ink bg-surface-2' : 'border-line text-ink-2 bg-surface-2',
                         ].join(' ')}
                     >
                         {SORT_LABELS[option]}

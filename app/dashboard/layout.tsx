@@ -5,7 +5,8 @@ import BottomNav from '@/components/BottomNav';
 import Loader from '@/components/Loader';
 import { useAuth } from '../context/AuthContext';
 import { useRouter } from 'next/navigation';
-import { useEffect } from 'react';
+import { useEffect, useRef } from 'react';
+import { useAutoFocusMainContent } from '../hooks/useAutoFocusMainContent';
 
 export default function DashboardLayout({
     children,
@@ -14,12 +15,15 @@ export default function DashboardLayout({
 }) {
     const { isAuthenticated, isLoading } = useAuth();
     const router = useRouter();
+    const mainRef = useRef<HTMLElement>(null);
 
     useEffect(() => {
         if (!isLoading && !isAuthenticated) {
             router.push('/');
         }
     }, [isAuthenticated, isLoading, router]);
+
+    useAutoFocusMainContent(mainRef);
 
     if (isLoading) {
         return (
@@ -34,7 +38,7 @@ export default function DashboardLayout({
     return (
         <div className="flex flex-col md:flex-row h-screen bg-bg overflow-hidden">
             <NavRail />
-            <main className="flex-1 overflow-y-auto h-full pb-16 md:pb-0">
+            <main ref={mainRef} className="flex-1 overflow-y-auto h-full pb-16 md:pb-0">
                 <div className="max-w-[1800px] mx-auto min-h-full">{children}</div>
             </main>
             <BottomNav />

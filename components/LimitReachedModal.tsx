@@ -59,6 +59,7 @@ export default function LimitReachedModal({ open, onClose }: LimitReachedModalPr
                             key={s.deviceId}
                             onClick={() => join(s)}
                             data-focusable="true"
+                            tabIndex={0}
                             className="w-full flex items-center space-x-3 p-3 rounded-xl bg-surface border border-line text-left"
                         >
                             <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-soft text-brand shrink-0">

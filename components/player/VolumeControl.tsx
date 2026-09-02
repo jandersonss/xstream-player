@@ -25,6 +25,19 @@ export default function VolumeControl({ volume, muted, onToggleMute, onVolumeCha
         }
     };
 
+    // The slider is rendered vertically, but useTvNavigation treats ArrowUp/
+    // ArrowDown as page navigation for every form control (it only exempts
+    // ArrowLeft/ArrowRight on a range input) — so those keys would otherwise
+    // move focus off the slider instead of raising/lowering the volume.
+    const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>) => {
+        if (e.key !== 'ArrowUp' && e.key !== 'ArrowDown') return;
+        e.preventDefault();
+        e.stopPropagation();
+        const step = 0.05;
+        const delta = e.key === 'ArrowUp' ? step : -step;
+        onVolumeChange(Math.min(1, Math.max(0, volume + delta)));
+    };
+
     return (
         <div
             ref={containerRef}
@@ -52,6 +65,7 @@ export default function VolumeControl({ volume, muted, onToggleMute, onVolumeCha
                             step="0.01"
                             value={volume}
                             onChange={(e) => onVolumeChange(parseFloat(e.target.value))}
+                            onKeyDown={handleKeyDown}
                             onFocus={() => setVisible(true)}
                             onBlur={handleBlur}
                             data-focusable="true"
