@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, TouchEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Bookmark } from 'lucide-react';
+import { Play, Bookmark, Star } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
 import { useFavorites } from '../app/context/FavoritesContext';
 import { apiFetch } from '../app/lib/apiClient';
@@ -219,9 +219,13 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         </div>
                         <div className="ml-2">
                             <Badge tone="rating">
-                                {/* No `leading-none` here: the other badges take
-                                    their height from the text-xs line box, so
+                                {/* The star stays under the 1rem line box of the
+                                    text beside it, so it marks the number without
+                                    driving the badge height. No `leading-none`
+                                    here either: the sibling badges take their
+                                    height from that same text-xs line box, and
                                     overriding it made this one visibly shorter. */}
+                                <Star size={10} className="mr-1 flex-shrink-0" fill="currentColor" />
                                 <span className="tnum">{currentItem.rating.toFixed(1)}</span>
                             </Badge>
                         </div>
