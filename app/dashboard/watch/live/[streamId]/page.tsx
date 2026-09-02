@@ -2,11 +2,12 @@
 
 import { useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
-import { Radio } from 'lucide-react';
 import { useAuth } from '@/app/context/AuthContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import type Hls from 'hls.js';
 import SyncButton from '@/components/SyncButton';
+import BroadcastToggle from '@/components/BroadcastToggle';
+import Badge from '@/components/ui/Badge';
 import { useShareBroadcast, useSyncPlayback, syncKey } from '@/app/hooks/useLiveShare';
 import { getAutoBroadcast } from '@/app/lib/device';
 import { apiUrl } from '@/app/lib/apiClient';
@@ -57,31 +58,23 @@ export default function WatchLivePage() {
     useShareBroadcast(isSharing && !isJoining, broadcastInfo);
 
     if (!streamUrl) {
-        return <div className="min-h-screen bg-black flex items-center justify-center text-white">Preparando stream...</div>;
+        return (
+            <div className="min-h-screen bg-bg flex items-center justify-center text-ink-2">
+                Preparando stream...
+            </div>
+        );
     }
 
     const shareToggle = !isJoining ? (
-        <button
-            onClick={() => setIsSharing((v) => !v)}
-            className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing
-                ? 'bg-red-600 text-white'
-                : 'bg-black/60 text-gray-200 hover:bg-white/20'
-                }`}
-            title={isSharing ? 'Transmitindo para o Modo TV' : 'Transmitir este canal no Modo TV'}
-        >
-            <Radio size={18} className={isSharing ? 'animate-pulse' : ''} />
-            <span>{isSharing ? 'Transmitindo' : 'Transmitir'}</span>
-        </button>
+        <BroadcastToggle active={isSharing} onToggle={() => setIsSharing((v) => !v)} />
     ) : (
-        <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center space-x-2">
-            <Radio size={18} className="animate-pulse" /> Modo TV
-        </span>
+        <Badge tone="live" dot>Modo TV</Badge>
     );
 
     return (
-        <div className="fixed inset-0 bg-black z-50 flex flex-col">
+        <div className="fixed inset-0 bg-bg z-50 flex flex-col">
             <div className="absolute inset-0 overflow-hidden pointer-events-none">
-                <div className="absolute inset-0 bg-gradient-to-t from-black via-black/40 to-transparent z-10"></div>
+                <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/40 to-transparent z-10" />
             </div>
 
             <div className="relative flex-1 flex items-center justify-center">
@@ -92,7 +85,7 @@ export default function WatchLivePage() {
                     onBack={() => router.back()}
                     title={title}
                     onVideoElement={setVideoEl}
-                        onHlsInstance={setHlsInstance}
+                    onHlsInstance={setHlsInstance}
                     topRightSlot={
                         <div className="flex items-center space-x-2">
                             {useRelay && canSync && <SyncButton role={isJoining ? 'viewer' : 'broadcaster'} onClick={sync} />}

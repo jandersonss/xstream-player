@@ -7,12 +7,17 @@ import { useFavorites } from '@/app/context/FavoritesContext';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import type Hls from 'hls.js';
-import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles, Radio } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import LimitReachedModal from '@/components/LimitReachedModal';
 import { apiFetch } from '@/app/lib/apiClient';
 import BroadcastStartModal from '@/components/BroadcastStartModal';
+import BroadcastToggle from '@/components/BroadcastToggle';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import IconButton from '@/components/ui/IconButton';
+import EmptyState from '@/components/ui/EmptyState';
 import { useConnectionLimit } from '@/app/hooks/useConnectionLimit';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
 import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
@@ -274,7 +279,7 @@ export default function WatchMoviePage() {
         const src = relaySrc({ contentType: 'movie', streamId, ext: joinExt })
             + (reloadNonce ? `&_r=${reloadNonce}` : '');
         return (
-            <div className="fixed inset-0 bg-black z-50 flex flex-col">
+            <div className="fixed inset-0 bg-bg z-50 flex flex-col">
                 <div className="relative flex-1 flex items-center justify-center">
                     <VideoPlayer
                         src={src}
@@ -287,9 +292,7 @@ export default function WatchMoviePage() {
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {canSync && <SyncButton role="viewer" onClick={sync} />}
-                                <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center space-x-2">
-                                    <Radio size={18} className="animate-pulse" /> Modo TV
-                                </span>
+                                <Badge tone="live" dot>Modo TV</Badge>
                             </div>
                         }
                     />
@@ -302,11 +305,15 @@ export default function WatchMoviePage() {
 
     if (error || !movie) {
         return (
-            <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white space-y-4">
-                <p className="text-red-500 text-xl">{error || 'Filme não encontrado'}</p>
-                <button onClick={() => router.back()} className="flex items-center space-x-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">
-                    <ArrowLeft size={20} /> Voltar
-                </button>
+            <div className="min-h-screen bg-bg flex flex-col items-center justify-center">
+                <EmptyState
+                    title={error || 'Filme não encontrado'}
+                    action={
+                        <Button variant="secondary" icon={ArrowLeft} onClick={() => router.back()}>
+                            Voltar
+                        </Button>
+                    }
+                />
             </div>
         );
     }
@@ -348,28 +355,8 @@ export default function WatchMoviePage() {
             ? relaySrc({ contentType: 'movie', streamId, ext: extension, start: startSeconds })
             : directUrl;
 
-        const shareToggle = (
-            <button
-                onClick={() => {
-                    // Stopping is immediate; starting asks where to begin (the point is
-                    // baked into ffmpeg and cannot change once it is running).
-                    if (isSharing) {
-                        setIsSharing(false);
-                        setBroadcastStart(null);
-                    } else {
-                        setShowStartModal(true);
-                    }
-                }}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
-                title={isSharing ? 'Transmitindo para o Modo TV (sem avançar/pausar)' : 'Transmitir este filme no Modo TV'}
-            >
-                <Radio size={18} className={isSharing ? 'animate-pulse' : ''} />
-                <span>{isSharing ? 'Transmitindo' : 'Transmitir'}</span>
-            </button>
-        );
-
         return (
-            <div className="fixed inset-0 bg-black z-50 flex flex-col">
+            <div className="fixed inset-0 bg-bg z-50 flex flex-col">
                 <div className="relative flex-1 flex items-center justify-center">
                     <VideoPlayer
                         src={streamUrl}
@@ -388,7 +375,19 @@ export default function WatchMoviePage() {
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}
-                                {shareToggle}
+                                <BroadcastToggle
+                                    active={isSharing}
+                                    onToggle={() => {
+                                        // Stopping is immediate; starting asks where to begin (the point is
+                                        // baked into ffmpeg and cannot change once it is running).
+                                        if (isSharing) {
+                                            setIsSharing(false);
+                                            setBroadcastStart(null);
+                                        } else {
+                                            setShowStartModal(true);
+                                        }
+                                    }}
+                                />
                             </div>
                         }
                     />
@@ -408,26 +407,25 @@ export default function WatchMoviePage() {
     }
 
     // Details View
+    const favorited = isFavorite(movie.movie_data.stream_id, 'movie');
+    const hasProgress = resumeTime > 0;
+
     return (
-        <div className="min-h-screen bg-[#141414] text-white ">
+        <div className="min-h-screen bg-bg text-ink">
             {/* Background Backdrop (using poster logic if backdrop not available, blurred) */}
             <div className="absolute inset-0 overflow-hidden">
                 <div
                     className="absolute inset-0 bg-cover bg-center blur-3xl opacity-30 scale-110"
                     style={{ backgroundImage: `url(${movie.info.movie_image})` }}
-                ></div>
-                <div className="absolute inset-0 bg-gradient-to-t from-[#141414] via-[#141414]/80 to-transparent"></div>
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent" />
+                <div className="absolute inset-0 w-1/2 bg-gradient-to-r from-bg/80 to-transparent" />
             </div>
 
-            <div className="relative z-10 container mx-auto p-4 md:p-6 lg:p-10">
-                <button
-                    onClick={() => router.back()}
-                    data-focusable="true"
-                    tabIndex={0}
-                    className="mb-8 flex items-center space-x-2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-red-500 focus:scale-110 origin-left"
-                >
-                    <ArrowLeft size={24} /> Voltar
-                </button>
+            <div className="relative z-10 px-6 md:px-10 lg:px-14 py-8">
+                <Button variant="ghost" icon={ArrowLeft} onClick={() => router.back()} className="mb-8">
+                    Voltar
+                </Button>
 
                 <div className="flex flex-col lg:flex-row space-y-10 lg:space-y-0 lg:space-x-16 items-start">
                     {/* Poster */}
@@ -442,67 +440,53 @@ export default function WatchMoviePage() {
 
                     {/* Metadata */}
                     <div className="flex-1 space-y-6">
-                        <h1 className="text-3xl lg:text-5xl font-bold leading-tight">{movie.info.name}</h1>
+                        <h1 className="text-3xl md:text-5xl font-semibold tracking-tight leading-tight">{movie.info.name}</h1>
 
-                        <div className="flex flex-wrap items-center space-x-4 text-sm lg:text-base text-gray-300">
+                        <div className="flex flex-wrap items-center">
                             {movie.info.releasedate && (
-                                <span className="flex items-center space-x-1 bg-white/10 px-3 py-1 rounded-full">
-                                    <Calendar size={16} /> {movie.info.releasedate}
+                                <span className="mr-2 mb-2">
+                                    <Badge>
+                                        <Calendar size={14} className="mr-1.5" /> {movie.info.releasedate}
+                                    </Badge>
                                 </span>
                             )}
                             {movie.info.rating && (
-                                <span className="flex items-center space-x-1 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full border border-yellow-500/30">
-                                    <Star size={16} fill="currentColor" /> {movie.info.rating}
+                                <span className="mr-2 mb-2 flex items-center text-sm text-ink-2 tnum">
+                                    <Star size={16} className="mr-1 text-ink-2" fill="currentColor" /> {movie.info.rating}
                                 </span>
                             )}
                             {movie.info.duration && (
-                                <span className="flex items-center space-x-1 bg-white/10 px-3 py-1 rounded-full">
-                                    <Clock size={16} /> {movie.info.duration}
+                                <span className="mr-2 mb-2">
+                                    <Badge>
+                                        <Clock size={14} className="mr-1.5" /> {movie.info.duration}
+                                    </Badge>
                                 </span>
                             )}
                         </div>
 
-                        <p className="text-lg text-gray-300 leading-relaxed max-w-3xl">
+                        <p className="text-sm md:text-base text-ink-2 leading-relaxed max-w-3xl">
                             {movie.info.plot || "Nenhuma descrição disponível."}
                         </p>
 
-                        <div className="space-y-2 text-gray-400">
-                            <p><strong className="text-white">Gênero:</strong> {movie.info.genre}</p>
-                            <p><strong className="text-white">Diretor:</strong> {movie.info.director}</p>
+                        <div className="space-y-1 text-sm text-ink-2">
+                            {movie.info.genre && <p><span className="text-ink font-medium">Gênero:</span> {movie.info.genre}</p>}
+                            {movie.info.director && <p><span className="text-ink font-medium">Diretor:</span> {movie.info.director}</p>}
                         </div>
-                        <div className='flex items-center space-x-4'>
-                            <button
-                                onClick={handlePlay}
-                                data-focusable="true"
-                                tabIndex={0}
-                                className="bg-red-600 hover:bg-red-700 text-white font-bold py-4 px-10 rounded-full flex items-center space-x-3 transition-all transform hover:scale-105 shadow-lg shadow-red-900/40 focus:outline-none focus:ring-4 focus:ring-white focus:scale-110"
-                            >
-                                <Play size={28} fill="currentColor" />
-                                <span>Reproduzir Filme</span>
-                            </button>
-                            <button
-                                onClick={() => setShowSubtitlePanel(true)}
-                                data-focusable="true"
-                                tabIndex={0}
-                                className={`font-bold py-4 px-8 rounded-full flex items-center space-x-3 transition-all transform hover:scale-105 shadow-lg focus:outline-none focus:ring-4 focus:ring-white focus:scale-110 ${subtitleUrl
-                                    ? 'bg-emerald-600 hover:bg-emerald-700 text-white shadow-emerald-900/40'
-                                    : 'bg-white/10 hover:bg-white/20 text-white border border-white/20'
-                                    }`}
-                            >
-                                <Subtitles size={24} />
-                                <span>{subtitleUrl ? 'Legendas ✓' : 'Legendas'}</span>
-                            </button>
-                            <button
+
+                        <div className="flex items-center space-x-3">
+                            <Button variant="primary" size="lg" icon={Play} onClick={handlePlay}>
+                                {hasProgress ? <>Retomar · <span className="tnum ml-1">{formatDuration(resumeTime)}</span></> : 'Assistir'}
+                            </Button>
+                            <Button variant="secondary" size="lg" icon={Subtitles} onClick={() => setShowSubtitlePanel(true)}>
+                                {subtitleUrl ? 'Legendas ✓' : 'Legendas'}
+                            </Button>
+                            <IconButton
+                                icon={Bookmark}
+                                label={favorited ? 'Remover da minha lista' : 'Adicionar à minha lista'}
+                                variant="secondary"
+                                active={favorited}
                                 onClick={toggleFavorite}
-                                data-focusable="true"
-                                tabIndex={0}
-                                className={`p-4 rounded-full border transition-all focus:outline-none focus:ring-4 focus:ring-white ${movie && isFavorite(movie.movie_data.stream_id, 'movie')
-                                    ? 'bg-white text-red-600 border-white'
-                                    : 'bg-transparent text-white border-white/30 hover:bg-white/10'
-                                    }`}
-                            >
-                                <Bookmark size={28} fill={movie && isFavorite(movie.movie_data.stream_id, 'movie') ? "currentColor" : "none"} />
-                            </button>
+                            />
                         </div>
                     </div>
                 </div>
@@ -522,4 +506,14 @@ export default function WatchMoviePage() {
             <LimitReachedModal open={showLimitModal} onClose={() => setShowLimitModal(false)} />
         </div>
     );
+}
+
+/** Formats seconds as "H:MM:SS" or "M:SS" for the "Retomar" label. */
+function formatDuration(totalSeconds: number): string {
+    const s = Math.max(0, Math.floor(totalSeconds));
+    const h = Math.floor(s / 3600);
+    const m = Math.floor((s % 3600) / 60);
+    const sec = s % 60;
+    const pad = (n: number) => String(n).padStart(2, '0');
+    return h > 0 ? `${h}:${pad(m)}:${pad(sec)}` : `${m}:${pad(sec)}`;
 }

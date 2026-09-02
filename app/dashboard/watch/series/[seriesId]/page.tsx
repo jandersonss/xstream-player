@@ -7,23 +7,38 @@ import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import type Hls from 'hls.js';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
-import { ArrowLeft, Play, Calendar, Star, Clock, List, Bookmark, Subtitles, Radio, Download, Loader2, X, Search, Check } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles, Download, Loader2, X, Search, Check } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import SyncButton from '@/components/SyncButton';
 import { apiFetch } from '@/app/lib/apiClient';
 import BroadcastStartModal from '@/components/BroadcastStartModal';
+import BroadcastToggle from '@/components/BroadcastToggle';
+import Badge from '@/components/ui/Badge';
+import Button from '@/components/ui/Button';
+import IconButton from '@/components/ui/IconButton';
+import EmptyState from '@/components/ui/EmptyState';
+import SectionHeader from '@/components/ui/SectionHeader';
+import Field, { inputClassName } from '@/components/ui/Field';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
 import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
 import { getAutoBroadcast } from '@/app/lib/device';
 
 // Types
+interface EpisodeInfo {
+    movie_image?: string;
+    plot?: string;
+    duration?: string;
+    duration_secs?: number;
+    releasedate?: string;
+}
+
 interface Episode {
     id: string;
     episode_num: string | number;
     title: string;
     container_extension: string;
-    info: any;
+    info: EpisodeInfo;
     custom_sid: string;
     added: string;
     season: number | string;
@@ -45,6 +60,24 @@ interface SeriesInfo {
     episodes: {
         [key: string]: Episode[];
     };
+}
+
+/** Context passed to `SubtitleSearchPanel` when it is opened from an episode row. */
+interface SubtitleEpisodeContext {
+    seasonNumber: number;
+    episodeNumber: number;
+    episodeRef: Episode;
+}
+
+// The subtitle panel is a shared component that does not know about episodes; this global
+// carries which episode triggered it. Not refactored per spec 07 — only typed safely here
+// instead of the original `window as any`.
+function getSubtitleEpisodeContext(): SubtitleEpisodeContext | null {
+    return (window as unknown as { __subtitleEpisode?: SubtitleEpisodeContext | null }).__subtitleEpisode ?? null;
+}
+
+function setSubtitleEpisodeContext(ctx: SubtitleEpisodeContext | null) {
+    (window as unknown as { __subtitleEpisode?: SubtitleEpisodeContext | null }).__subtitleEpisode = ctx;
 }
 
 import { useData } from '@/app/context/DataContext';
@@ -505,7 +538,7 @@ export default function WatchSeriesPage() {
         const src = relaySrc({ contentType: 'series', streamId: joinEpisode || '', ext: joinExt })
             + (reloadNonce ? `&_r=${reloadNonce}` : '');
         return (
-            <div className="fixed inset-0 bg-black z-50 flex flex-col">
+            <div className="fixed inset-0 bg-bg z-50 flex flex-col">
                 <div className="relative flex-1 flex items-center justify-center">
                     <VideoPlayer
                         src={src}
@@ -518,9 +551,7 @@ export default function WatchSeriesPage() {
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {canSync && <SyncButton role="viewer" onClick={sync} />}
-                                <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-red-300 flex items-center space-x-2">
-                                    <Radio size={18} className="animate-pulse" /> Modo TV
-                                </span>
+                                <Badge tone="live" dot>Modo TV</Badge>
                             </div>
                         }
                     />
@@ -533,11 +564,15 @@ export default function WatchSeriesPage() {
 
     if (error || !series) {
         return (
-            <div className="min-h-screen bg-[#141414] flex flex-col items-center justify-center text-white space-y-4">
-                <p className="text-red-500 text-xl">{error || 'Série não encontrada'}</p>
-                <button onClick={() => router.back()} className="flex items-center space-x-2 px-4 py-2 bg-white/10 rounded-lg hover:bg-white/20">
-                    <ArrowLeft size={20} /> Voltar
-                </button>
+            <div className="min-h-screen bg-bg flex flex-col items-center justify-center">
+                <EmptyState
+                    title={error || 'Série não encontrada'}
+                    action={
+                        <Button variant="secondary" icon={ArrowLeft} onClick={() => router.back()}>
+                            Voltar
+                        </Button>
+                    }
+                />
             </div>
         );
     }
@@ -551,8 +586,7 @@ export default function WatchSeriesPage() {
             : resumeTime;
         // Only the provider's own length is trustworthy here; the relay stream carries
         // just a sliding window, so without this the bar would measure the window.
-        const rawDuration: unknown = selectedEpisode.info?.duration_secs;
-        const titleDuration = typeof rawDuration === 'number' ? rawDuration : 0;
+        const titleDuration = selectedEpisode.info?.duration_secs ?? 0;
 
         // Seek outside the window: the upstream is re-read from the new point, which
         // moves every device watching this broadcast (one stream, like a channel).
@@ -588,26 +622,6 @@ export default function WatchSeriesPage() {
             ? relaySrc({ contentType: 'series', streamId: selectedEpisode.id, ext: extension, start: startSeconds })
             : directUrl;
 
-        const shareToggle = (
-            <button
-                onClick={() => {
-                    // Stopping is immediate; starting asks where to begin (the point is
-                    // baked into ffmpeg and cannot change once it is running).
-                    if (isSharing) {
-                        setIsSharing(false);
-                        setBroadcastStart(null);
-                    } else {
-                        setShowStartModal(true);
-                    }
-                }}
-                className={`flex items-center space-x-2 px-3 py-2 rounded-full text-sm font-semibold transition-all shadow-xl focus:outline-none focus:ring-2 focus:ring-red-500 ${isSharing ? 'bg-red-600 text-white' : 'bg-black/60 text-gray-200 hover:bg-white/20'}`}
-                title={isSharing ? 'Transmitindo para o Modo TV (sem avançar/pausar)' : 'Transmitir este episódio no Modo TV'}
-            >
-                <Radio size={18} className={isSharing ? 'animate-pulse' : ''} />
-                <span>{isSharing ? 'Transmitindo' : 'Transmitir'}</span>
-            </button>
-        );
-
         // Navigation logic
         const allEpisodes: Episode[] = [];
         Object.keys(series.episodes)
@@ -639,7 +653,7 @@ export default function WatchSeriesPage() {
         };
 
         return (
-            <div className="fixed inset-0 bg-black z-50 flex flex-col">
+            <div className="fixed inset-0 bg-bg z-50 flex flex-col">
                 <div className="relative flex-1 flex items-center justify-center">
                     <VideoPlayer
                         src={streamUrl}
@@ -663,12 +677,25 @@ export default function WatchSeriesPage() {
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {autoSubLoading && (
-                                    <span className="px-3 py-2 rounded-full text-sm font-semibold bg-black/60 text-emerald-300 flex items-center space-x-2">
-                                        <Loader2 size={16} className="animate-spin" /> Legenda…
+                                    <span className="flex items-center space-x-2 h-10 px-3 rounded-full bg-surface-2 text-ok text-sm">
+                                        <Loader2 size={16} className="animate-spin" />
+                                        <span>Legenda…</span>
                                     </span>
                                 )}
                                 {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}
-                                {shareToggle}
+                                <BroadcastToggle
+                                    active={isSharing}
+                                    onToggle={() => {
+                                        // Stopping is immediate; starting asks where to begin (the point is
+                                        // baked into ffmpeg and cannot change once it is running).
+                                        if (isSharing) {
+                                            setIsSharing(false);
+                                            setBroadcastStart(null);
+                                        } else {
+                                            setShowStartModal(true);
+                                        }
+                                    }}
+                                />
                             </div>
                         }
                     />
@@ -695,30 +722,28 @@ export default function WatchSeriesPage() {
     const downloadedCount = availabilityList.filter(s => s.status === 'downloaded').length;
     const unavailableCount = availabilityList.filter(s => s.status === 'unavailable').length;
 
+    const favorited = isFavorite(seriesId, 'series');
+
     return (
-        <div className="min-h-screen bg-[#141414] text-white">
-            {/* Background Backdrop */}
-            <div className="absolute inset-0 overflow-hidden h-[60vh]">
+        <div className="min-h-screen bg-bg text-ink">
+            {/* Background Backdrop — same treatment as the movie detail screen (spec 07 §6) */}
+            <div className="absolute inset-0 overflow-hidden">
                 <div
-                    className="absolute inset-0 bg-cover bg-top  opacity-40 scale-105"
+                    className="absolute inset-0 bg-cover bg-center blur-3xl opacity-30 scale-110"
                     style={{ backgroundImage: `url(${series.info.cover})` }}
-                ></div>
-                <div className="absolute inset-0 bg-gradient-to-b from-transparent via-[#141414]/90 to-[#141414]"></div>
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-bg via-bg/80 to-transparent" />
+                <div className="absolute inset-0 w-1/2 bg-gradient-to-r from-bg/80 to-transparent" />
             </div>
 
-            <div className="relative z-10 container mx-auto p-4 md:p-6 lg:p-10">
-                <button
-                    onClick={() => router.back()}
-                    data-focusable="true"
-                    tabIndex={0}
-                    className="mb-8 flex items-center space-x-2 text-gray-300 hover:text-white transition-colors focus:outline-none focus:text-red-500 focus:scale-110 origin-left"
-                >
-                    <ArrowLeft size={24} /> Voltar
-                </button>
+            <div className="relative z-10 px-6 md:px-10 lg:px-14 py-8">
+                <Button variant="ghost" icon={ArrowLeft} onClick={() => router.back()} className="mb-8">
+                    Voltar
+                </Button>
 
-                <div className="flex flex-col lg:flex-row space-y-10 lg:space-y-0 lg:space-x-16 items-start mb-16">
+                <div className="flex flex-col lg:flex-row space-y-10 lg:space-y-0 lg:space-x-16 items-start mb-14">
                     {/* Poster */}
-                    <div className="w-full max-w-[250px] lg:max-w-[350px] flex-shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/50 mx-auto lg:mx-0">
+                    <div className="w-full max-w-[300px] lg:max-w-[400px] flex-shrink-0 rounded-xl overflow-hidden shadow-2xl shadow-black/50 mx-auto lg:mx-0">
                         <img
                             src={series.info.cover}
                             alt={series.info.name}
@@ -729,34 +754,45 @@ export default function WatchSeriesPage() {
 
                     {/* Metadata */}
                     <div className="flex-1 space-y-6">
-                        <h1 className="text-3xl lg:text-5xl font-bold leading-tight">{series.info.name}</h1>
+                        <h1 className="text-3xl md:text-5xl font-semibold tracking-tight leading-tight">{series.info.name}</h1>
 
-                        <div className="flex flex-wrap items-center space-x-4 text-sm lg:text-base text-gray-300">
+                        <div className="flex flex-wrap items-center">
                             {series.info.releaseDate && (
-                                <span className="flex items-center space-x-1 bg-white/10 px-3 py-1 rounded-full">
-                                    <Calendar size={16} /> {series.info.releaseDate}
+                                <span className="mr-2 mb-2">
+                                    <Badge>
+                                        <Calendar size={14} className="mr-1.5" /> {series.info.releaseDate}
+                                    </Badge>
                                 </span>
                             )}
                             {series.info.rating && (
-                                <span className="flex items-center space-x-1 bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full border border-yellow-500/30">
-                                    <Star size={16} fill="currentColor" /> {series.info.rating}
+                                <span className="mr-2 mb-2 flex items-center text-sm text-ink-2 tnum">
+                                    <Star size={16} className="mr-1 text-ink-2" fill="currentColor" /> {series.info.rating}
                                 </span>
                             )}
                         </div>
 
-                        <p className="text-lg text-gray-300 leading-relaxed max-w-3xl">
+                        <p className="text-sm md:text-base text-ink-2 leading-relaxed max-w-3xl">
                             {series.info.plot || "Nenhuma sinopse disponível."}
                         </p>
 
-                        <div className="flex space-x-4 mt-8">
-                            <button
+                        <div className="space-y-1 text-sm text-ink-2">
+                            {series.info.genre && <p><span className="text-ink font-medium">Gênero:</span> {series.info.genre}</p>}
+                            {series.info.cast && <p><span className="text-ink font-medium">Elenco:</span> {series.info.cast}</p>}
+                            {series.info.director && <p><span className="text-ink font-medium">Diretor:</span> {series.info.director}</p>}
+                        </div>
+
+                        <div className="flex items-center space-x-3">
+                            <IconButton
+                                icon={Bookmark}
+                                label={favorited ? 'Remover da minha lista' : 'Adicionar à minha lista'}
+                                variant="secondary"
+                                active={favorited}
                                 onClick={() => {
-                                    const id = seriesId;
-                                    if (isFavorite(id, 'series')) {
-                                        removeFavorite(id, 'series');
+                                    if (favorited) {
+                                        removeFavorite(seriesId, 'series');
                                     } else {
                                         addFavorite({
-                                            id: id,
+                                            id: seriesId,
                                             type: 'series',
                                             name: series.info.name,
                                             image: series.info.cover,
@@ -764,117 +800,104 @@ export default function WatchSeriesPage() {
                                         });
                                     }
                                 }}
-                                data-focusable="true"
-                                tabIndex={0}
-                                className={`flex items-center space-x-2 px-6 py-3 rounded-full border transition-all focus:outline-none focus:ring-4 focus:ring-white ${isFavorite(seriesId, 'series')
-                                    ? 'bg-white text-red-600 border-white font-bold'
-                                    : 'bg-transparent text-white border-white/30 hover:bg-white/10'
-                                    }`}
-                            >
-                                <Bookmark size={20} fill={isFavorite(seriesId, 'series') ? "currentColor" : "none"} />
-                                {isFavorite(seriesId, 'series') ? 'Na Minha Lista' : 'Adicionar à Minha Lista'}
-                            </button>
-                        </div>
-
-                        <div className="space-y-2 text-gray-400">
-                            <p><strong className="text-white">Gênero:</strong> {series.info.genre}</p>
-                            <p><strong className="text-white">Elenco:</strong> {series.info.cast}</p>
+                            />
                         </div>
                     </div>
                 </div>
 
                 {/* Episodes Section */}
                 <div className="space-y-6">
-                    {/* Buscar / baixar legendas de todos os episódios */}
-                    {/* flex gap needs Chrome 84+ (WebOS TVs lack it): child m-1.5 + p-2.5 emulate gap-3 + p-4 */}
-                    <div className="flex flex-wrap items-center p-2.5 bg-[#1a1a1a] border border-[#333] rounded-xl">
-                        <div className="m-1.5 flex items-center space-x-2 text-emerald-500">
-                            <Subtitles size={20} />
-                            <span className="text-sm font-semibold text-white">Legendas de toda a série</span>
-                        </div>
+                    {/* Batch subtitle search/download for the whole series */}
+                    <div className="bg-surface-2 border border-line rounded-xl p-4">
+                        <SectionHeader
+                            title="Legendas de toda a série"
+                            description={seriesHasSubs
+                                ? 'Como a série já tem legendas, ao abrir um episódio sem legenda ela é baixada automaticamente antes de reproduzir (consome 1 do limite diário de 5).'
+                                : undefined}
+                            action={remainingDownloads !== null ? (
+                                <Badge tone={remainingDownloads <= 0 ? 'warn' : 'ok'}>
+                                    <span className="tnum">{remainingDownloads}</span> download{remainingDownloads === 1 ? '' : 's'} restante{remainingDownloads === 1 ? '' : 's'} hoje
+                                </Badge>
+                            ) : undefined}
+                        />
 
-                        {remainingDownloads !== null && (
-                            <span className={`m-1.5 text-xs px-2 py-1 rounded ${remainingDownloads <= 0 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                                {remainingDownloads} download{remainingDownloads === 1 ? '' : 's'} restante{remainingDownloads === 1 ? '' : 's'} hoje
-                            </span>
-                        )}
-
-                        <select
-                            value={batchLanguage}
-                            onChange={(e) => setBatchLanguage(e.target.value)}
-                            disabled={isBatchBusy}
-                            className="m-1.5 px-3 py-2 bg-[#0f0f0f] border border-[#333] rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 disabled:opacity-50"
-                        >
-                            {BATCH_LANGUAGES.map(lang => (
-                                <option key={lang.code} value={lang.code}>{lang.label}</option>
-                            ))}
-                        </select>
-
-                        {isBatchBusy ? (
-                            <button
-                                onClick={() => { batchCancelRef.current = true; }}
-                                className="m-1.5 px-4 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white text-sm font-medium flex items-center space-x-2 transition-colors"
-                            >
-                                <X size={16} /> Cancelar
-                            </button>
-                        ) : (
-                            <>
-                                <button
-                                    onClick={handleBatchSearch}
-                                    className="m-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white text-sm font-medium flex items-center space-x-2 transition-colors"
-                                >
-                                    <Search size={16} /> Buscar legendas
-                                </button>
-                                {availableCount > 0 && (
-                                    <button
-                                        onClick={handleBatchDownload}
-                                        className="m-1.5 px-4 py-2 bg-white/10 hover:bg-white/20 border border-emerald-500/40 rounded-lg text-white text-sm font-medium flex items-center space-x-2 transition-colors"
+                        {/* flex gap needs Chrome 84+ (WebOS TVs lack it): child m-1.5 emulates gap-3 */}
+                        <div className="flex flex-wrap items-end">
+                            <div className="w-full sm:w-56 m-1.5">
+                                <Field label="Idioma">
+                                    <select
+                                        value={batchLanguage}
+                                        onChange={(e) => setBatchLanguage(e.target.value)}
+                                        disabled={isBatchBusy}
+                                        data-focusable="true"
+                                        tabIndex={0}
+                                        className={inputClassName}
                                     >
-                                        <Download size={16} /> Baixar {availableCount} legenda{availableCount > 1 ? 's' : ''}
-                                    </button>
-                                )}
-                            </>
-                        )}
-
-                        {batch && (
-                            <div className="m-1.5 flex items-center space-x-2 text-xs text-gray-400 ml-auto">
-                                {isBatchBusy && <Loader2 size={14} className="animate-spin text-emerald-500" />}
-                                <span>
-                                    {batch.phase === 'searching' && `Buscando ${batch.done}/${batch.total}…`}
-                                    {batch.phase === 'downloading' && `Baixando ${batch.done}/${batch.total}…`}
-                                    {batch.phase === 'searched' && (
-                                        availableCount > 0
-                                            ? `${availableCount} disponível(is) · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
-                                            : `Nenhuma legenda nova encontrada · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
-                                    )}
-                                    {batch.phase === 'done' && (
-                                        batch.quotaHit
-                                            ? `Cota diária atingida. ${batch.downloadedNow} baixada(s) — o resto continua amanhã.`
-                                            : `Concluído: ${batch.downloadedNow} baixada(s)${batch.failed > 0 ? ` · ${batch.failed} falharam` : ''}.`
-                                    )}
-                                </span>
+                                        {BATCH_LANGUAGES.map(lang => (
+                                            <option key={lang.code} value={lang.code}>{lang.label}</option>
+                                        ))}
+                                    </select>
+                                </Field>
                             </div>
-                        )}
 
-                        {seriesHasSubs && (
-                            <p className="w-full text-xs text-gray-500">
-                                Como a série já tem legendas, ao abrir um episódio sem legenda ela é baixada
-                                automaticamente antes de reproduzir (consome 1 do limite diário de 5).
-                            </p>
-                        )}
+                            <div className="m-1.5 flex items-center space-x-2">
+                                {isBatchBusy ? (
+                                    <Button
+                                        variant="ghost"
+                                        icon={X}
+                                        onClick={() => { batchCancelRef.current = true; }}
+                                    >
+                                        Cancelar
+                                    </Button>
+                                ) : (
+                                    <>
+                                        <Button variant="secondary" icon={Search} onClick={handleBatchSearch}>
+                                            Buscar legendas
+                                        </Button>
+                                        {availableCount > 0 && (
+                                            <Button variant="secondary" icon={Download} onClick={handleBatchDownload}>
+                                                Baixar {availableCount} legenda{availableCount > 1 ? 's' : ''}
+                                            </Button>
+                                        )}
+                                    </>
+                                )}
+                            </div>
+
+                            {batch && (
+                                <div className="m-1.5 flex items-center space-x-2 text-xs text-ink-2 tnum ml-auto">
+                                    {isBatchBusy && <Loader2 size={14} className="animate-spin" />}
+                                    <span>
+                                        {batch.phase === 'searching' && `Buscando ${batch.done}/${batch.total}…`}
+                                        {batch.phase === 'downloading' && `Baixando ${batch.done}/${batch.total}…`}
+                                        {batch.phase === 'searched' && (
+                                            availableCount > 0
+                                                ? `${availableCount} disponível(is) · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
+                                                : `Nenhuma legenda nova encontrada · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
+                                        )}
+                                        {batch.phase === 'done' && (
+                                            batch.quotaHit
+                                                ? `Cota diária atingida. ${batch.downloadedNow} baixada(s) — o resto continua amanhã.`
+                                                : `Concluído: ${batch.downloadedNow} baixada(s)${batch.failed > 0 ? ` · ${batch.failed} falharam` : ''}.`
+                                        )}
+                                    </span>
+                                </div>
+                            )}
+                        </div>
                     </div>
 
-                    <div className="flex items-center space-x-4 overflow-x-auto pb-4 scrollbar-hide border-b border-white/10">
+                    {/* Season selector */}
+                    <div className="row-scroller flex items-center overflow-x-auto">
                         {seasons.map(season => (
                             <button
                                 key={season}
+                                type="button"
                                 onClick={() => setActiveSeason(season)}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className={`px-6 py-2 rounded-full font-bold whitespace-nowrap transition-all focus:outline-none focus:ring-4 focus:ring-white ${activeSeason === season
-                                    ? 'bg-red-600 text-white'
-                                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                                    }`}
+                                className={[
+                                    'flex-shrink-0 mr-2 h-10 px-4 rounded-full text-sm font-medium whitespace-nowrap transition-colors',
+                                    activeSeason === season ? 'bg-ink text-bg' : 'bg-surface-2 text-ink-2 border border-line',
+                                ].join(' ')}
                             >
                                 Temporada {season}
                             </button>
@@ -889,81 +912,95 @@ export default function WatchSeriesPage() {
                             const duration = progress?.duration || 0;
                             const currentTime = progress?.progress || 0;
                             const percent = duration > 0 ? (currentTime / duration) * 100 : 0;
+                            const status = availability[ep.id]?.status;
 
                             return (
-                                <button
-                                    key={ep.id}
-                                    type="button"
-                                    onClick={() => setSelectedEpisode(ep)}
-                                    data-focusable="true"
-                                    tabIndex={0}
-                                    className="relative flex items-center space-x-4 p-4 bg-[#1f1f1f] rounded-xl hover:bg-[#2a2a2a] transition-all cursor-pointer group border border-white/5 hover:border-red-500/30 focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-[1.02] z-10 w-full text-left overflow-hidden"
-                                >
-                                    <div className="w-12 h-12 flex items-center justify-center bg-white/10 rounded-full group-hover:bg-red-600 transition-colors flex-shrink-0">
-                                        <Play size={20} fill="currentColor" className="text-white ml-1" />
-                                    </div>
-                                    <div className="flex-1">
-                                        <h4 className="font-bold text-lg text-white group-hover:text-red-400 transition-colors">
-                                            {ep.episode_num}. {ep.title}
-                                        </h4>
-                                        {ep.info && ep.info.releasedate && <p className="text-sm text-gray-500">{ep.info.releasedate}</p>}
-                                    </div>
-                                    {/* Status da legenda (após buscar em lote) */}
-                                    {availability[ep.id]?.status === 'downloaded' && (
-                                        <span className="text-xs px-2 py-1 rounded bg-emerald-600/20 text-emerald-400 flex items-center space-x-1 flex-shrink-0">
-                                            <Check size={12} /> Legenda
-                                        </span>
-                                    )}
-                                    {availability[ep.id]?.status === 'available' && (
-                                        <span className="text-xs px-2 py-1 rounded bg-emerald-500/10 text-emerald-300 flex-shrink-0">
-                                            Disponível
-                                        </span>
-                                    )}
-                                    {availability[ep.id]?.status === 'unavailable' && (
-                                        <span className="text-xs px-2 py-1 rounded bg-white/5 text-gray-500 flex-shrink-0">
-                                            Sem legenda
-                                        </span>
-                                    )}
+                                <div key={ep.id} className="relative bg-surface border border-line rounded-xl p-4">
+                                    <div className="flex items-start">
+                                        <button
+                                            type="button"
+                                            onClick={() => setSelectedEpisode(ep)}
+                                            data-focusable="true"
+                                            tabIndex={0}
+                                            className="flex-1 min-w-0 flex items-start text-left"
+                                        >
+                                            <div className="w-32 md:w-40 flex-shrink-0 mr-4">
+                                                <div className="ratio ratio-wide rounded-lg overflow-hidden bg-surface-2">
+                                                    {ep.info?.movie_image ? (
+                                                        <img
+                                                            src={ep.info.movie_image}
+                                                            alt=""
+                                                            className="ratio-fill object-cover"
+                                                            onError={(e) => { e.currentTarget.style.display = 'none'; }}
+                                                        />
+                                                    ) : (
+                                                        <div className="ratio-fill flex items-center justify-center text-ink-3">
+                                                            <Play size={20} />
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-start justify-between">
+                                                    <h4 className="text-sm md:text-base font-medium text-ink">
+                                                        {ep.episode_num}. {ep.title}
+                                                    </h4>
+                                                    {ep.info?.duration && (
+                                                        <span className="tnum text-xs text-ink-2 flex items-center flex-shrink-0 ml-2">
+                                                            <Clock size={12} className="mr-1" /> {ep.info.duration}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                                {ep.info?.plot && (
+                                                    <p className="mt-1 text-xs md:text-sm text-ink-2 line-clamp-2">
+                                                        {ep.info.plot}
+                                                    </p>
+                                                )}
+                                                <div className="flex items-center mt-2">
+                                                    {status === 'downloaded' && (
+                                                        <Badge tone="ok"><Check size={12} className="mr-1" /> Legenda</Badge>
+                                                    )}
+                                                    {status === 'available' && (
+                                                        <Badge>Disponível</Badge>
+                                                    )}
+                                                    {status === 'unavailable' && (
+                                                        <Badge>Sem legenda</Badge>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </button>
 
-                                    <div className="text-xs text-gray-500 bg-black/30 px-2 py-1 rounded">
-                                        {ep.container_extension}
-                                    </div>
-
-                                    {/* Subtitle Button */}
-                                    <div
-                                        className="ml-2 flex-shrink-0"
-                                        onClick={(e) => {
-                                            e.stopPropagation();
-                                            setSelectedEpisode(null);
-                                            setShowSubtitlePanel(true);
-                                            // Store the episode info temporarily for the search
-                                            (window as any).__subtitleEpisode = {
-                                                seasonNumber: Number(ep.season || activeSeason),
-                                                episodeNumber: Number(ep.episode_num),
-                                                episodeRef: ep,
-                                            };
-                                        }}
-                                    >
-                                        <Subtitles
-                                            size={18}
-                                            className="text-gray-600 hover:text-emerald-400 transition-colors cursor-pointer"
+                                        <IconButton
+                                            icon={Subtitles}
+                                            label="Buscar legenda deste episódio"
+                                            variant="secondary"
+                                            className="ml-3 flex-shrink-0 focus-flat"
+                                            onClick={() => {
+                                                setSelectedEpisode(null);
+                                                setShowSubtitlePanel(true);
+                                                setSubtitleEpisodeContext({
+                                                    seasonNumber: Number(ep.season || activeSeason),
+                                                    episodeNumber: Number(ep.episode_num),
+                                                    episodeRef: ep,
+                                                });
+                                            }}
                                         />
                                     </div>
 
-                                    {/* Progress Bar */}
+                                    {/* Playback progress */}
                                     {progress && duration > 0 && currentTime > 0 && (
-                                        <div className="absolute bottom-0 left-0 w-full h-1.5 bg-gray-600/80">
+                                        <div className="absolute bottom-0 left-0 w-full h-1 bg-surface-3 rounded-b-xl overflow-hidden">
                                             <div
-                                                className="h-full bg-red-600 transition-all duration-500"
+                                                className="h-full bg-brand"
                                                 style={{ width: `${Math.min(percent, 100)}%` }}
                                             />
                                         </div>
                                     )}
-                                </button>
+                                </div>
                             );
                         })}
                         {currentEpisodes.length === 0 && (
-                            <p className="text-gray-500">Nenhum episódio encontrado para esta temporada.</p>
+                            <EmptyState compact title="Nenhum episódio encontrado para esta temporada." />
                         )}
                     </div>
                 </div>
@@ -973,21 +1010,21 @@ export default function WatchSeriesPage() {
                 <SubtitleSearchPanel
                     title={series.info.name}
                     year={series.info.releaseDate}
-                    seasonNumber={(window as any).__subtitleEpisode?.seasonNumber || Number(activeSeason)}
-                    episodeNumber={(window as any).__subtitleEpisode?.episodeNumber || 1}
+                    seasonNumber={getSubtitleEpisodeContext()?.seasonNumber || Number(activeSeason)}
+                    episodeNumber={getSubtitleEpisodeContext()?.episodeNumber || 1}
                     parentTmdbId={parentTmdbId}
-                    streamId={(window as any).__subtitleEpisode?.episodeRef?.id || String(seriesId)}
+                    streamId={getSubtitleEpisodeContext()?.episodeRef?.id || String(seriesId)}
                     onSubtitleSelected={(url) => {
                         setSubtitleUrl(url);
                         // Auto-select the episode that was clicked for subtitle search
-                        const epRef = (window as any).__subtitleEpisode?.episodeRef;
+                        const epRef = getSubtitleEpisodeContext()?.episodeRef;
                         if (epRef) {
                             setSelectedEpisode(epRef);
                         }
                     }}
                     onClose={() => {
                         setShowSubtitlePanel(false);
-                        (window as any).__subtitleEpisode = null;
+                        setSubtitleEpisodeContext(null);
                     }}
                 />
             )}
