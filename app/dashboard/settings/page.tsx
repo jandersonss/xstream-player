@@ -22,7 +22,7 @@ export default function SettingsPage() {
                 <div className="border-t border-line pt-8">
                     <ProfilesSection />
                 </div>
-                <div className="border-t border-line pt-8">
+                <div id="legendas" className="border-t border-line pt-8">
                     <SubtitlesSection />
                 </div>
                 <div className="border-t border-line pt-8">

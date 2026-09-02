@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
+import Link from 'next/link';
 import { useAuth } from '@/app/context/AuthContext';
 import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
@@ -18,7 +19,6 @@ import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import IconButton from '@/components/ui/IconButton';
 import EmptyState from '@/components/ui/EmptyState';
-import SectionHeader from '@/components/ui/SectionHeader';
 import Field, { inputClassName } from '@/components/ui/Field';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
 import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
@@ -100,7 +100,11 @@ export default function WatchSeriesPage() {
     const { updateProgress, getProgress, loadDetail, isLoaded: progressLoaded, loadingDetails } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
     const { searchTV, isConfigured: tmdbConfigured } = useTMDb();
-    const { getSavedSubtitle, searchSeriesSubtitles, downloadSeriesSubtitles, autoDownloadEpisodeSubtitle, remainingDownloads } = useSubtitle();
+    const {
+        getSavedSubtitle, searchSeriesSubtitles, downloadSeriesSubtitles, autoDownloadEpisodeSubtitle,
+        remainingDownloads, isConfigured: subtitlesConfigured, isConfigResolved: subtitlesConfigResolved,
+        ensureConfigLoaded: ensureSubtitleConfigLoaded,
+    } = useSubtitle();
     const { activeProfile } = useProfile();
     const params = useParams();
     const router = useRouter();
@@ -201,6 +205,12 @@ export default function WatchSeriesPage() {
         if (!isSharing || !episodeId) return;
         setBroadcastStart(prev => (prev?.episodeId === episodeId ? prev : { episodeId, start: resumeTime }));
     }, [isSharing, selectedEpisode?.id, resumeTime]);
+
+    // Resolved eagerly, not lazily on panel open — the batch subtitle section
+    // needs to know right away whether to show its CTA or its controls.
+    useEffect(() => {
+        ensureSubtitleConfigLoaded();
+    }, [ensureSubtitleConfigLoaded]);
 
     useEffect(() => {
         if (!credentials || !seriesId || isJoining) return;
@@ -808,81 +818,110 @@ export default function WatchSeriesPage() {
                 {/* Episodes Section */}
                 <div className="space-y-6">
                     {/* Batch subtitle search/download for the whole series */}
-                    <div className="bg-surface-2 border border-line rounded-xl p-4">
-                        <SectionHeader
-                            title="Legendas de toda a série"
-                            description={seriesHasSubs
-                                ? 'Como a série já tem legendas, ao abrir um episódio sem legenda ela é baixada automaticamente antes de reproduzir (consome 1 do limite diário de 5).'
-                                : undefined}
-                            action={remainingDownloads !== null ? (
+                    <div className="bg-surface-2 border border-line rounded-xl p-3">
+                        <div className="flex items-center justify-between mb-2">
+                            <h2 className="text-sm font-semibold text-ink flex items-center">
+                                <Subtitles size={15} className="mr-2 text-ink-3 flex-shrink-0" />
+                                Legendas da série
+                            </h2>
+                            {subtitlesConfigured && remainingDownloads !== null && (
                                 <Badge tone={remainingDownloads <= 0 ? 'warn' : 'ok'}>
-                                    <span className="tnum">{remainingDownloads}</span> download{remainingDownloads === 1 ? '' : 's'} restante{remainingDownloads === 1 ? '' : 's'} hoje
+                                    <span className="tnum">{remainingDownloads}</span> restante{remainingDownloads === 1 ? '' : 's'} hoje
                                 </Badge>
-                            ) : undefined}
-                        />
-
-                        {/* flex gap needs Chrome 84+ (WebOS TVs lack it): child m-1.5 emulates gap-3 */}
-                        <div className="flex flex-wrap items-end">
-                            <div className="w-full sm:w-56 m-1.5">
-                                <Field label="Idioma">
-                                    <select
-                                        value={batchLanguage}
-                                        onChange={(e) => setBatchLanguage(e.target.value)}
-                                        disabled={isBatchBusy}
-                                        data-focusable="true"
-                                        tabIndex={0}
-                                        className={inputClassName}
-                                    >
-                                        {BATCH_LANGUAGES.map(lang => (
-                                            <option key={lang.code} value={lang.code}>{lang.label}</option>
-                                        ))}
-                                    </select>
-                                </Field>
-                            </div>
-
-                            <div className="m-1.5 flex items-center space-x-2">
-                                {isBatchBusy ? (
-                                    <Button
-                                        variant="ghost"
-                                        icon={X}
-                                        onClick={() => { batchCancelRef.current = true; }}
-                                    >
-                                        Cancelar
-                                    </Button>
-                                ) : (
-                                    <>
-                                        <Button variant="secondary" icon={Search} onClick={handleBatchSearch}>
-                                            Buscar legendas
-                                        </Button>
-                                        {availableCount > 0 && (
-                                            <Button variant="secondary" icon={Download} onClick={handleBatchDownload}>
-                                                Baixar {availableCount} legenda{availableCount > 1 ? 's' : ''}
-                                            </Button>
-                                        )}
-                                    </>
-                                )}
-                            </div>
-
-                            {batch && (
-                                <div className="m-1.5 flex items-center space-x-2 text-xs text-ink-2 tnum ml-auto">
-                                    {isBatchBusy && <Loader2 size={14} className="animate-spin" />}
-                                    <span>
-                                        {batch.phase === 'searching' && `Buscando ${batch.done}/${batch.total}…`}
-                                        {batch.phase === 'downloading' && `Baixando ${batch.done}/${batch.total}…`}
-                                        {batch.phase === 'searched' && (
-                                            availableCount > 0
-                                                ? `${availableCount} disponível(is) · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
-                                                : `Nenhuma legenda nova encontrada · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
-                                        )}
-                                        {batch.phase === 'done' && (
-                                            batch.quotaHit
-                                                ? `Cota diária atingida. ${batch.downloadedNow} baixada(s) — o resto continua amanhã.`
-                                                : `Concluído: ${batch.downloadedNow} baixada(s)${batch.failed > 0 ? ` · ${batch.failed} falharam` : ''}.`
-                                        )}
-                                    </span>
-                                </div>
                             )}
                         </div>
+
+                        {subtitlesConfigResolved && !subtitlesConfigured ? (
+                            /* No OpenSubtitles key yet — searching/downloading needs one, so lead
+                               with the one action that unblocks everything else instead of
+                               showing controls that would just fail. Settings lives on its own
+                               page now (spec 02), not a modal, and is D-pad-reachable the same
+                               way on a TV as in a browser — no separate path needed for either. */
+                            <div className="flex flex-wrap items-center justify-between">
+                                <p className="text-xs text-ink-2 mr-3">
+                                    Configure o OpenSubtitles em Ajustes para buscar e baixar legendas.
+                                </p>
+                                <Link
+                                    href="/dashboard/settings#legendas"
+                                    data-focusable="true"
+                                    tabIndex={0}
+                                    className="inline-flex items-center h-9 px-3 rounded-lg bg-surface-3 text-ink text-sm font-medium flex-shrink-0"
+                                >
+                                    Abrir Ajustes
+                                </Link>
+                            </div>
+                        ) : (
+                            <>
+                                {seriesHasSubs && (
+                                    <p className="text-xs text-ink-2 mb-2">
+                                        Episódio sem legenda baixa uma automaticamente ao abrir (consome a cota diária).
+                                    </p>
+                                )}
+
+                                {/* flex gap needs Chrome 84+ (WebOS TVs lack it): child m-1.5 emulates gap-3 */}
+                                <div className="flex flex-wrap items-end">
+                                    <div className="w-full sm:w-48 m-1.5">
+                                        <Field label="Idioma">
+                                            <select
+                                                value={batchLanguage}
+                                                onChange={(e) => setBatchLanguage(e.target.value)}
+                                                disabled={isBatchBusy}
+                                                data-focusable="true"
+                                                tabIndex={0}
+                                                className={inputClassName}
+                                            >
+                                                {BATCH_LANGUAGES.map(lang => (
+                                                    <option key={lang.code} value={lang.code}>{lang.label}</option>
+                                                ))}
+                                            </select>
+                                        </Field>
+                                    </div>
+
+                                    <div className="m-1.5 flex items-center space-x-2">
+                                        {isBatchBusy ? (
+                                            <Button
+                                                variant="ghost"
+                                                icon={X}
+                                                onClick={() => { batchCancelRef.current = true; }}
+                                            >
+                                                Cancelar
+                                            </Button>
+                                        ) : (
+                                            <>
+                                                <Button variant="secondary" icon={Search} onClick={handleBatchSearch}>
+                                                    Buscar legendas
+                                                </Button>
+                                                {availableCount > 0 && (
+                                                    <Button variant="secondary" icon={Download} onClick={handleBatchDownload}>
+                                                        Baixar {availableCount} legenda{availableCount > 1 ? 's' : ''}
+                                                    </Button>
+                                                )}
+                                            </>
+                                        )}
+                                    </div>
+
+                                    {batch && (
+                                        <div className="m-1.5 flex items-center space-x-2 text-xs text-ink-2 tnum ml-auto">
+                                            {isBatchBusy && <Loader2 size={14} className="animate-spin" />}
+                                            <span>
+                                                {batch.phase === 'searching' && `Buscando ${batch.done}/${batch.total}…`}
+                                                {batch.phase === 'downloading' && `Baixando ${batch.done}/${batch.total}…`}
+                                                {batch.phase === 'searched' && (
+                                                    availableCount > 0
+                                                        ? `${availableCount} disponível(is) · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
+                                                        : `Nenhuma legenda nova encontrada · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
+                                                )}
+                                                {batch.phase === 'done' && (
+                                                    batch.quotaHit
+                                                        ? `Cota diária atingida. ${batch.downloadedNow} baixada(s) — o resto continua amanhã.`
+                                                        : `Concluído: ${batch.downloadedNow} baixada(s)${batch.failed > 0 ? ` · ${batch.failed} falharam` : ''}.`
+                                                )}
+                                            </span>
+                                        </div>
+                                    )}
+                                </div>
+                            </>
+                        )}
                     </div>
 
                     {/* Season selector */}
