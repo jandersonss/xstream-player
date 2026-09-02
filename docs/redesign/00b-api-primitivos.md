@@ -73,7 +73,8 @@ export default function Poster(props: PosterProps): JSX.Element;
 ```
 
 - Envolve um `next/link` com `data-focusable="true"`, `tabIndex={0}`,
-  `className="spotlight-item focus-lift-lg"`.
+  `className="spotlight-item focus-card"`, e a caixa `.ratio` interna leva
+  `focus-card-target` (o anel/escala do foco vão para ela, não para o link — ver §4.1).
 - Imagem em `.ratio`/`.ratio-fill` conforme `ratio`, `loading="lazy"`, `decoding="async"`,
   `object-cover`. `onError` troca por um bloco `bg-surface-2` com a inicial do título —
   **não** esconder a imagem deixando buraco.

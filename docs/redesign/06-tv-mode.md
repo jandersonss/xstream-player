@@ -115,7 +115,7 @@ modal (`window.confirm` não é focável por D-pad em webOS e trava a TV do mesm
 Tela cheia `fixed inset-0 z-[100] bg-bg` — **não** usa `Modal` (é um gate, não um diálogo).
 Título "Quem está assistindo?" em `text-2xl md:text-4xl`. Avatares grandes
 (`w-24 h-24 md:w-32 md:h-32`, `rounded-xl bg-surface-2`) com a inicial, nome abaixo em
-`text-sm md:text-base`, todos `data-focusable` + `focus-lift-lg`. Layout `flex flex-wrap`
+`text-sm md:text-base`, todos `data-focusable`, com `.focus-card` no botão e `.focus-card-target` na caixa do avatar. Layout `flex flex-wrap`
 com margens nos filhos (**nunca** `gap`) — o hack de margem negativa atual está correto,
 mantenha o padrão. Criação de perfil: `Field` + `Button`, preservando que o perfil novo
 **não** é selecionado automaticamente.

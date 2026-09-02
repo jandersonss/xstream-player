@@ -47,9 +47,9 @@ export default function ProfileSelector() {
                         onClick={() => selectProfile(profile.id)}
                         data-focusable="true"
                         tabIndex={0}
-                        className="focus-lift-lg m-3 flex flex-col items-center space-y-3"
+                        className="focus-card m-3 flex flex-col items-center space-y-3"
                     >
-                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-surface-2 flex items-center justify-center">
+                        <div className="focus-card-target w-24 h-24 md:w-32 md:h-32 rounded-xl bg-surface-2 flex items-center justify-center">
                             <span className="text-3xl md:text-4xl font-semibold text-ink">
                                 {profile.name.charAt(0).toUpperCase()}
                             </span>
@@ -83,9 +83,9 @@ export default function ProfileSelector() {
                         onClick={() => setIsCreating(true)}
                         data-focusable="true"
                         tabIndex={0}
-                        className="focus-lift-lg m-3 flex flex-col items-center space-y-3"
+                        className="focus-card m-3 flex flex-col items-center space-y-3"
                     >
-                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-surface-2 border border-line flex items-center justify-center">
+                        <div className="focus-card-target w-24 h-24 md:w-32 md:h-32 rounded-xl bg-surface-2 border border-line flex items-center justify-center">
                             <Plus size={40} className="text-ink-3" />
                         </div>
                         <span className="text-ink-2 text-sm md:text-base font-medium">

@@ -171,8 +171,7 @@ Regras de uso:
    `useTvNavigation` (`app/hooks/useTvNavigation.ts:84`).
 2. Não escreva `focus:ring-*` nem `focus:outline-*` nos componentes — o estilo global já
    resolve. Classes de anel espalhadas foram a origem da inconsistência atual.
-3. Escala `1.04` é o padrão. Cards de pôster grandes podem usar `1.06` via classe
-   `.focus-lift-lg`; nada além disso (a 3 m, escala maior corta o vizinho).
+3. Escala `1.04` é o padrão para um elemento focável simples. Um cartão composto — imagem/avatar mais legenda abaixo, sem fundo próprio na legenda — usa `.focus-card` no elemento focável e `.focus-card-target` na caixa visual interna: o anel e a escala (`1.06`) vão só para a caixa, não para o link inteiro, senão o resultado é um retângulo grande cobrindo imagem e texto em vez do card acendendo.
 4. Contêiner com `overflow-hidden` **corta o anel do filho focado**. Todo scroller horizontal
    precisa de `py-6 px-1` interno de folga (o anel + a escala pedem ~10 px de cada lado).
 
