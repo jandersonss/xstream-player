@@ -1,26 +1,23 @@
 'use client';
 
 import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
-import { Search, Film, Tv, Layers, Play, AlertCircle, Loader as LoaderIcon } from 'lucide-react';
-import Link from 'next/link';
+import { Search, AlertCircle, Loader as LoaderIcon } from 'lucide-react';
 
-import { useData } from '../../context/DataContext';
+import { useData } from '@/app/context/DataContext';
 import { useInfiniteScroll } from '@/app/hooks/useInfiniteScroll';
 import { getDeviceProfile, type DeviceTier } from '@/app/lib/deviceProfile';
-import Loader from '@/components/Loader';
+import { toCatalogItems, type CatalogItem } from '@/app/lib/catalogItem';
+import { inputClassName } from '@/components/ui/Field';
 import CardGrid from '@/components/CardGrid';
+import Poster from '@/components/ui/Poster';
+import EmptyState from '@/components/ui/EmptyState';
+import Skeleton from '@/components/ui/Skeleton';
+import Loader from '@/components/Loader';
 
 type SearchCategory = 'all' | 'live' | 'movie' | 'series';
 
-interface SearchResult {
-    id: string | number;
-    name: string;
-    type: 'live' | 'movie' | 'series';
-    image?: string;
-    rating?: string;
-}
-
 const MIN_QUERY_LENGTH = 2;
+const SKELETON_COUNT = 12;
 
 /**
  * Search is CPU-bound on the client, not the server (SQLite answers a folded
@@ -35,12 +32,18 @@ const SEARCH_TUNING: Record<DeviceTier, { debounceMs: number; limit: number; ini
     'ultra-high': { debounceMs: 250, limit: 300, initialBatch: 30, loadBatch: 20 },
 };
 
-const TABS: { id: SearchCategory; label: string; icon: typeof Search }[] = [
-    { id: 'all', label: 'Tudo', icon: Search },
-    { id: 'live', label: 'TV ao Vivo', icon: Tv },
-    { id: 'movie', label: 'Filmes', icon: Film },
-    { id: 'series', label: 'Séries', icon: Layers },
+const TABS: { id: SearchCategory; label: string }[] = [
+    { id: 'all', label: 'Tudo' },
+    { id: 'live', label: 'TV ao vivo' },
+    { id: 'movie', label: 'Filmes' },
+    { id: 'series', label: 'Séries' },
 ];
+
+const BADGE_LABEL: Record<'live' | 'movie' | 'series', string> = {
+    live: 'Ao vivo',
+    movie: 'Filme',
+    series: 'Série',
+};
 
 /**
  * Owns the keystroke-by-keystroke input state so typing never re-renders the
@@ -71,7 +74,7 @@ const SearchInput = memo(function SearchInput({
     return (
         <div className="relative max-w-2xl">
             <div className="absolute inset-y-0 left-0 pl-4 flex items-center pointer-events-none">
-                <Search className="h-6 w-6 text-gray-400" />
+                <Search className="h-5 w-5 text-ink-3" />
             </div>
             <input
                 type="text"
@@ -80,64 +83,28 @@ const SearchInput = memo(function SearchInput({
                 placeholder="Digite para pesquisar..."
                 data-focusable="true"
                 tabIndex={0}
-                className="block w-full pl-12 pr-4 py-4 bg-white/5 border border-white/10 rounded-xl text-white placeholder-gray-500 focus:outline-none focus:ring-4 focus:ring-red-600 focus:bg-white/10 transition-all text-lg"
+                className={[inputClassName, 'h-14 pl-12 pr-12'].join(' ')}
                 autoFocus
             />
             {isSearching && (
                 <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
-                    <LoaderIcon className="h-5 w-5 text-red-600 animate-spin" />
+                    <LoaderIcon className="h-5 w-5 text-ink-2 animate-spin" />
                 </div>
             )}
         </div>
     );
 });
 
-const SearchResultCard = memo(function SearchResultCard({ item }: { item: SearchResult }) {
-    const href =
-        item.type === 'live' ? `/dashboard/watch/live/${item.id}` :
-            item.type === 'movie' ? `/dashboard/watch/movie/${item.id}` :
-                `/dashboard/watch/series/${item.id}`;
-
+const SearchResultCard = memo(function SearchResultCard({ item }: { item: CatalogItem }) {
     return (
-        <div className="group relative bg-[#1a1a1a] rounded-xl overflow-hidden hover:scale-105 transition-transform duration-300 shadow-lg border border-white/5 hover:border-red-500/30">
-            <Link
-                href={href}
-                data-focusable="true"
-                tabIndex={0}
-                className="block focus:outline-none focus:ring-4 focus:ring-red-600 z-10 rounded-xl"
-            >
-                {/* pt-[150%] keeps the 2:3 poster box on Chrome < 88 (no aspect-ratio) */}
-                <div className="relative pt-[150%]">
-                    {item.image ? (
-                        <img
-                            src={item.image}
-                            alt={item.name}
-                            className="absolute inset-0 w-full h-full object-cover"
-                            loading="lazy"
-                        />
-                    ) : (
-                        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-white/5 text-gray-600">
-                            {item.type === 'live' ? <Tv size={40} /> : item.type === 'movie' ? <Film size={40} /> : <Layers size={40} />}
-                        </div>
-                    )}
-                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                        <Play className="text-white fill-current w-12 h-12 drop-shadow-lg" />
-                    </div>
-                    <div className="absolute top-2 right-2 bg-black/80 px-2 py-1 rounded text-xs font-bold uppercase text-white tracking-wider border border-white/10">
-                        {item.type === 'live' ? 'ao vivo' : item.type === 'movie' ? 'filme' : 'série'}
-                    </div>
-                </div>
-                <div className="p-4">
-                    <h3 className="text-white font-medium line-clamp-2 text-sm">{item.name}</h3>
-                    {item.rating && (
-                        <div className="flex items-center space-x-1 mt-1">
-                            <span className="text-yellow-500 text-xs">★</span>
-                            <span className="text-gray-400 text-xs">{item.rating}</span>
-                        </div>
-                    )}
-                </div>
-            </Link>
-        </div>
+        <Poster
+            href={item.href}
+            title={item.name}
+            image={item.image}
+            ratio={item.type === 'live' ? 'square' : 'poster'}
+            rating={item.rating}
+            badge={{ text: BADGE_LABEL[item.type] }}
+        />
     );
 });
 
@@ -146,7 +113,7 @@ const SearchResultsGrid = memo(function SearchResultsGrid({
     hasMore,
     sentinelRef,
 }: {
-    items: SearchResult[];
+    items: CatalogItem[];
     hasMore: boolean;
     sentinelRef: React.RefObject<HTMLDivElement | null>;
 }) {
@@ -172,7 +139,7 @@ export default function SearchPage() {
 
     const [query, setQuery] = useState('');
     const [activeTab, setActiveTab] = useState<SearchCategory>('all');
-    const [results, setResults] = useState<SearchResult[]>([]);
+    const [results, setResults] = useState<CatalogItem[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -209,13 +176,7 @@ export default function SearchPage() {
 
                 if (cancelled || requestId !== latestRequestRef.current) return;
 
-                setResults(streams.map(stream => ({
-                    id: stream.id,
-                    name: stream.name,
-                    type: stream.type,
-                    image: stream.icon || stream.cover,
-                    rating: stream.rating,
-                })));
+                setResults(toCatalogItems(streams));
                 setError(null);
             } catch (err) {
                 if (cancelled || requestId !== latestRequestRef.current) return;
@@ -241,15 +202,14 @@ export default function SearchPage() {
         <div className="min-h-full flex flex-col space-y-8 p-4 md:p-6 lg:p-10">
             <div className="flex flex-col space-y-6">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Pesquisar</h1>
-                    <p className="text-gray-400 mt-1 text-sm md:text-base">Encontre seus filmes, séries e canais favoritos.</p>
+                    <h1 className="text-2xl md:text-3xl font-semibold text-ink tracking-tight">Pesquisar</h1>
+                    <p className="text-ink-2 mt-1 text-sm md:text-base">Encontre seus filmes, séries e canais favoritos.</p>
                 </div>
 
                 <SearchInput debounceMs={tuning.debounceMs} isSearching={isSearching} onCommit={handleCommit} />
 
-                <div className="flex space-x-2 overflow-x-auto pb-2 scrollbar-hide">
+                <div className="flex flex-wrap">
                     {TABS.map((tab) => {
-                        const Icon = tab.icon;
                         const isActive = activeTab === tab.id;
                         return (
                             <button
@@ -257,12 +217,11 @@ export default function SearchPage() {
                                 onClick={() => setActiveTab(tab.id)}
                                 data-focusable="true"
                                 tabIndex={0}
-                                className={`flex items-center space-x-2 px-6 py-2.5 rounded-full font-medium transition-all duration-300 whitespace-nowrap focus:outline-none focus:ring-4 focus:ring-white ${isActive
-                                    ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-                                    : 'bg-white/5 text-gray-400 hover:bg-white/10 hover:text-white'
-                                    }`}
+                                className={[
+                                    'mr-2 h-10 px-4 rounded-full text-sm font-medium transition-colors whitespace-nowrap',
+                                    isActive ? 'bg-ink text-bg' : 'bg-surface-2 text-ink-2 border border-line',
+                                ].join(' ')}
                             >
-                                <Icon size={18} />
                                 {tab.label}
                             </button>
                         );
@@ -272,28 +231,22 @@ export default function SearchPage() {
 
             <div className="flex-1 min-h-[300px]">
                 {showEmptyHint ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-600 opacity-50">
-                        <Search className="w-24 h-24 mb-4" />
-                        <p className="text-xl font-medium">Comece a digitar para pesquisar</p>
-                    </div>
+                    <EmptyState icon={Search} title="Comece a digitar para pesquisar" />
                 ) : error ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                        <AlertCircle className="w-12 h-12 mb-4 text-red-500/50" />
-                        <p className="text-lg">{error}</p>
-                    </div>
+                    <EmptyState icon={AlertCircle} title={error} />
                 ) : isSearching && results.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-500 space-y-4">
-                        <LoaderIcon className="w-10 h-10 animate-spin text-red-600" />
-                        <p className="animate-pulse">Buscando...</p>
-                    </div>
+                    <CardGrid base={2} md={4} lg={5} xl={6} gap={6}>
+                        {Array.from({ length: SKELETON_COUNT }, (_, index) => (
+                            <div key={index} className="ratio ratio-poster rounded-xl overflow-hidden">
+                                <Skeleton className="ratio-fill" />
+                            </div>
+                        ))}
+                    </CardGrid>
                 ) : results.length === 0 ? (
-                    <div className="h-full flex flex-col items-center justify-center text-gray-500">
-                        <AlertCircle className="w-12 h-12 mb-4 text-red-500/50" />
-                        <p className="text-lg">Nenhum resultado encontrado para &quot;{query}&quot;</p>
-                    </div>
+                    <EmptyState icon={AlertCircle} title={`Nenhum resultado encontrado para "${query}"`} />
                 ) : (
                     <SearchResultsGrid
-                        items={visibleItems as SearchResult[]}
+                        items={visibleItems}
                         hasMore={hasMore}
                         sentinelRef={sentinelRef}
                     />

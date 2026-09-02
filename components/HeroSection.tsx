@@ -1,10 +1,13 @@
 'use client';
 
-import { useState, useEffect, useCallback, useRef, KeyboardEvent, TouchEvent } from 'react';
+import { useState, useEffect, useCallback, useRef, TouchEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Volume2, VolumeX } from 'lucide-react';
+import { Play, Bookmark } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
+import { useFavorites } from '../app/context/FavoritesContext';
 import { apiFetch } from '../app/lib/apiClient';
+import Button from './ui/Button';
+import Badge from './ui/Badge';
 
 interface HeroItem {
     id: string;
@@ -29,6 +32,7 @@ const NEXT_DELAY = 30000;
 export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const { user } = useAuth();
     const router = useRouter();
+    const { addFavorite, removeFavorite, isFavorite } = useFavorites();
 
     const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -39,14 +43,13 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const [videoKey, setVideoKey] = useState<string | null>(null);
     const [showVideo, setShowVideo] = useState(true);
     const iframeRef = useRef<HTMLIFrameElement>(null);
-    const heroRef = useRef<HTMLDivElement>(null);
     const touchStartX = useRef<number | null>(null);
     const touchStartY = useRef<number | null>(null);
 
     // Detect TV browsers to disable heavy iframe
     const isTV = typeof window !== 'undefined' && /Web0S|WebOS|Tizen|SmartTV|Roku/i.test(navigator.userAgent);
 
-    const handleNavigate = useCallback(() => {
+    const handleWatch = useCallback(() => {
         if (!heroItems.length) return;
         const item = heroItems[currentIndex];
         router.push(
@@ -56,24 +59,29 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
         );
     }, [heroItems, currentIndex, router]);
 
-    const handleKeyDown = useCallback((e: KeyboardEvent<HTMLDivElement>) => {
-        if (e.key === 'ArrowRight') {
-            // At last item: let focus move to the next element naturally
-            if (currentIndex < heroItems.length - 1) {
-                e.preventDefault();
-                setCurrentIndex((prev) => prev + 1);
-            }
-        } else if (e.key === 'ArrowLeft') {
-            // At first item: let focus move to the previous element naturally
-            if (currentIndex > 0) {
-                e.preventDefault();
-                setCurrentIndex((prev) => prev - 1);
-            }
-        } else if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            handleNavigate();
+    const handleToggleFavorite = useCallback(() => {
+        if (!heroItems.length) return;
+        const item = heroItems[currentIndex];
+        if (isFavorite(item.id, item.type)) {
+            removeFavorite(item.id, item.type);
+        } else {
+            addFavorite({
+                id: item.id,
+                type: item.type,
+                name: item.title,
+                image: item.poster || item.backdrop,
+                rating: item.rating.toFixed(1),
+            });
         }
-    }, [currentIndex, heroItems.length, handleNavigate]);
+    }, [heroItems, currentIndex, isFavorite, addFavorite, removeFavorite]);
+
+    // Slides are browsed through the indicators below, which switch on focus —
+    // not by hijacking Left/Right on the action buttons. Intercepting the keys
+    // there would pin focus on "Assistir" forever: the slide would change under
+    // a cursor that never reaches "Minha lista".
+    const handleIndicatorFocus = useCallback((index: number) => {
+        setCurrentIndex(index);
+    }, []);
 
     const handleTouchStart = useCallback((e: TouchEvent<HTMLDivElement>) => {
         touchStartX.current = e.touches[0].clientX;
@@ -157,28 +165,21 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     if (isLoading || heroItems.length === 0) return null;
 
     const currentItem = heroItems[currentIndex];
+    const isCurrentFavorite = isFavorite(currentItem.id, currentItem.type);
 
     return (
         <div
-            ref={heroRef}
-            className="relative w-full h-[45vh] md:h-[60vh] lg:h-[85vh] overflow-hidden group outline-none cursor-pointer"
-            tabIndex={0}
-            data-focusable="true"
-            data-carousel="true"
-            onClick={handleNavigate}
-            onKeyDown={handleKeyDown}
+            className="relative w-full h-[52vh] md:h-[64vh] lg:h-[76vh] overflow-hidden"
             onTouchStart={handleTouchStart}
             onTouchEnd={handleTouchEnd}
-            aria-label="Hero carousel"
-            aria-roledescription="carousel">
-            <div
-                className="relative w-full h-full overflow-hidden"
-            >
+            aria-roledescription="carousel"
+        >
+            <div className="relative w-full h-full overflow-hidden">
                 {/* Background Image / Video Placeholder */}
-                <div className="absolute inset-0 z-0 w-full ">
+                <div className="absolute inset-0 z-0 w-full">
                     {/* Fallback Image */}
                     <div
-                        className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-in-out transform scale-105 group-hover:scale-110 ${showVideo ? 'opacity-0' : 'opacity-100'}`}
+                        className={`absolute inset-0 bg-cover bg-center bg-no-repeat transition-all duration-1000 ease-in-out transform scale-105 ${showVideo ? 'opacity-0' : 'opacity-100'}`}
                         style={{ backgroundImage: `url(${currentItem.backdrop})` }}
                     />
 
@@ -187,7 +188,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         <div className={`absolute w-full h-full inset-0 transition-opacity duration-1000 ${showVideo ? 'opacity-100' : 'opacity-0'}`}>
                             <iframe
                                 ref={iframeRef}
-                                className="w-full h-full aspect-video scale-150 pointer-events-none"
+                                className="w-full h-full scale-150 pointer-events-none"
                                 src={`https://www.youtube.com/embed/${videoKey}?autoplay=1&mute=0&controls=0&showinfo=0&rel=0&iv_load_policy=3&modestbranding=1&enablejsapi=1&loop=1&playlist=${videoKey}&origin=${typeof window !== 'undefined' ? window.location.origin : ''}`}
                                 title="Trailer"
                                 allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
@@ -195,34 +196,55 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         </div>
                     )}
                 </div>
+
+                {/* Bottom gradient — lets the text sit on top of any backdrop */}
+                <div className="absolute inset-0 z-10 bg-gradient-to-t from-bg via-bg/60 to-transparent" />
+                {/* Lateral gradient over the left half — extra contrast for bright images */}
+                <div className="absolute inset-0 z-10 w-1/2 bg-gradient-to-r from-bg/80 to-transparent" />
             </div>
+
             {/* Content Container */}
-            <div className="absolute inset-0 z-20 flex flex-col justify-end pb-16 md:pb-15 px-6 md:px-16 w-full pointer-events-none bg-gradient-to-t from-black via-black/10 from-20% to-transparent">
+            <div className="absolute inset-0 z-20 flex flex-col justify-end pb-16 md:pb-20 px-6 md:px-16 w-full">
                 <div
                     className={`transition-all duration-700 transform ${showLogo ? 'translate-y-0 opacity-100' : 'translate-y-10 opacity-0'}`}
                 >
                     {/* Metadata Tags */}
-                    <div className="flex items-center space-x-2 mb-2">
-                        <span className="px-2 py-1 bg-red-600 text-white text-xs font-bold rounded uppercase tracking-wider">
-                            {currentItem.type === 'movie' ? 'Filme' : 'Série'}
+                    <div className="flex items-center mb-3">
+                        <Badge tone="neutral">{currentItem.type === 'movie' ? 'Filme' : 'Série'}</Badge>
+                        <span className="ml-2">
+                            <Badge tone="neutral">{currentItem.year}</Badge>
                         </span>
-                        <span className="px-2 py-1 bg-white/20  text-white text-xs font-bold rounded border border-white/10">
-                            {currentItem.year}
-                        </span>
-                        <div className="flex items-center space-x-1 text-yellow-500">
-                            <span className="text-sm font-bold">{currentItem.rating.toFixed(1)}</span>
-                        </div>
+                        <span className="ml-2 text-sm text-ink-2 tnum">{currentItem.rating.toFixed(1)}</span>
                     </div>
 
                     {/* Title */}
-                    <h1 className="text-2xl md:text-4xl font-bold text-white mb-1 leading-tight max-w-4xl tracking-tight drop-shadow-2xl">
+                    <h1 className="text-3xl md:text-5xl lg:text-6xl font-semibold tracking-tight text-ink mb-3 leading-tight max-w-4xl">
                         {currentItem.title}
                     </h1>
 
                     {/* Description */}
-                    <p className="text-gray-300 text-base md:text-lg max-w-2xl line-clamp-3 md:line-clamp-2 drop-shadow-md">
+                    <p className="text-sm md:text-base text-ink-2 max-w-2xl line-clamp-2 mb-6">
                         {currentItem.description}
                     </p>
+
+                    {/* Explicit actions — the D-pad reaches these, not the hero itself */}
+                    <div className="flex items-center">
+                        <Button variant="primary" size="lg" icon={Play} onClick={handleWatch} className="mr-3">
+                            Assistir
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            size="lg"
+                            onClick={handleToggleFavorite}
+                        >
+                            <Bookmark
+                                size={20}
+                                className="mr-2"
+                                fill={isCurrentFavorite ? 'currentColor' : 'none'}
+                            />
+                            {isCurrentFavorite ? 'Na sua lista' : 'Minha lista'}
+                        </Button>
+                    </div>
                 </div>
             </div>
 
@@ -231,21 +253,20 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                 {heroItems.map((_, idx) => (
                     <button
                         key={idx}
-                        onClick={(e) => { e.stopPropagation(); setCurrentIndex(idx); }}
-                        className="px-2 py-3 flex items-center justify-center"
+                        onClick={() => setCurrentIndex(idx)}
+                        onFocus={() => handleIndicatorFocus(idx)}
+                        data-focusable="true"
+                        tabIndex={0}
+                        className="focus-flat px-2 py-3 flex items-center justify-center"
                         aria-label={`Ir para slide ${idx + 1}`}
                         aria-current={idx === currentIndex ? 'true' : undefined}
                     >
                         <span
-                            className={`block h-1.5 rounded-full transition-all duration-300 ${idx === currentIndex
-                                ? 'w-8 bg-white shadow-[0_0_8px_rgba(255,255,255,0.8)]'
-                                : 'w-4 bg-white/30 hover:bg-white/50'
-                                }`}
+                            className={`block h-0.5 rounded-full transition-all duration-300 ${idx === currentIndex ? 'w-8 bg-ink' : 'w-4 bg-line-strong'}`}
                         />
                     </button>
                 ))}
             </div>
-
         </div>
     );
 }

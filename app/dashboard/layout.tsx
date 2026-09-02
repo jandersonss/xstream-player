@@ -1,6 +1,6 @@
 'use client';
 
-import Sidebar from '@/components/Sidebar';
+import NavRail from '@/components/NavRail';
 import BottomNav from '@/components/BottomNav';
 import Loader from '@/components/Loader';
 import { useAuth } from '../context/AuthContext';
@@ -23,7 +23,7 @@ export default function DashboardLayout({
 
     if (isLoading) {
         return (
-            <div className="min-h-screen flex items-center justify-center bg-black text-white">
+            <div className="min-h-screen flex items-center justify-center bg-bg text-ink">
                 <Loader />
             </div>
         );
@@ -32,15 +32,11 @@ export default function DashboardLayout({
     if (!isAuthenticated) return null;
 
     return (
-        <div className="flex flex-col md:flex-row h-screen bg-background overflow-hidden">
-            <Sidebar />
-
-            <main className="flex-1 overflow-y-auto h-full transition-all duration-300 pb-16 md:pb-0">
-                <div className="max-w-[1600px] mx-auto min-h-full">
-                    {children}
-                </div>
+        <div className="flex flex-col md:flex-row h-screen bg-bg overflow-hidden">
+            <NavRail />
+            <main className="flex-1 overflow-y-auto h-full pb-16 md:pb-0">
+                <div className="max-w-[1800px] mx-auto min-h-full">{children}</div>
             </main>
-
             <BottomNav />
         </div>
     );

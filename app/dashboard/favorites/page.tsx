@@ -1,59 +1,56 @@
 'use client';
 
-import { useFavorites } from '@/app/context/FavoritesContext';
-import { Bookmark, Play, Tv, Film, Layers, AlertCircle } from 'lucide-react';
-import Link from 'next/link';
+import { useRouter } from 'next/navigation';
+import { Bookmark, Trash2 } from 'lucide-react';
+import { useFavorites, type FavoriteItem } from '@/app/context/FavoritesContext';
 import CardGrid from '@/components/CardGrid';
+import SectionHeader from '@/components/ui/SectionHeader';
+import EmptyState from '@/components/ui/EmptyState';
+import Skeleton from '@/components/ui/Skeleton';
+import Button from '@/components/ui/Button';
+import IconButton from '@/components/ui/IconButton';
+import Poster from '@/components/ui/Poster';
 
-export default function FavoritesPage() {
-    const { favorites, removeFavorite } = useFavorites();
+const SKELETON_COUNT = 6;
 
-    const liveItems = favorites.filter(f => f.type === 'live');
-    const movieItems = favorites.filter(f => f.type === 'movie');
-    const seriesItems = favorites.filter(f => f.type === 'series');
+function buildHref(item: FavoriteItem): string {
+    return `/dashboard/watch/${item.type}/${item.id}`;
+}
 
-    const renderSection = (title: string, items: any[], emptyMsg: string, icon: any) => (
-        <div className="space-y-6">
-            <div className="flex items-center space-x-3 border-b border-white/10 pb-4">
-                {icon}
-                <h2 className="text-2xl font-bold text-white">{title}</h2>
-                <span className="text-sm font-medium text-gray-400 bg-white/10 px-2 py-0.5 rounded-full">{items.length}</span>
-            </div>
+interface FavoritesSectionProps {
+    title: string;
+    items: FavoriteItem[];
+    emptyMessage: string;
+    onRemove: (item: FavoriteItem) => void;
+}
 
+function FavoritesSection({ title, items, emptyMessage, onRemove }: FavoritesSectionProps) {
+    return (
+        <div className="space-y-3">
+            <SectionHeader title={title} count={items.length} />
             {items.length === 0 ? (
-                <div className="text-gray-500 italic py-8">{emptyMsg}</div>
+                <EmptyState compact title={emptyMessage} />
             ) : (
-                <CardGrid base={2} md={4} lg={5} xl={6} gap={6}>
+                <CardGrid base={2} sm={3} md={4} lg={5} xl={6} gap={6}>
                     {items.map((item) => (
-                        <div key={`${item.type}-${item.id}`} className="group relative bg-[#1f1f1f] rounded-xl overflow-hidden shadow-lg border border-white/5 hover:border-red-500/30 transition-all hover:-translate-y-1">
-                            <Link href={`/dashboard/watch/${item.type}/${item.id}`} data-focusable="true" tabIndex={0} className="block focus:outline-none focus:ring-4 focus:ring-red-600 focus:scale-105 z-10 rounded-xl">
-                                {/* pt-[150%] keeps the 2:3 poster box on Chrome < 88 (no aspect-ratio) */}
-                                <div className="relative pt-[150%]">
-                                    {item.image ? (
-                                        <img src={item.image} alt={item.name} className="absolute inset-0 w-full h-full object-cover" />
-                                    ) : (
-                                        <div className="absolute inset-0 w-full h-full flex items-center justify-center bg-white/5 text-gray-600">
-                                            <Bookmark size={40} />
-                                        </div>
-                                    )}
-                                    <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                                        <Play className="text-white fill-current w-12 h-12 scale-0 group-hover:scale-110 transition-transform duration-300" />
-                                    </div>
-                                </div>
-                            </Link>
-                            <div className="p-4">
-                                <h3 className="text-white font-medium truncate text-sm mb-2">{item.name}</h3>
-                                <button
-                                    onClick={(e) => {
-                                        e.preventDefault();
-                                        removeFavorite(item.id, item.type);
-                                    }}
-                                    data-focusable="true"
-                                    tabIndex={0}
-                                    className="text-xs text-red-500 hover:text-red-400 flex items-center space-x-1 transition-colors focus:outline-none focus:text-white focus:bg-red-600 px-2 py-1 rounded"
-                                >
-                                    <Bookmark size={12} fill="currentColor" /> Remover
-                                </button>
+                        <div key={`${item.type}-${item.id}`}>
+                            <Poster
+                                href={buildHref(item)}
+                                title={item.name}
+                                image={item.image}
+                                ratio={item.type === 'live' ? 'square' : 'poster'}
+                                rating={item.rating}
+                            />
+                            {/* Remove control sits below the poster next to its title,
+                                never overlapping the image — the old hover-only overlay
+                                was unreachable by D-pad (D5). */}
+                            <div className="mt-1 flex justify-end">
+                                <IconButton
+                                    icon={Trash2}
+                                    label="Remover dos favoritos"
+                                    size="sm"
+                                    onClick={() => onRemove(item)}
+                                />
                             </div>
                         </div>
                     ))}
@@ -61,27 +58,60 @@ export default function FavoritesPage() {
             )}
         </div>
     );
+}
+
+export default function FavoritesPage() {
+    const router = useRouter();
+    const { favorites, removeFavorite, isLoaded } = useFavorites();
+
+    const liveItems = favorites.filter((f) => f.type === 'live');
+    const movieItems = favorites.filter((f) => f.type === 'movie');
+    const seriesItems = favorites.filter((f) => f.type === 'series');
+
+    const handleRemove = (item: FavoriteItem) => removeFavorite(item.id, item.type);
 
     return (
-        <div className="space-y-12 p-4 md:p-6 lg:p-10">
-            <div className="flex flex-col space-y-2">
-                <h1 className="text-2xl md:text-3xl font-bold text-white tracking-tight">Minha Lista</h1>
-                <p className="text-gray-400 text-sm md:text-base">Sua coleção personalizada de conteúdo.</p>
+        <div className="p-4 md:p-6 lg:p-10 space-y-10">
+            <div>
+                <h1 className="text-2xl md:text-3xl font-semibold text-ink tracking-tight">Minha lista</h1>
+                <p className="text-ink-2 text-sm md:text-base mt-1">Sua coleção personalizada de conteúdo.</p>
             </div>
 
-            {favorites.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-20 text-gray-500 space-y-4">
-                    <Bookmark size={64} className="opacity-20" />
-                    <p className="text-xl">Sua lista ainda está vazia.</p>
-                    <Link href="/dashboard/search" className="text-red-500 hover:text-red-400 font-medium">
-                        Explore o conteúdo para adicionar alguns!
-                    </Link>
-                </div>
+            {!isLoaded ? (
+                <CardGrid base={2} sm={3} md={4} lg={5} xl={6} gap={6}>
+                    {Array.from({ length: SKELETON_COUNT }, (_, index) => (
+                        <div key={index} className="ratio ratio-poster rounded-xl overflow-hidden">
+                            <Skeleton className="ratio-fill" />
+                        </div>
+                    ))}
+                </CardGrid>
+            ) : favorites.length === 0 ? (
+                <EmptyState
+                    icon={Bookmark}
+                    title="Sua lista ainda está vazia."
+                    description="Explore o conteúdo para adicionar alguns!"
+                    action={<Button onClick={() => router.push('/dashboard/search')}>Explorar catálogo</Button>}
+                />
             ) : (
                 <>
-                    {renderSection('Canais de TV ao Vivo', liveItems, 'Nenhum canal na lista.', <Tv className="text-red-500" />)}
-                    {renderSection('Filmes', movieItems, 'Nenhum filme na lista.', <Film className="text-blue-500" />)}
-                    {renderSection('Séries', seriesItems, 'Nenhuma série na lista.', <Layers className="text-purple-500" />)}
+                    <FavoritesSection
+                        title="TV ao vivo"
+                        items={liveItems}
+                        emptyMessage="Nenhum canal na lista."
+                        onRemove={handleRemove}
+                    />
+                    <FavoritesSection
+                        title="Filmes"
+                        items={movieItems}
+                        emptyMessage="Nenhum filme na lista."
+                        onRemove={handleRemove}
+                    />
+                    <FavoritesSection
+                        title="Séries"
+                        items={seriesItems}
+                        emptyMessage="Nenhuma série na lista."
+                        onRemove={handleRemove}
+                    />
                 </>
             )}
         </div>

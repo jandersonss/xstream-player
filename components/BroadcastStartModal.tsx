@@ -1,7 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Radio, Play, RotateCcw, Minus, Plus, X } from 'lucide-react';
+import { Radio, Play, RotateCcw, Minus, Plus } from 'lucide-react';
+import Modal from '@/components/ui/Modal';
+import Button from '@/components/ui/Button';
+import IconButton from '@/components/ui/IconButton';
 
 interface BroadcastStartModalProps {
     /** Saved progress for this content (seconds); 0 when there is none. */
@@ -30,7 +33,9 @@ function formatTime(total: number): string {
  * why this appears before sharing is turned on, and never while it is running.
  *
  * Mount it only while it should be visible: the initial pick is seeded from the saved
- * progress, and unmounting is what discards a previous pick.
+ * progress, and unmounting is what discards a previous pick. It stays uncontrolled on
+ * purpose — turning it into an always-mounted modal would keep a stale `seconds` pick
+ * around for the next broadcast.
  */
 export default function BroadcastStartModal({
     resumeTime,
@@ -41,132 +46,92 @@ export default function BroadcastStartModal({
     const maxSeconds = duration && duration > END_MARGIN_S ? duration - END_MARGIN_S : undefined;
     const [seconds, setSeconds] = useState(() => (resumeTime > 0 ? Math.floor(resumeTime) : 0));
 
-    const clamp = (value: number) => {
+    const clampSeconds = (value: number) => {
         const floored = Math.max(0, Math.floor(value));
         return maxSeconds !== undefined ? Math.min(floored, Math.floor(maxSeconds)) : floored;
     };
-    const step = (deltaMinutes: number) => setSeconds((s) => clamp(s + deltaMinutes * 60));
+    const step = (deltaMinutes: number) => setSeconds((s) => clampSeconds(s + deltaMinutes * 60));
 
     const hasResume = resumeTime > 0;
     const isAtStart = seconds === 0;
     const isAtResume = hasResume && seconds === Math.floor(resumeTime);
 
-    const optionClass = (active: boolean) =>
-        `w-full flex items-center space-x-3 p-3 rounded-xl text-left transition-colors focus:outline-none focus:ring-2 focus:ring-red-500 ${
-            active ? 'bg-red-600/20 text-white' : 'bg-white/5 text-gray-300 hover:bg-white/10'
-        }`;
+    const optionClassName = (active: boolean) =>
+        active ? 'border-line-strong' : '';
 
     return (
-        <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/80 p-4">
-            <div className="w-full max-w-md bg-[#181818] border border-white/10 rounded-2xl shadow-2xl overflow-hidden">
-                <div className="flex items-start justify-between p-6 pb-4">
-                    <div>
-                        <h2 className="text-xl font-bold text-white">Começar a transmitir de onde?</h2>
-                        <p className="text-gray-400 text-sm mt-1">
-                            Quem entrar depois pega a transmissão no ponto em que ela estiver, como um canal.
-                        </p>
-                    </div>
-                    <button
-                        onClick={onCancel}
-                        className="text-gray-500 hover:text-white p-1"
-                        aria-label="Fechar"
-                        data-focusable="true"
-                    >
-                        <X size={22} />
-                    </button>
+        <Modal
+            isOpen
+            onClose={onCancel}
+            title="De onde começar a transmitir"
+            description="Quem entrar depois pega a transmissão no ponto em que ela estiver, como um canal."
+            size="sm"
+            footer={
+                <div className="flex justify-end space-x-3">
+                    <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
+                    <Button variant="primary" icon={Radio} onClick={() => onConfirm(seconds)}>Transmitir</Button>
                 </div>
+            }
+        >
+            <div className="space-y-2">
+                <Button
+                    variant="secondary"
+                    icon={Play}
+                    fullWidth
+                    className={`justify-start ${optionClassName(isAtStart)}`}
+                    onClick={() => setSeconds(0)}
+                >
+                    Do início
+                </Button>
 
-                <div className="px-6 pb-2 space-y-2">
-                    <button
-                        onClick={() => setSeconds(0)}
-                        className={optionClass(isAtStart)}
-                        data-focusable="true"
+                {hasResume && (
+                    <Button
+                        variant="secondary"
+                        icon={RotateCcw}
+                        fullWidth
+                        className={`justify-start ${optionClassName(isAtResume)}`}
+                        onClick={() => setSeconds(Math.floor(resumeTime))}
                     >
-                        <Play size={20} className="shrink-0" />
-                        <span className="font-semibold">Do início</span>
-                    </button>
-
-                    {hasResume && (
-                        <button
-                            onClick={() => setSeconds(Math.floor(resumeTime))}
-                            className={optionClass(isAtResume)}
-                            data-focusable="true"
-                        >
-                            <RotateCcw size={20} className="shrink-0" />
-                            <span className="font-semibold">
-                                De onde parei · {formatTime(resumeTime)}
-                            </span>
-                        </button>
-                    )}
-                </div>
-
-                <div className="px-6 py-4">
-                    <p className="text-xs uppercase tracking-wide text-gray-500 mb-2">Ajustar ponto</p>
-                    <div className="flex items-center justify-between bg-white/5 rounded-xl p-2">
-                        <div className="flex items-center space-x-1">
-                            <button
-                                onClick={() => step(-5)}
-                                className="px-2 py-2 rounded-lg text-gray-300 hover:bg-white/10 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-red-500"
-                                data-focusable="true"
-                                aria-label="Voltar 5 minutos"
-                            >
-                                −5m
-                            </button>
-                            <button
-                                onClick={() => step(-1)}
-                                className="p-2 rounded-lg text-gray-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                data-focusable="true"
-                                aria-label="Voltar 1 minuto"
-                            >
-                                <Minus size={18} />
-                            </button>
-                        </div>
-
-                        <span className="text-2xl font-bold text-white tabular-nums px-2">
-                            {formatTime(seconds)}
-                        </span>
-
-                        <div className="flex items-center space-x-1">
-                            <button
-                                onClick={() => step(1)}
-                                className="p-2 rounded-lg text-gray-300 hover:bg-white/10 focus:outline-none focus:ring-2 focus:ring-red-500"
-                                data-focusable="true"
-                                aria-label="Avançar 1 minuto"
-                            >
-                                <Plus size={18} />
-                            </button>
-                            <button
-                                onClick={() => step(5)}
-                                className="px-2 py-2 rounded-lg text-gray-300 hover:bg-white/10 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-red-500"
-                                data-focusable="true"
-                                aria-label="Avançar 5 minutos"
-                            >
-                                +5m
-                            </button>
-                        </div>
-                    </div>
-                    <p className="text-xs text-gray-500 mt-2">
-                        A transmissão começa no keyframe mais próximo, alguns segundos antes do ponto escolhido.
-                    </p>
-                </div>
-
-                <div className="p-4 border-t border-white/10 flex justify-end space-x-3">
-                    <button
-                        onClick={onCancel}
-                        className="px-4 py-2 rounded-lg text-gray-300 hover:bg-white/5 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
-                        data-focusable="true"
-                    >
-                        Cancelar
-                    </button>
-                    <button
-                        onClick={() => onConfirm(seconds)}
-                        className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-white font-semibold flex items-center space-x-2 transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
-                        data-focusable="true"
-                    >
-                        <Radio size={18} /> <span>Transmitir</span>
-                    </button>
-                </div>
+                        De onde parei · {formatTime(resumeTime)}
+                    </Button>
+                )}
             </div>
-        </div>
+
+            <div className="mt-4">
+                <p className="text-xs text-ink-2 mb-2">Ajustar ponto</p>
+                <div className="flex items-center justify-between bg-surface rounded-lg p-2">
+                    <div className="flex items-center space-x-1">
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Voltar 5 minutos"
+                            onClick={() => step(-5)}
+                        >
+                            −5m
+                        </Button>
+                        <IconButton icon={Minus} label="Voltar 1 minuto" onClick={() => step(-1)} />
+                    </div>
+
+                    <span className="text-lg font-semibold text-ink tnum px-2">
+                        {formatTime(seconds)}
+                    </span>
+
+                    <div className="flex items-center space-x-1">
+                        <IconButton icon={Plus} label="Avançar 1 minuto" onClick={() => step(1)} />
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            aria-label="Avançar 5 minutos"
+                            onClick={() => step(5)}
+                        >
+                            +5m
+                        </Button>
+                    </div>
+                </div>
+                <p className="text-xs text-ink-3 mt-2">
+                    A transmissão começa no keyframe mais próximo, alguns segundos antes do ponto escolhido.
+                </p>
+            </div>
+        </Modal>
     );
 }

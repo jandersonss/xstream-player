@@ -1,12 +1,16 @@
 'use client';
 
 import { useState } from 'react';
-import { Plus, User } from 'lucide-react';
+import { Plus } from 'lucide-react';
 import { useProfile } from '@/app/context/ProfileContext';
+import { inputClassName } from '@/components/ui/Field';
 
 /**
  * Full-screen picker shown when a device has never chosen a profile and more
  * than one exists. Choosing writes the cookie, so it only appears once per device.
+ *
+ * This is a gate, not a dialog: it takes over the whole screen instead of using
+ * `components/ui/Modal.tsx`, and there is no way to dismiss it without picking.
  */
 export default function ProfileSelector() {
     const { profiles, selectProfile, createProfile } = useProfile();
@@ -20,6 +24,8 @@ export default function ProfileSelector() {
 
         try {
             await createProfile(trimmed);
+            // Deliberately not auto-selected: the user still has to choose a profile
+            // to watch as, even the one they just created.
             setName('');
             setIsCreating(false);
             setError(null);
@@ -29,10 +35,11 @@ export default function ProfileSelector() {
     };
 
     return (
-        <div className="fixed inset-0 z-[100] bg-black flex flex-col items-center justify-center p-6">
-            <h1 className="text-3xl lg:text-4xl font-bold text-white mb-10">Quem está assistindo?</h1>
+        <div className="fixed inset-0 z-[100] bg-bg flex flex-col items-center justify-center p-6">
+            <h1 className="text-2xl md:text-4xl font-semibold text-ink mb-10">Quem está assistindo?</h1>
 
-            {/* flex gap needs Chrome 84+ (WebOS TVs lack it): child m-3 + container -m-3 emulate gap-6 */}
+            {/* Flexbox gap spacing needs Chrome 84+ (WebOS TVs lack it): child m-3 plus a
+                negative margin on the container reproduces the same 24px spacing. */}
             <div className="flex flex-wrap justify-center -m-3 max-w-4xl">
                 {profiles.map(profile => (
                     <button
@@ -40,12 +47,14 @@ export default function ProfileSelector() {
                         onClick={() => selectProfile(profile.id)}
                         data-focusable="true"
                         tabIndex={0}
-                        className="group m-3 flex flex-col items-center space-y-3 focus:outline-none"
+                        className="focus-lift-lg m-3 flex flex-col items-center space-y-3"
                     >
-                        <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-2xl bg-gradient-to-br from-red-600 to-red-900 flex items-center justify-center ring-2 ring-transparent group-hover:ring-white group-focus:ring-white transition-all">
-                            <User size={48} className="text-white" />
+                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-surface-2 flex items-center justify-center">
+                            <span className="text-3xl md:text-4xl font-semibold text-ink">
+                                {profile.name.charAt(0).toUpperCase()}
+                            </span>
                         </div>
-                        <span className="text-gray-400 group-hover:text-white group-focus:text-white text-sm font-medium transition-colors">
+                        <span className="text-ink-2 text-sm md:text-base font-medium">
                             {profile.name}
                         </span>
                     </button>
@@ -53,8 +62,8 @@ export default function ProfileSelector() {
 
                 {isCreating ? (
                     <div className="m-3 flex flex-col items-center space-y-3">
-                        <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center">
-                            <User size={48} className="text-gray-600" />
+                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-surface-2 border border-line flex items-center justify-center">
+                            <Plus size={40} className="text-ink-3" />
                         </div>
                         <input
                             autoFocus
@@ -66,7 +75,7 @@ export default function ProfileSelector() {
                             }}
                             placeholder="Nome do perfil"
                             data-focusable="true"
-                            className="w-32 bg-white/10 text-white text-sm text-center rounded-lg px-2 py-1.5 focus:outline-none focus:ring-2 focus:ring-red-600"
+                            className={`${inputClassName} w-32 text-center`}
                         />
                     </div>
                 ) : (
@@ -74,19 +83,19 @@ export default function ProfileSelector() {
                         onClick={() => setIsCreating(true)}
                         data-focusable="true"
                         tabIndex={0}
-                        className="group m-3 flex flex-col items-center space-y-3 focus:outline-none"
+                        className="focus-lift-lg m-3 flex flex-col items-center space-y-3"
                     >
-                        <div className="w-24 h-24 lg:w-32 lg:h-32 rounded-2xl bg-white/5 border border-white/10 flex items-center justify-center group-hover:bg-white/10 group-focus:ring-2 group-focus:ring-white transition-all">
-                            <Plus size={48} className="text-gray-500 group-hover:text-white transition-colors" />
+                        <div className="w-24 h-24 md:w-32 md:h-32 rounded-xl bg-surface-2 border border-line flex items-center justify-center">
+                            <Plus size={40} className="text-ink-3" />
                         </div>
-                        <span className="text-gray-500 group-hover:text-white text-sm font-medium transition-colors">
+                        <span className="text-ink-2 text-sm md:text-base font-medium">
                             Adicionar perfil
                         </span>
                     </button>
                 )}
             </div>
 
-            {error && <p className="text-red-500 text-sm mt-6">{error}</p>}
+            {error && <p className="text-brand text-sm mt-6">{error}</p>}
         </div>
     );
 }

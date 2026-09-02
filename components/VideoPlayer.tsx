@@ -2,11 +2,16 @@
 
 import { useEffect, useRef, useState, useCallback, type CSSProperties } from 'react';
 import Hls from 'hls.js';
-import { Maximize, Minimize, Play, Pause, Volume2, VolumeX, AlertTriangle, ArrowLeft, Loader2, Subtitles, SkipForward } from 'lucide-react';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
 import { useProfile } from '@/app/context/ProfileContext';
 import { getDeviceProfile } from '@/app/lib/deviceProfile';
 import { getDeviceToken, getServerBaseUrl } from '@/app/lib/apiClient';
+import PlayerTopBar from '@/components/player/PlayerTopBar';
+import PlayerControls from '@/components/player/PlayerControls';
+import PlayerOverlays from '@/components/player/PlayerOverlays';
+import NextEpisodePrompt from '@/components/player/NextEpisodePrompt';
+import type { SeekBarProps } from '@/components/player/SeekBar';
+import type { VolumeControlProps } from '@/components/player/VolumeControl';
 
 type VideoPreloadMode = 'auto' | 'metadata' | 'none';
 
@@ -52,7 +57,6 @@ interface WebKitFullscreenContainer extends HTMLDivElement {
     webkitRequestFullscreen?: () => void;
 }
 
-const DEBUG_PATH = '/debug';
 /** How long before the end of the episode the next-episode prompt appears. */
 const NEXT_EPISODE_PROMPT_LEAD_SEC = 60;
 /** Countdown, in video time, until the automatic skip. */
@@ -201,7 +205,6 @@ export default function VideoPlayer({
     const [isBuffering, setIsBuffering] = useState(false);
     const [bufferedPercent, setBufferedPercent] = useState(0);
     const [skipIndicator, setSkipIndicator] = useState<{ show: boolean; text: string }>({ show: false, text: '' });
-    const [showVolumeSlider, setShowVolumeSlider] = useState(false);
     const [centerPlayPause, setCenterPlayPause] = useState<{ show: boolean; playing: boolean }>({ show: false, playing: false });
     const [subtitleFontSize, setSubtitleFontSize] = useState(() => {
         const saved = activeProfile?.prefs.subtitleFontSize;
@@ -364,17 +367,6 @@ export default function VideoPlayer({
         };
     }, [isCurrentlyFullscreen]);
 
-    const formatTime = (time: number) => {
-        if (isNaN(time)) return '00:00';
-        const h = Math.floor(time / 3600);
-        const m = Math.floor((time % 3600) / 60);
-        const s = Math.floor(time % 60);
-        if (h > 0) {
-            return `${h}:${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-        }
-        return `${m.toString().padStart(2, '0')}:${s.toString().padStart(2, '0')}`;
-    };
-
     const hasAppliedInitialTime = useRef(false);
     /** Snapshot of `initialTime` at the moment `src` changes — avoids recreating HLS when the checkpoint updates. */
     const initialSeekForActiveSrcRef = useRef(0);
@@ -534,8 +526,7 @@ export default function VideoPlayer({
         onSeekBeyondWindow?.(target);
     }, [timeOffset, totalDuration, onSeekBeyondWindow]);
 
-    const handleSeek = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
-        const time = parseFloat(e.target.value);
+    const handleSeek = useCallback((time: number) => {
         if (isBroadcastTimeline) {
             seekToAbsolute(time);
             return;
@@ -571,6 +562,24 @@ export default function VideoPlayer({
         }
     }, [isMuted]);
 
+    /**
+     * Slider-driven volume change (VolumeControl). Kept beside `adjustVolume`
+     * so the mute/unmute decision on 0/non-zero volume lives in one place
+     * instead of being duplicated in the presentation layer (spec 05 §4).
+     */
+    const handleVolumeChange = useCallback((next: number) => {
+        if (!videoRef.current) return;
+        videoRef.current.volume = next;
+        setVolume(next);
+        if (next === 0) {
+            setIsMuted(true);
+            videoRef.current.muted = true;
+        } else if (isMuted) {
+            setIsMuted(false);
+            videoRef.current.muted = false;
+        }
+    }, [isMuted]);
+
     const jumpToPercent = useCallback((percent: number) => {
         if (isBroadcastTimeline) {
             seekToAbsolute((percent / 100) * totalDuration);
@@ -602,7 +611,22 @@ export default function VideoPlayer({
                 return;
             }
 
-            switch (e.key.toLowerCase()) {
+            const key = e.key.toLowerCase();
+
+            // While focus sits inside the control bar, arrow keys must propagate
+            // untouched so useTvNavigation can move the D-pad cursor between its
+            // buttons — otherwise the buttons stay focusable but unreachable
+            // (spec 05 §3, corrects D6). The next-episode prompt has its own
+            // handler above (moveNextEpisodePromptFocus) and runs first, since
+            // its buttons live outside [data-player-controls].
+            if (key === 'arrowleft' || key === 'arrowright' || key === 'arrowup' || key === 'arrowdown') {
+                const activeElement = document.activeElement;
+                if (activeElement instanceof Element && activeElement.closest('[data-player-controls]')) {
+                    return;
+                }
+            }
+
+            switch (key) {
                 case ' ':
                     e.preventDefault();
                     togglePlay();
@@ -1091,17 +1115,39 @@ export default function VideoPlayer({
     // In Modo TV the stream's own duration is just the sliding window (a few seconds,
     // and growing) — the title's real timeline comes from the offset + known duration.
     const isLive = isBroadcastTimeline ? false : (duration === Infinity || duration === 0);
-    const volumePercent = Math.round(volume * 100);
-    const autoSkipProgress = ((NEXT_EPISODE_AUTO_SKIP_SEC - autoSkipSecondsLeft) / NEXT_EPISODE_AUTO_SKIP_SEC) * 100;
+    // 0..1 — NextEpisodePrompt turns this into a CSS width percentage itself.
+    const autoSkipProgress = (NEXT_EPISODE_AUTO_SKIP_SEC - autoSkipSecondsLeft) / NEXT_EPISODE_AUTO_SKIP_SEC;
 
     const containerStyle: CSSProperties & Record<'--subtitle-font-size', string> = {
         '--subtitle-font-size': `${subtitleFontSize}rem`,
     };
 
+    const subtitlesAvailable = Boolean(subtitleUrl);
+
+    const seekBarProps: SeekBarProps = {
+        currentTime: displayTime,
+        duration: displayDuration,
+        bufferedPercent,
+        disabled: isLive,
+        onSeek: handleSeek,
+        onSeekStart: () => setIsSeeking(true),
+        onSeekEnd: () => setIsSeeking(false),
+    };
+
+    const volumeControlProps: VolumeControlProps = {
+        volume,
+        muted: isMuted,
+        onToggleMute: toggleMute,
+        onVolumeChange: handleVolumeChange,
+    };
+
     return (
         <div
             ref={containerRef}
-            className="relative w-full max-h-[100vh] aspect-video bg-black group overflow-hidden rounded-xl shadow-2xl border border-white/10"
+            // D7: explicit sizing instead of a proportion-locking utility
+            // class (needs Chrome 88); the player always fills the viewport,
+            // so a fixed height is exact.
+            className="relative w-full h-[100vh] max-h-[100vh] bg-black overflow-hidden"
             style={containerStyle}
             onMouseMove={handleInteraction}
             onMouseLeave={() => isPlaying && setShowControls(false)}
@@ -1134,94 +1180,25 @@ export default function VideoPlayer({
                 )}
             </video>
 
-            {/* Buffering Indicator */}
-            {isBuffering && (
-                <div className="absolute inset-0 flex items-center justify-center z-30 pointer-events-none">
-                    <div className="bg-black/70 rounded-2xl p-6 shadow-2xl text-center max-w-sm mx-4">
-                        <Loader2 className="w-12 h-12 text-red-500 animate-spin" />
-                        {showBufferingHelp && (
-                            <div className="mt-4 text-white text-sm pointer-events-auto">
-                                <p className="mb-2">O carregamento está demorando.</p>
-                                <a href={DEBUG_PATH} className="text-red-300 underline font-semibold">
-                                    Abrir diagnóstico
-                                </a>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Center Play/Pause Indicator */}
-            {centerPlayPause.show && (
-                <div className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none">
-                    <div className="bg-black/70  rounded-full p-8 shadow-2xl animate-in fade-in zoom-in duration-200">
-                        {centerPlayPause.playing ? (
-                            <Play size={64} fill="white" className="text-white" />
-                        ) : (
-                            <Pause size={64} fill="white" className="text-white" />
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Skip Indicator */}
-            {skipIndicator.show && (
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 z-20 pointer-events-none">
-                    <div className="bg-black/80  rounded-2xl px-8 py-4 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-300">
-                        <p className="text-white text-3xl font-bold">{skipIndicator.text}</p>
-                    </div>
-                </div>
-            )}
+            <PlayerOverlays
+                isBuffering={isBuffering}
+                showBufferingHelp={showBufferingHelp}
+                centerPlayPause={centerPlayPause}
+                skipIndicator={skipIndicator}
+                error={error}
+            />
 
             {/* Próximo episódio — último minuto, com pulo automático em 10s */}
-            {showNextEpisodePrompt && (
-                <div
-                    ref={nextEpisodePromptRef}
-                    /* bg-black/90 (not /70): webOS 5/6 lack backdrop-filter, so the
-                       prompt must stay legible on the un-blurred fallback. */
-                    className="absolute bottom-24 right-6 z-20 flex items-center space-x-1 rounded-lg border border-white/10 bg-black/90 p-1.5 shadow-2xl backdrop-blur-sm animate-in fade-in slide-in-from-bottom-2 duration-300"
-                >
-                    <button
-                        ref={nextEpisodeButtonRef}
-                        type="button"
-                        onClick={onNext}
-                        data-focusable="true"
-                        className="relative flex items-center space-x-2 overflow-hidden rounded-md bg-white/10 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-red-600 focus:bg-red-600 focus:outline-none focus:ring-2 focus:ring-white"
-                        aria-label="Pular para o próximo episódio"
-                    >
-                        <SkipForward size={16} aria-hidden="true" />
-                        Próximo episódio
-                        <span className="text-xs tabular-nums text-white/70" aria-hidden="true">{autoSkipSecondsLeft}s</span>
-                        <span
-                            className="absolute bottom-0 left-0 h-0.5 bg-red-500 transition-[width] duration-300 ease-linear"
-                            style={{ width: `${autoSkipProgress}%` }}
-                            aria-hidden="true"
-                        />
-                    </button>
-                    <button
-                        ref={postponeButtonRef}
-                        type="button"
-                        onClick={handlePostponeNextEpisode}
-                        data-focusable="true"
-                        className="rounded-md px-3 py-2 text-sm font-medium text-white/70 transition-colors hover:bg-white/10 hover:text-white focus:bg-white/15 focus:text-white focus:outline-none focus:ring-2 focus:ring-white"
-                    >
-                        Adiar 1 min
-                    </button>
-                </div>
-            )}
-
-            {/* Error Overlay */}
-            {error && (
-                <div className="absolute inset-0 flex items-center justify-center bg-black/90 z-30">
-                    <div className="text-center text-red-400 max-w-md mx-auto px-6">
-                        <AlertTriangle size={64} className="mx-auto mb-4 drop-shadow-lg" />
-                        <p className="text-lg font-medium">{error}</p>
-                        <a href={DEBUG_PATH} className="mt-4 inline-block text-red-200 underline font-semibold">
-                            Abrir diagnóstico
-                        </a>
-                    </div>
-                </div>
-            )}
+            <NextEpisodePrompt
+                visible={showNextEpisodePrompt}
+                autoSkipProgress={autoSkipProgress}
+                secondsLeft={autoSkipSecondsLeft}
+                onNext={onNext}
+                onPostpone={handlePostponeNextEpisode}
+                promptRef={nextEpisodePromptRef}
+                nextButtonRef={nextEpisodeButtonRef}
+                postponeButtonRef={postponeButtonRef}
+            />
 
             {/* Controls Overlay */}
             <div
@@ -1235,278 +1212,37 @@ export default function VideoPlayer({
             >
                 {/* Top Bar with Back Button */}
                 {(onBack || topRightSlot || title) && (
-                    <div className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/80 via-black/40 to-transparent flex items-center justify-between space-x-3">
-                        <div className="flex items-center space-x-3 min-w-0">
-                            {onBack && (
-                                <button
-                                    onClick={onBack}
-                                    className="bg-black/60  hover:bg-white/20 p-2 rounded-full text-white transition-all transform hover:scale-110 focus:outline-none focus:ring-2 focus:ring-red-500 shadow-xl flex-shrink-0"
-                                    title="Voltar"
-                                    aria-label="Voltar"
-                                >
-                                    <ArrowLeft size={24} />
-                                </button>
-                            )}
-                            {title && (
-                                <div className="min-w-0">
-                                    <p className="text-white font-semibold text-base md:text-lg truncate drop-shadow-lg">{title}</p>
-                                    {subtitle && (
-                                        <p className="text-gray-300 text-xs md:text-sm truncate drop-shadow-lg">{subtitle}</p>
-                                    )}
-                                </div>
-                            )}
-                        </div>
-                        {topRightSlot}
-                    </div>
+                    <PlayerTopBar
+                        title={title}
+                        subtitle={subtitle}
+                        onBack={onBack}
+                        rightSlot={topRightSlot}
+                        visible={showControls}
+                    />
                 )}
 
                 {/* Bottom Controls */}
-                <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black/95 via-black/80 to-transparent px-4 py-2">
-                    {/* Barra de fundo + buffer (sempre); posição/seek só em VOD */}
-                    <div className="mb-1 group/progress">
-                        <div className="relative h-1 flex items-center">
-                            <div className="absolute inset-0 bg-white/5 rounded-full" />
-
-                            <div
-                                className="absolute inset-y-0 left-0 bg-white/25 rounded-full transition-all duration-300"
-                                style={{ width: `${Number.isFinite(bufferedPercent) ? bufferedPercent : 0}%` }}
-                                aria-hidden
-                            />
-
-                            {!isLive && (
-                                <>
-                                    <div
-                                        className="absolute inset-y-0 left-0 bg-red-500 rounded-full pointer-events-none z-[1]"
-                                        style={{
-                                            width: `${displayDuration > 0 ? Math.min(100, (displayTime / displayDuration) * 100) : 0}%`
-                                        }}
-                                    />
-
-                                    <input
-                                        type="range"
-                                        min={0}
-                                        max={displayDuration || 0}
-                                        value={displayTime}
-                                        onChange={handleSeek}
-                                        onMouseDown={() => setIsSeeking(true)}
-                                        onMouseUp={() => setIsSeeking(false)}
-                                        className="absolute inset-0 w-full bg-transparent appearance-none cursor-pointer z-10
-                                        [&::-webkit-slider-runnable-track]:bg-transparent
-                                        [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
-                                        [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-red-500 
-                                        [&::-webkit-slider-thumb]:shadow-[0_0_10px_rgba(239,68,68,0.5)] [&::-webkit-slider-thumb]:cursor-pointer
-                                        [&::-webkit-slider-thumb]:transition-transform [&::-webkit-slider-thumb]:hover:scale-125
-                                        [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white
-                                        [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 
-                                        [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-red-500 
-                                        [&::-moz-range-thumb]:shadow-lg [&::-moz-range-thumb]:cursor-pointer
-                                        [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white"
-                                        aria-label="Progresso do vídeo"
-                                    />
-                                </>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Control Buttons */}
-                    <div className="flex items-center justify-between space-x-3">
-                        <div className="flex items-center space-x-3">
-                            {/* Previous Episode */}
-                            {onPrevious && (hasPrevious || true) && (
-                                <button
-                                    onClick={onPrevious}
-                                    disabled={!hasPrevious}
-                                    className={`text-white transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 ${!hasPrevious ? 'opacity-30 cursor-not-allowed' : 'hover:text-red-400 hover:scale-110'}`}
-                                    title="Episódio Anterior"
-                                    aria-label="Episódio Anterior"
-                                >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                                        <polygon points="19 20 9 12 19 4 19 20"></polygon>
-                                        <line x1="5" y1="19" x2="5" y2="5"></line>
-                                    </svg>
-                                </button>
-                            )}
-
-                            {/* Skip Backward */}
-                            <button
-                                onClick={() => skip(-10)}
-                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
-                                title="Voltar 10s"
-                                aria-label="Voltar 10 segundos"
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                                    <path d="M11 17l-5-5 5-5M18 17l-5-5 5-5" />
-                                </svg>
-                            </button>
-
-                            {/* Play/Pause */}
-                            <button
-                                onClick={togglePlay}
-                                data-focusable="true"
-                                tabIndex={0}
-                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-full p-2 bg-white/10"
-                                aria-label={isPlaying ? 'Pausar' : 'Reproduzir'}
-                            >
-                                {isPlaying ? <Pause size={28} fill="currentColor" /> : <Play size={28} fill="currentColor" />}
-                            </button>
-
-                            {/* Skip Forward */}
-                            <button
-                                onClick={() => skip(10)}
-                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
-                                title="Avançar 10s"
-                                aria-label="Avançar 10 segundos"
-                            >
-                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                                    <path d="M13 17l5-5-5-5M6 17l5-5-5-5" />
-                                </svg>
-                            </button>
-
-                            {/* Time Display integrated here */}
-                            {!isLive && (
-                                <div className="flex items-center space-x-1.5 px-2 text-[11px] font-medium text-gray-400 whitespace-nowrap tabular-nums">
-                                    <span className="text-white">{formatTime(displayTime)}</span>
-                                    <span className="opacity-40">/</span>
-                                    <span>{formatTime(displayDuration)}</span>
-                                </div>
-                            )}
-
-                            {/* Next Episode */}
-                            {onNext && (hasNext || true) && (
-                                <button
-                                    onClick={onNext}
-                                    disabled={!hasNext}
-                                    className={`text-white transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 ${!hasNext ? 'opacity-30 cursor-not-allowed' : 'hover:text-red-400 hover:scale-110'}`}
-                                    title="Próximo Episódio"
-                                    aria-label="Próximo Episódio"
-                                >
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="w-6 h-6">
-                                        <polygon points="5 4 15 12 5 20 5 4"></polygon>
-                                        <line x1="19" y1="5" x2="19" y2="19"></line>
-                                    </svg>
-                                </button>
-                            )}
-
-                            {/* Volume Control */}
-                            <div
-                                className="relative ml-2"
-                                onMouseEnter={() => setShowVolumeSlider(true)}
-                                onMouseLeave={() => setShowVolumeSlider(false)}
-                            >
-                                <button
-                                    onClick={toggleMute}
-                                    data-focusable="true"
-                                    tabIndex={0}
-                                    className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
-                                    aria-label={isMuted ? 'Ativar som' : 'Silenciar'}
-                                >
-                                    {isMuted || volume === 0 ? <VolumeX size={24} /> : <Volume2 size={24} />}
-                                </button>
-
-                                {/* Volume Slider */}
-                                {showVolumeSlider && (
-                                    <div className="absolute bottom-full left-1/2 -translate-x-1/2 mb-2 bg-black/80  rounded-xl p-3 shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200">
-                                        <div className="flex flex-col items-center space-y-2">
-                                            <span className="text-white text-xs font-medium">{volumePercent}%</span>
-                                            <input
-                                                type="range"
-                                                min="0"
-                                                max="1"
-                                                step="0.01"
-                                                value={volume}
-                                                onChange={(e) => {
-                                                    const newVolume = parseFloat(e.target.value);
-                                                    if (videoRef.current) {
-                                                        videoRef.current.volume = newVolume;
-                                                        setVolume(newVolume);
-                                                        if (newVolume === 0) {
-                                                            setIsMuted(true);
-                                                            videoRef.current.muted = true;
-                                                        } else if (isMuted) {
-                                                            setIsMuted(false);
-                                                            videoRef.current.muted = false;
-                                                        }
-                                                    }
-                                                }}
-                                                className="h-24 w-2 appearance-none bg-white/20 rounded-full cursor-pointer
-                                                    [writing-mode:bt-lr] [-webkit-appearance:slider-vertical]
-                                                    [&::-webkit-slider-thumb]:appearance-none [&::-webkit-slider-thumb]:w-4 [&::-webkit-slider-thumb]:h-4 
-                                                    [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-red-500 
-                                                    [&::-webkit-slider-thumb]:shadow-lg [&::-webkit-slider-thumb]:cursor-pointer
-                                                    [&::-webkit-slider-thumb]:border-2 [&::-webkit-slider-thumb]:border-white
-                                                    [&::-moz-range-thumb]:w-4 [&::-moz-range-thumb]:h-4 
-                                                    [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-red-500 
-                                                    [&::-moz-range-thumb]:shadow-lg [&::-moz-range-thumb]:cursor-pointer
-                                                    [&::-moz-range-thumb]:border-2 [&::-moz-range-thumb]:border-white"
-                                                aria-label="Controle de volume"
-                                            />
-                                        </div>
-                                    </div>
-                                )}
-                            </div>
-
-                            {/* Live Indicator */}
-                            {isLive && (
-                                <div className="flex items-center space-x-2 ml-2">
-                                    <span className="relative flex h-3 w-3">
-                                        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-red-400 opacity-75"></span>
-                                        <span className="relative inline-flex rounded-full h-3 w-3 bg-red-500"></span>
-                                    </span>
-                                    <span className="text-white text-sm font-semibold uppercase tracking-wide">Ao Vivo</span>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Right Controls */}
-                        <div className="flex items-center space-x-3">
-                            {/* Subtitle Font Size Controls */}
-                            {subtitleUrl && subtitlesEnabled && (
-                                <div className="flex items-center space-x-1 bg-white/5 rounded-lg px-2 py-1">
-                                    <button
-                                        onClick={() => changeFontSize(-0.1)}
-                                        className="text-white/60 hover:text-white p-1 transition-colors"
-                                        title="Diminuir fonte ( [ )"
-                                    >
-                                        <span className="text-xs font-bold">A-</span>
-                                    </button>
-                                    <div className="w-[1px] h-3 bg-white/10 mx-1"></div>
-                                    <button
-                                        onClick={() => changeFontSize(0.1)}
-                                        className="text-white/60 hover:text-white p-1 transition-colors"
-                                        title="Aumentar fonte ( ] )"
-                                    >
-                                        <span className="text-sm font-bold">A+</span>
-                                    </button>
-                                </div>
-                            )}
-
-                            {/* Subtitle Toggle */}
-                            {subtitleUrl && (
-                                <button
-                                    onClick={toggleSubtitles}
-                                    data-focusable="true"
-                                    tabIndex={0}
-                                    className={`transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2 ${subtitlesEnabled ? 'text-emerald-400 hover:text-emerald-300' : 'text-white/40 hover:text-white/70'} hover:scale-110`}
-                                    aria-label={subtitlesEnabled ? 'Desativar legendas' : 'Ativar legendas'}
-                                    title={subtitlesEnabled ? 'Desativar legendas (C)' : 'Ativar legendas (C)'}
-                                >
-                                    <Subtitles size={24} />
-                                </button>
-                            )}
-
-                            {/* Fullscreen Button */}
-                            <button
-                                onClick={toggleFullscreen}
-                                data-focusable="true"
-                                tabIndex={0}
-                                className="text-white hover:text-red-400 hover:scale-110 transition-all focus:outline-none focus:ring-2 focus:ring-white/50 rounded-lg p-2"
-                                aria-label={isFullscreen ? 'Sair do modo tela cheia' : 'Modo tela cheia'}
-                            >
-                                {isFullscreen ? <Minimize size={24} /> : <Maximize size={24} />}
-                            </button>
-                        </div>
-                    </div>
-                </div>
+                <PlayerControls
+                    isPlaying={isPlaying}
+                    onTogglePlay={togglePlay}
+                    onSkip={skip}
+                    onPrevious={onPrevious}
+                    onNext={onNext}
+                    hasPrevious={hasPrevious}
+                    hasNext={hasNext}
+                    isLive={isLive}
+                    currentTime={displayTime}
+                    duration={displayDuration}
+                    subtitlesAvailable={subtitlesAvailable}
+                    subtitlesEnabled={subtitlesEnabled}
+                    onToggleSubtitles={toggleSubtitles}
+                    subtitleFontSize={subtitleFontSize}
+                    onChangeFontSize={changeFontSize}
+                    isFullscreen={isFullscreen}
+                    onToggleFullscreen={toggleFullscreen}
+                    seek={seekBarProps}
+                    volume={volumeControlProps}
+                />
             </div>
         </div>
     );

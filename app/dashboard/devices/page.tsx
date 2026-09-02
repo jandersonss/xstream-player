@@ -3,6 +3,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Check, LogOut, MonitorSmartphone, Pencil, Plus, Trash2, Tv, X } from 'lucide-react';
 import { apiFetch } from '@/app/lib/apiClient';
+import SectionHeader from '@/components/ui/SectionHeader';
+import Field, { inputClassName } from '@/components/ui/Field';
+import Button from '@/components/ui/Button';
+import IconButton from '@/components/ui/IconButton';
+import Badge from '@/components/ui/Badge';
+import EmptyState from '@/components/ui/EmptyState';
 
 interface Device {
     id: string;
@@ -60,9 +66,9 @@ function DeviceRow({
     };
 
     return (
-        <li className="flex items-center justify-between rounded-xl border border-white/10 bg-white/5 px-4 py-3">
+        <li className="flex items-center justify-between bg-surface border border-line rounded-xl p-4">
             <div className="flex items-center min-w-0 space-x-3">
-                <MonitorSmartphone size={20} className="flex-shrink-0 text-sky-400" />
+                <MonitorSmartphone size={20} className="flex-shrink-0 text-ink-2" />
                 <div className="min-w-0">
                     {editing ? (
                         <div className="flex items-center space-x-2">
@@ -72,61 +78,43 @@ function DeviceRow({
                                 onChange={(event) => setDraft(event.target.value)}
                                 onKeyDown={(event) => { if (event.key === 'Enter') void save(); }}
                                 data-focusable="true"
-                                className="rounded bg-white/10 px-2 py-1 text-white outline-none focus:ring-2 focus:ring-red-500"
+                                className={inputClassName}
                             />
-                            <button
-                                onClick={() => void save()}
-                                data-focusable="true"
-                                aria-label="Salvar nome"
-                                className="p-1 text-emerald-400 hover:text-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500 rounded"
-                            >
-                                <Check size={18} />
-                            </button>
-                            <button
+                            <IconButton icon={Check} label="Salvar nome" onClick={() => void save()} />
+                            <IconButton
+                                icon={X}
+                                label="Cancelar"
                                 onClick={() => { setDraft(device.name); setEditing(false); }}
-                                data-focusable="true"
-                                aria-label="Cancelar"
-                                className="p-1 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500 rounded"
-                            >
-                                <X size={18} />
-                            </button>
+                            />
                         </div>
                     ) : (
-                        <p className="truncate font-semibold text-white">
+                        <p className="truncate font-semibold text-ink">
                             {device.name}
-                            {isCurrent && <span className="ml-2 text-xs font-normal text-sky-400">· este aparelho</span>}
+                            {isCurrent && <span className="ml-2 text-xs font-normal text-ink-2">· este aparelho</span>}
                         </p>
                     )}
-                    <p className="mt-1 truncate text-xs text-gray-400">
+                    <p className="mt-1 truncate text-xs text-ink-2">
                         {PLATFORM_LABEL[device.platform] ?? PLATFORM_LABEL.unknown}
-                        {' · '}Último acesso: {formatMoment(device.lastSeenAt)}
+                        {' · '}Último acesso: <span className="tnum">{formatMoment(device.lastSeenAt)}</span>
                         {profileName ? ` · Perfil: ${profileName}` : ''}
                     </p>
                 </div>
             </div>
 
-            <div className="flex flex-shrink-0 items-center space-x-1">
-                {!editing && (
-                    <button
+            {!editing && (
+                <div className="flex flex-shrink-0 items-center space-x-1">
+                    <IconButton
+                        icon={Pencil}
+                        label="Renomear aparelho"
                         onClick={() => { setDraft(device.name); setEditing(true); }}
-                        data-focusable="true"
-                        aria-label="Renomear aparelho"
-                        title="Renomear"
-                        className="rounded p-2 text-gray-400 hover:text-white focus:outline-none focus:ring-2 focus:ring-red-500"
-                    >
-                        <Pencil size={16} />
-                    </button>
-                )}
-                <button
-                    onClick={() => void onRevoke(device.id)}
-                    data-focusable="true"
-                    aria-label="Revogar aparelho"
-                    title="Revogar acesso"
-                    className="rounded p-2 text-gray-400 hover:text-red-400 focus:outline-none focus:ring-2 focus:ring-red-500"
-                >
-                    <Trash2 size={16} />
-                </button>
-            </div>
+                    />
+                    <IconButton
+                        icon={Trash2}
+                        label="Revogar aparelho"
+                        onClick={() => void onRevoke(device.id)}
+                    />
+                </div>
+            )}
         </li>
     );
 }
@@ -147,6 +135,7 @@ export default function DevicesPage() {
     const [currentDeviceId, setCurrentDeviceId] = useState<string | null>(null);
     const [disconnecting, setDisconnecting] = useState(false);
     const [disconnected, setDisconnected] = useState(false);
+    const [confirmingDisconnect, setConfirmingDisconnect] = useState(false);
 
     // A phone that scanned the TV's QR lands here with `?code=…`. Pre-fill the
     // field so approving is one tap, then drop the param so a refresh after
@@ -191,9 +180,7 @@ export default function DevicesPage() {
     };
 
     const disconnectThisDevice = async () => {
-        if (!window.confirm('Desconectar esta TV? Você vai precisar parear de novo (e poderá escolher outro servidor).')) {
-            return;
-        }
+        setConfirmingDisconnect(false);
         setDisconnecting(true);
         try {
             const response = await apiFetch('/api/devices/session', { method: 'DELETE' });
@@ -295,63 +282,80 @@ export default function DevicesPage() {
 
     if (disconnected) {
         return (
-            <div className="flex min-h-[60vh] flex-col items-center justify-center p-6 text-center">
-                <Tv size={48} className="mb-4 text-sky-400" />
-                <h1 className="text-2xl font-bold text-white">Aparelho desconectado</h1>
-                <p className="mt-2 max-w-md text-sm text-gray-400">
-                    Feche e abra o app na TV de novo. Ele vai voltar para a tela de conexão, onde você
-                    pode confirmar o mesmo servidor ou informar outro.
-                </p>
-            </div>
+            <EmptyState
+                icon={Tv}
+                title="Aparelho desconectado"
+                description="Feche e abra o app na TV de novo. Ele vai voltar para a tela de conexão, onde você pode confirmar o mesmo servidor ou informar outro."
+            />
         );
     }
 
     return (
-        <div className="p-6 lg:p-10">
-            <header className="mb-8">
-                <h1 className="text-2xl font-bold text-white">Aparelhos</h1>
-                <p className="mt-1 text-sm text-gray-400">
-                    Escaneie o QR code que a TV mostra, ou digite o código de {CODE_LENGTH} caracteres.
-                    O código vale por 5 minutos e só pode ser usado uma vez.
-                </p>
-            </header>
+        <div className="px-6 md:px-10 lg:px-14 pt-6 pb-10">
+            <SectionHeader
+                title="Aparelhos"
+                description={`Escaneie o QR code que a TV mostra, ou digite o código de ${CODE_LENGTH} caracteres. O código vale por 5 minutos e só pode ser usado uma vez.`}
+            />
 
             {currentDeviceId && (
-                <section className="mb-8 flex flex-col justify-between rounded-2xl border border-sky-400/30 bg-sky-400/10 p-5 md:flex-row md:items-center">
-                    <div className="flex items-start space-x-3">
-                        <Tv size={20} className="mt-0.5 flex-shrink-0 text-sky-400" />
-                        <div>
-                            <p className="font-semibold text-white">Você está vendo esta tela pela TV</p>
-                            <p className="mt-1 text-sm text-gray-300">
-                                Para apontar esta TV para outro servidor (ex.: alternar entre dev e prod),
-                                desconecte e pareie de novo.
-                            </p>
+                <section className="mt-8 pt-8 border-t border-line">
+                    <SectionHeader title="Esta TV" />
+                    <div className="bg-surface-2 border border-line rounded-xl p-5 flex flex-col md:flex-row md:items-center md:justify-between">
+                        <div className="flex items-start space-x-3">
+                            <Badge tone="warn">Sessão ativa</Badge>
+                            <div>
+                                <p className="font-semibold text-ink">Você está vendo esta tela pela TV</p>
+                                <p className="mt-1 text-sm text-ink-2">
+                                    Para apontar esta TV para outro servidor (ex.: alternar entre dev e prod),
+                                    desconecte e pareie de novo.
+                                </p>
+                            </div>
                         </div>
+
+                        {confirmingDisconnect ? (
+                            <div className="mt-4 md:mt-0 md:ml-4 flex flex-shrink-0 items-center space-x-3">
+                                <Button
+                                    variant="ghost"
+                                    disabled={disconnecting}
+                                    onClick={() => setConfirmingDisconnect(false)}
+                                >
+                                    Cancelar
+                                </Button>
+                                <Button
+                                    variant="danger"
+                                    icon={LogOut}
+                                    disabled={disconnecting}
+                                    onClick={() => void disconnectThisDevice()}
+                                >
+                                    {disconnecting ? 'Desconectando...' : 'Confirmar'}
+                                </Button>
+                            </div>
+                        ) : (
+                            <Button
+                                variant="danger"
+                                icon={LogOut}
+                                disabled={disconnecting}
+                                onClick={() => setConfirmingDisconnect(true)}
+                                className="mt-4 md:mt-0 md:ml-4 flex-shrink-0"
+                            >
+                                Desconectar e trocar servidor
+                            </Button>
+                        )}
                     </div>
-                    <button
-                        onClick={() => void disconnectThisDevice()}
-                        disabled={disconnecting}
-                        data-focusable="true"
-                        className="mt-4 flex flex-shrink-0 items-center justify-center space-x-2 rounded-lg border border-sky-400/40 px-4 py-2 font-semibold text-sky-300 transition-colors hover:bg-sky-400/10 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-sky-500 md:mt-0 md:ml-4"
-                    >
-                        <LogOut size={18} />
-                        <span>{disconnecting ? 'Desconectando...' : 'Desconectar e trocar servidor'}</span>
-                    </button>
                 </section>
             )}
 
-            <section className="mb-10 rounded-2xl border border-white/10 bg-white/5 p-5">
-                <h2 className="mb-4 text-lg font-semibold text-white">Parear novo aparelho</h2>
+            <section className="mt-8 pt-8 border-t border-line">
+                <SectionHeader title="Parear aparelho" />
 
                 {codeFromQr && (
-                    <p className="mb-4 text-sm text-emerald-400">
+                    <p className="mb-4 text-sm text-ok">
                         Código preenchido pela TV. Confira o nome e o perfil e toque em Aprovar.
                     </p>
                 )}
 
                 <div className="flex flex-col space-y-3 md:flex-row md:items-end md:space-y-0 md:space-x-3">
-                    <label className="flex flex-col text-xs text-gray-400">
-                        Código
+                    <Field label="Código">
                         <input
                             value={code}
                             onChange={(event) => {
@@ -362,59 +366,61 @@ export default function DevicesPage() {
                             placeholder="ABC234"
                             maxLength={CODE_LENGTH}
                             data-focusable="true"
-                            className="mt-1 w-40 rounded-lg bg-black/40 px-3 py-2 text-xl font-bold tracking-[0.3em] text-white outline-none focus:ring-2 focus:ring-red-500"
+                            className={`${inputClassName} w-40 uppercase tracking-[0.3em] text-center tnum`}
                         />
-                    </label>
+                    </Field>
 
-                    <label className="flex flex-col text-xs text-gray-400">
-                        Nome (opcional)
+                    <Field label="Nome (opcional)">
                         <input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
                             placeholder="TV da sala"
                             data-focusable="true"
-                            className="mt-1 w-56 rounded-lg bg-black/40 px-3 py-2 text-white outline-none focus:ring-2 focus:ring-red-500"
+                            className={`${inputClassName} w-56`}
                         />
-                    </label>
+                    </Field>
 
-                    <label className="flex flex-col text-xs text-gray-400">
-                        Perfil (opcional)
+                    <Field label="Perfil (opcional)">
                         <select
                             value={profileId}
                             onChange={(event) => setProfileId(event.target.value)}
                             data-focusable="true"
-                            className="mt-1 w-56 rounded-lg bg-black/40 px-3 py-2 text-white outline-none focus:ring-2 focus:ring-red-500"
+                            className={`${inputClassName} w-56`}
                         >
                             <option value="">Perfil padrão</option>
                             {profiles.map(profile => (
                                 <option key={profile.id} value={profile.id}>{profile.name}</option>
                             ))}
                         </select>
-                    </label>
+                    </Field>
 
-                    <button
-                        onClick={() => void approve()}
+                    <Button
+                        variant="primary"
+                        icon={Plus}
                         disabled={isBusy}
-                        data-focusable="true"
-                        className="flex items-center justify-center space-x-2 rounded-lg bg-red-600 px-4 py-2 font-semibold text-white transition-colors hover:bg-red-500 disabled:opacity-50 focus:outline-none focus:ring-2 focus:ring-red-400"
+                        onClick={() => void approve()}
                     >
-                        <Plus size={18} />
-                        <span>{isBusy ? 'Aprovando...' : 'Aprovar'}</span>
-                    </button>
+                        {isBusy ? 'Aprovando...' : 'Aprovar'}
+                    </Button>
                 </div>
 
                 {message && (
-                    <p className={`mt-4 text-sm ${message.type === 'error' ? 'text-red-400' : 'text-emerald-400'}`}>
+                    <p className={`mt-4 text-sm ${message.type === 'error' ? 'text-brand' : 'text-ok'}`}>
                         {message.text}
                     </p>
                 )}
             </section>
 
-            <section>
-                <h2 className="mb-4 text-lg font-semibold text-white">Aparelhos pareados</h2>
+            <section className="mt-8 pt-8 border-t border-line">
+                <SectionHeader title="Aparelhos pareados" count={devices.length} />
 
                 {devices.length === 0 ? (
-                    <p className="text-sm text-gray-500">Nenhum aparelho pareado ainda.</p>
+                    <EmptyState
+                        icon={Tv}
+                        title="Nenhum aparelho pareado ainda"
+                        description="A TV mostra um código ao abrir o app — digite-o acima para parear."
+                        compact
+                    />
                 ) : (
                     <ul className="space-y-2">
                         {devices.map(device => (

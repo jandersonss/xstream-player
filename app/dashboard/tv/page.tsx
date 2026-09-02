@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
 import { Radio, Tv, Film, Layers, Pencil, Check, PowerOff, Play } from 'lucide-react';
@@ -8,9 +8,27 @@ import { useLiveSessions, excludeSelf, joinHref, type ShareSession } from '@/app
 import { getDeviceName, setDeviceName } from '@/app/lib/device';
 import { apiFetch } from '@/app/lib/apiClient';
 import CardGrid from '@/components/CardGrid';
+import SectionHeader from '@/components/ui/SectionHeader';
+import Modal from '@/components/ui/Modal';
+import Button from '@/components/ui/Button';
+import Field, { inputClassName } from '@/components/ui/Field';
+import Badge from '@/components/ui/Badge';
+import EmptyState from '@/components/ui/EmptyState';
 
 const TYPE_ICON = { live: Tv, movie: Film, series: Layers } as const;
 const TYPE_LABEL = { live: 'Canal ao vivo', movie: 'Filme', series: 'Série' } as const;
+
+function formatElapsed(ms: number): string {
+    const totalSeconds = Math.max(0, Math.floor(ms / 1000));
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    if (minutes >= 60) {
+        const hours = Math.floor(minutes / 60);
+        return `${hours}h ${minutes % 60}min`;
+    }
+    if (minutes > 0) return `${minutes}min ${seconds}s`;
+    return `${seconds}s`;
+}
 
 function DeviceNameEditor() {
     const [name, setName] = useState(() => getDeviceName());
@@ -26,78 +44,103 @@ function DeviceNameEditor() {
         setEditing(false);
     };
 
-    return (
-        <div className="flex items-center space-x-2 text-sm text-gray-400">
-            <span>Este aparelho:</span>
-            {editing ? (
-                <>
+    if (editing) {
+        return (
+            <div className="flex items-end space-x-2">
+                <Field label="Este aparelho">
                     <input
                         autoFocus
                         value={draft}
                         onChange={(e) => setDraft(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && save()}
-                        className="bg-white/10 rounded px-2 py-1 text-white outline-none focus:ring-2 focus:ring-red-500"
+                        data-focusable="true"
+                        className={inputClassName}
                     />
-                    <button onClick={save} className="p-1 text-emerald-400 hover:text-emerald-300" aria-label="Salvar nome">
-                        <Check size={18} />
-                    </button>
-                </>
-            ) : (
-                <>
-                    <span className="text-white font-semibold">{name}</span>
-                    <button
-                        onClick={() => { setDraft(name); setEditing(true); }}
-                        className="p-1 text-gray-400 hover:text-white"
-                        aria-label="Editar nome do aparelho"
-                    >
-                        <Pencil size={16} />
-                    </button>
-                </>
-            )}
+                </Field>
+                <Button
+                    icon={Check}
+                    variant="secondary"
+                    aria-label="Salvar nome"
+                    onClick={save}
+                >
+                    Salvar
+                </Button>
+            </div>
+        );
+    }
+
+    return (
+        <div className="flex items-center space-x-2 text-sm text-ink-2">
+            <span>Este aparelho:</span>
+            <span className="text-ink font-semibold">{name}</span>
+            <button
+                onClick={() => { setDraft(name); setEditing(true); }}
+                data-focusable="true"
+                tabIndex={0}
+                aria-label="Editar nome do aparelho"
+                className="p-1 text-ink-2 hover:text-ink"
+            >
+                <Pencil size={16} />
+            </button>
         </div>
     );
 }
 
-function SessionCard({ session, onSelect }: { session: ShareSession; onSelect: (s: ShareSession) => void }) {
+function SessionCard({
+    session,
+    now,
+    onSelect,
+}: {
+    session: ShareSession;
+    /** Wall clock, ticked from an effect — components must stay pure, so `Date.now()`
+        cannot be called directly during render. */
+    now: number;
+    onSelect: (s: ShareSession) => void;
+}) {
     const Icon = TYPE_ICON[session.contentType];
+    // `updatedAt` is refreshed on every heartbeat (~20s), not the original broadcast
+    // start — the backend (tvModeStore.ts) does not track a separate start timestamp.
+    // It is still the closest available proxy for "how long it has been going".
+    const elapsed = formatElapsed(now - session.updatedAt);
 
     return (
         <button
             onClick={() => onSelect(session)}
             data-focusable="true"
-            className="text-left rounded-xl overflow-hidden border border-white/10 bg-white/5 hover:bg-white/10 hover:scale-[1.02] cursor-pointer transition-all group focus:outline-none focus:ring-2 focus:ring-red-500"
+            className="text-left bg-surface-2 border border-line rounded-xl overflow-hidden"
         >
-            {/* 16:9 box via padding-ratio: `aspect-video` (Chrome 88) and its
-                globals.css float fallback both misbehave inside a flex parent on
-                the webOS TV engines. */}
-            <div className="relative bg-black/40 pt-[56.25%]">
-                <div className="absolute inset-0 flex items-center justify-center">
+            <div className="ratio ratio-wide bg-bg">
+                <div className="ratio-fill flex items-center justify-center">
                     {session.poster ? (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img src={session.poster} alt="" className="w-full h-full object-cover" />
                     ) : (
-                        <Icon size={40} className="text-gray-600" />
+                        <Icon size={40} className="text-ink-3" />
                     )}
                 </div>
-                <span className="absolute top-2 left-2 flex items-center space-x-1 bg-red-600 text-white text-[10px] font-bold px-2 py-1 rounded-full">
-                    <Radio size={12} className="animate-pulse" /> {session.contentType === 'live' ? 'AO VIVO' : 'TRANSMITINDO'}
+                <span className="absolute top-2 left-2">
+                    <Badge tone="live" dot>
+                        {session.contentType === 'live' ? 'AO VIVO' : 'TRANSMITINDO'}
+                    </Badge>
                 </span>
             </div>
             <div className="p-3">
-                <p className="text-white font-semibold truncate">{session.title}</p>
-                <p className="text-xs text-gray-400 mt-1 truncate">
+                <p className="text-ink font-semibold truncate">{session.title}</p>
+                <p className="text-xs text-ink-2 mt-1 truncate">
                     {TYPE_LABEL[session.contentType]} · {session.deviceName}
                     {session.ip ? ` · ${session.ip}` : ''}
                 </p>
+                <p className="text-xs text-ink-3 mt-1 tnum">Há {elapsed}</p>
             </div>
         </button>
     );
 }
 
 /**
- * Actions for the selected broadcast. The options are stacked in a single column so the
- * remote only has to move up/down, and the destructive one asks for confirmation in this
- * same dialog instead of opening a second one on top.
+ * Actions for the selected broadcast. A single Modal alternates between the "actions"
+ * and "confirm stop" states instead of opening a second modal on top — opening one
+ * would complicate the useNavigationOverride stack (Back would have to know which
+ * modal to close first).
  */
 function SessionActionsDialog({
     session,
@@ -115,6 +158,8 @@ function SessionActionsDialog({
     const [confirming, setConfirming] = useState(false);
 
     // On a TV the remote's back button would otherwise leave the page with the dialog open.
+    // Modal itself also registers onClose via useNavigationOverride; this override sits on
+    // top of it (registered after) so Back steps out of "confirming" first, then closes.
     useNavigationOverride(
         useCallback(() => {
             if (busy) return;
@@ -124,66 +169,46 @@ function SessionActionsDialog({
     );
 
     return (
-        <div className="fixed inset-0 z-50 bg-black/80 flex items-center justify-center p-4">
-            <div className="w-full max-w-md rounded-xl border border-white/10 bg-[#1c1c1c] p-6">
-                <h2 className="text-xl font-bold text-white truncate">{session.title}</h2>
-                <p className="text-sm text-gray-400 mt-1 truncate">
-                    {TYPE_LABEL[session.contentType]} · {session.deviceName}
-                </p>
-
-                {confirming ? (
-                    <>
-                        <p className="text-gray-400 mt-5">
-                            Encerrar esta transmissão? Todos os aparelhos assistindo serão desconectados.
-                        </p>
-                        <div className="mt-6 space-y-2">
-                            <button
-                                onClick={onStop}
-                                disabled={busy}
-                                autoFocus
-                                data-focusable="true"
-                                className="w-full flex items-center justify-center px-4 py-3 rounded-lg bg-red-600 text-white font-semibold hover:bg-red-500 disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-white"
-                            >
-                                <PowerOff size={18} className="mr-2" /> {busy ? 'Encerrando...' : 'Encerrar agora'}
-                            </button>
-                            <button
-                                onClick={() => setConfirming(false)}
-                                disabled={busy}
-                                data-focusable="true"
-                                className="w-full px-4 py-3 rounded-lg bg-white/10 text-white hover:bg-white/20 disabled:opacity-50 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
-                            >
-                                Voltar
-                            </button>
-                        </div>
-                    </>
-                ) : (
-                    <div className="mt-6 space-y-2">
-                        <button
-                            onClick={onJoin}
-                            autoFocus
-                            data-focusable="true"
-                            className="w-full flex items-center justify-center px-4 py-3 rounded-lg bg-white text-black font-semibold hover:bg-gray-200 cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
+        <Modal isOpen onClose={onClose} title={session.title} description={`${TYPE_LABEL[session.contentType]} · ${session.deviceName}`} size="sm">
+            {confirming ? (
+                <div className="space-y-3">
+                    <p className="text-sm text-ink-2">
+                        Encerrar esta transmissão? Todos os aparelhos assistindo serão desconectados.
+                    </p>
+                    <div className="space-y-3">
+                        <Button
+                            variant="danger"
+                            icon={PowerOff}
+                            fullWidth
+                            disabled={busy}
+                            onClick={onStop}
                         >
-                            <Play size={18} className="mr-2" /> Assistir
-                        </button>
-                        <button
-                            onClick={() => setConfirming(true)}
-                            data-focusable="true"
-                            className="w-full flex items-center justify-center px-4 py-3 rounded-lg bg-white/10 text-white hover:bg-red-600 cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-red-500"
+                            {busy ? 'Encerrando...' : 'Encerrar agora'}
+                        </Button>
+                        <Button
+                            variant="secondary"
+                            fullWidth
+                            disabled={busy}
+                            onClick={() => setConfirming(false)}
                         >
-                            <PowerOff size={18} className="mr-2" /> Encerrar transmissão
-                        </button>
-                        <button
-                            onClick={onClose}
-                            data-focusable="true"
-                            className="w-full px-4 py-3 rounded-lg text-gray-400 hover:text-white cursor-pointer focus:outline-none focus:ring-2 focus:ring-red-500"
-                        >
-                            Cancelar
-                        </button>
+                            Voltar
+                        </Button>
                     </div>
-                )}
-            </div>
-        </div>
+                </div>
+            ) : (
+                <div className="space-y-3">
+                    <Button variant="primary" icon={Play} fullWidth onClick={onJoin}>
+                        Assistir
+                    </Button>
+                    <Button variant="danger" icon={PowerOff} fullWidth onClick={() => setConfirming(true)}>
+                        Encerrar transmissão
+                    </Button>
+                    <Button variant="ghost" fullWidth onClick={onClose}>
+                        Cancelar
+                    </Button>
+                </div>
+            )}
+        </Modal>
     );
 }
 
@@ -194,6 +219,14 @@ export default function ModoTvPage() {
     const [stopping, setStopping] = useState(false);
     // excludeSelf uses localStorage (getDeviceId), evaluated on every list change.
     const visible = useMemo(() => excludeSelf(sessions), [sessions]);
+
+    // Ticked wall clock for the "started X ago" labels — read from state (set in an
+    // effect) instead of calling `Date.now()` straight in render.
+    const [now, setNow] = useState(0);
+    useEffect(() => {
+        const interval = setInterval(() => setNow(Date.now()), 1000);
+        return () => clearInterval(interval);
+    }, []);
 
     const confirmStop = async () => {
         if (!selected) return;
@@ -214,32 +247,30 @@ export default function ModoTvPage() {
     };
 
     return (
-        <div className="p-4 md:p-8 text-white">
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between space-y-3 md:space-y-0 md:space-x-3 mb-8">
-                <div>
-                    <h1 className="text-3xl font-bold flex items-center space-x-3">
-                        <Radio className="text-red-500" /> Modo TV
-                    </h1>
-                    <p className="text-gray-400 mt-2 max-w-2xl">
-                        Assista, sem gastar uma nova conexão, ao que outros aparelhos estão transmitindo agora.
-                        Para transmitir, ligue <strong className="text-white">Transmitir</strong> ao assistir um canal.
-                    </p>
+        <div className="px-6 md:px-10 lg:px-14 pt-6 pb-10">
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
+                <SectionHeader
+                    title="Modo TV"
+                    description="Assista, sem gastar uma nova conexão, ao que outros aparelhos estão transmitindo agora. Para transmitir, ligue Transmitir ao assistir um canal."
+                />
+                <div className="mt-4 md:mt-0">
+                    <DeviceNameEditor />
                 </div>
-                <DeviceNameEditor />
             </div>
 
             {loading && visible.length === 0 ? (
-                <p className="text-gray-500">Procurando transmissões...</p>
+                <p className="text-ink-2 text-sm">Procurando transmissões...</p>
             ) : visible.length === 0 ? (
-                <div className="text-center py-20 text-gray-500">
-                    <Tv size={48} className="mx-auto mb-4 opacity-40" />
-                    <p className="text-lg">Ninguém está transmitindo agora.</p>
-                    <p className="text-sm mt-1">Abra um canal e ligue “Transmitir” para aparecer aqui.</p>
-                </div>
+                <EmptyState
+                    icon={Radio}
+                    title="Nenhuma transmissão ativa"
+                    description='Ligue "Transmitir" em qualquer aparelho assistindo um canal para a sessão aparecer aqui.'
+                    action={<Button variant="ghost" onClick={refresh}>Atualizar</Button>}
+                />
             ) : (
-                <CardGrid base={2} sm={3} lg={4} gap={4}>
+                <CardGrid base={1} sm={2} lg={3} gap={4}>
                     {visible.map((s) => (
-                        <SessionCard key={s.deviceId} session={s} onSelect={setSelected} />
+                        <SessionCard key={s.deviceId} session={s} now={now} onSelect={setSelected} />
                     ))}
                 </CardGrid>
             )}

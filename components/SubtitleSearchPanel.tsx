@@ -1,9 +1,14 @@
 'use client';
 
 import { useState, useCallback, useEffect } from 'react';
-import { Search, Download, Loader2, Subtitles, X, Globe } from 'lucide-react';
+import { Search, Download, Loader2, Subtitles, Globe } from 'lucide-react';
 import { useSubtitle, SubtitleResult } from '../app/context/SubtitleContext';
 import { useProfile } from '../app/context/ProfileContext';
+import Modal from '@/components/ui/Modal';
+import Button from '@/components/ui/Button';
+import EmptyState from '@/components/ui/EmptyState';
+import Badge from '@/components/ui/Badge';
+import { inputClassName } from '@/components/ui/Field';
 
 interface SubtitleSearchPanelProps {
     title: string;
@@ -15,6 +20,16 @@ interface SubtitleSearchPanelProps {
     streamId: string;
     onSubtitleSelected: (vttUrl: string) => void;
     onClose: () => void;
+}
+
+interface SearchParams {
+    languages: string;
+    tmdb_id?: number;
+    parent_tmdb_id?: number;
+    season_number?: number;
+    episode_number?: number;
+    query?: string;
+    year?: number;
 }
 
 const LANGUAGES = [
@@ -67,7 +82,7 @@ export default function SubtitleSearchPanel({
         setIsSearching(true);
         setHasSearched(true);
 
-        const searchParams: any = {
+        const searchParams: SearchParams = {
             languages: selectedLanguage,
         };
 
@@ -111,166 +126,140 @@ export default function SubtitleSearchPanel({
             onSubtitleSelected(vttUrl);
             onClose();
         }
-    }, [downloadSubtitle, onSubtitleSelected, onClose]);
+    }, [downloadSubtitle, streamId, onSubtitleSelected, onClose]);
 
     // `ensureConfigLoaded` only runs after the first paint, so gating on
     // "resolved" (rather than "loading") avoids flashing the not-configured
     // message at a user who does have a key saved.
     if (!isConfigResolved) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80">
-                <Loader2 size={32} className="text-white animate-spin" />
-            </div>
+            <Modal isOpen onClose={onClose} title="Legendas" size="lg">
+                <div className="flex items-center justify-center py-12">
+                    <Loader2 size={32} className="text-ink animate-spin" />
+                </div>
+            </Modal>
         );
     }
 
     if (!isConfigured) {
         return (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 animate-in fade-in duration-200">
-                <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl w-full max-w-md mx-4 p-6 text-center animate-in zoom-in-95 duration-200">
-                    <Subtitles size={48} className="text-gray-500 mx-auto mb-4" />
-                    <h3 className="text-lg font-bold text-white mb-2">Legendas não configuradas</h3>
-                    <p className="text-sm text-gray-400 mb-4">
-                        Configure sua chave de API do OpenSubtitles no menu lateral para buscar legendas.
-                    </p>
-                    <button
-                        onClick={onClose}
-                        className="px-6 py-2 bg-white/10 hover:bg-white/20 rounded-lg text-white transition-colors"
-                    >
-                        Fechar
-                    </button>
-                </div>
-            </div>
+            <Modal isOpen onClose={onClose} title="Legendas" size="sm">
+                <EmptyState
+                    icon={Subtitles}
+                    title="Legendas não configuradas"
+                    description="Configure sua chave de API do OpenSubtitles em Ajustes para buscar legendas."
+                    action={<Button variant="secondary" onClick={onClose}>Fechar</Button>}
+                />
+            </Modal>
         );
     }
 
     return (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 animate-in fade-in duration-200">
-            <div className="bg-[#1a1a1a] border border-[#333] rounded-2xl shadow-2xl w-full max-w-lg mx-4 max-h-[80vh] flex flex-col animate-in zoom-in-95 duration-200">
-                {/* Header */}
-                <div className="flex items-center justify-between p-6 border-b border-[#333]">
-                    <div className="flex items-center space-x-3">
-                        <div className="p-2 bg-emerald-600/20 rounded-lg">
-                            <Subtitles size={24} className="text-emerald-500" />
-                        </div>
-                        <div>
-                            <h2 className="text-lg font-bold text-white">Buscar Legendas</h2>
-                            <div className="flex items-center space-x-2">
-                                <p className="text-xs text-gray-500 truncate max-w-[200px]">{title}</p>
-                                {remainingDownloads !== null && (
-                                    <span className={`text-xs px-1.5 py-0.5 rounded ${remainingDownloads <= 3 ? 'bg-red-500/20 text-red-400' : 'bg-emerald-500/20 text-emerald-400'}`}>
-                                        {remainingDownloads} restantes
-                                    </span>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                    <button
-                        onClick={onClose}
-                        className="p-2 hover:bg-white/10 rounded-lg transition-colors"
-                    >
-                        <X size={20} className="text-gray-400" />
-                    </button>
+        <Modal
+            isOpen
+            onClose={onClose}
+            title="Legendas"
+            description={title}
+            size="lg"
+        >
+            <div className="space-y-3 mb-4">
+                <div className="flex items-center space-x-2">
+                    {remainingDownloads !== null && (
+                        <Badge tone={remainingDownloads <= 3 ? 'warn' : 'ok'}>
+                            {remainingDownloads} restantes
+                        </Badge>
+                    )}
                 </div>
 
-                {/* Search Controls */}
-                <div className="p-4 border-b border-[#333] space-y-3">
-                    <div className="flex space-x-3">
-                        <div className="relative flex-1">
-                            <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                            <select
-                                value={selectedLanguage}
-                                onChange={(e) => changeLanguage(e.target.value)}
-                                className="w-full pl-9 pr-4 py-2.5 bg-[#0f0f0f] border border-[#333] rounded-lg text-white text-sm focus:outline-none focus:ring-2 focus:ring-emerald-600 appearance-none cursor-pointer"
-                            >
-                                {LANGUAGES.map(lang => (
-                                    <option key={lang.code} value={lang.code}>
-                                        {lang.label}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-
-                        <button
-                            onClick={handleSearch}
-                            disabled={isSearching}
-                            className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-lg text-white font-medium transition-colors disabled:opacity-50 flex items-center space-x-2 text-sm"
+                <div className="flex space-x-3">
+                    <div className="relative flex-1">
+                        <Globe size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-ink-3" />
+                        <select
+                            value={selectedLanguage}
+                            onChange={(e) => changeLanguage(e.target.value)}
+                            data-focusable="true"
+                            className={`${inputClassName} pl-9 appearance-none`}
                         >
-                            {isSearching ? (
-                                <Loader2 size={16} className="animate-spin" />
-                            ) : (
-                                <Search size={16} />
-                            )}
-                            Buscar
-                        </button>
+                            {LANGUAGES.map(lang => (
+                                <option key={lang.code} value={lang.code}>
+                                    {lang.label}
+                                </option>
+                            ))}
+                        </select>
                     </div>
 
-                    {seasonNumber !== undefined && episodeNumber !== undefined && (
-                        <p className="text-xs text-gray-500">
-                            Temporada {seasonNumber}, Episódio {episodeNumber}
-                        </p>
-                    )}
+                    <Button
+                        variant="primary"
+                        icon={isSearching ? undefined : Search}
+                        loading={isSearching}
+                        onClick={handleSearch}
+                    >
+                        Buscar
+                    </Button>
                 </div>
 
-                {/* Results */}
-                <div className="flex-1 overflow-y-auto p-4 space-y-2">
-                    {isSearching && (
-                        <div className="flex items-center justify-center py-12">
-                            <Loader2 size={32} className="text-emerald-500 animate-spin" />
-                        </div>
-                    )}
+                {seasonNumber !== undefined && episodeNumber !== undefined && (
+                    <p className="text-xs text-ink-2">
+                        Temporada {seasonNumber}, Episódio {episodeNumber}
+                    </p>
+                )}
+            </div>
 
-                    {!isSearching && hasSearched && results.length === 0 && (
-                        <div className="text-center py-12">
-                            <Subtitles size={48} className="text-gray-600 mx-auto mb-3" />
-                            <p className="text-gray-400">Nenhuma legenda encontrada</p>
-                            <p className="text-xs text-gray-600 mt-1">Tente outro idioma ou verifique o nome do conteúdo</p>
-                        </div>
-                    )}
+            <div className="max-h-96 overflow-y-auto space-y-2">
+                {isSearching && (
+                    <div className="flex items-center justify-center py-12">
+                        <Loader2 size={32} className="text-ink animate-spin" />
+                    </div>
+                )}
 
-                    {!isSearching && results.map((result) => {
-                        const fileId = result.attributes.files?.[0]?.file_id;
-                        if (!fileId) return null;
+                {!isSearching && hasSearched && results.length === 0 && (
+                    <EmptyState
+                        icon={Subtitles}
+                        title="Nenhuma legenda encontrada"
+                        description="Tente outro idioma ou verifique o nome do conteúdo."
+                        compact
+                    />
+                )}
 
-                        return (
-                            <button
-                                key={result.id}
-                                onClick={() => handleDownload(fileId)}
-                                disabled={isDownloading !== null}
-                                className="w-full text-left p-3 bg-[#252525] hover:bg-[#2f2f2f] rounded-xl transition-all border border-white/5 hover:border-emerald-500/30 disabled:opacity-50 group"
-                            >
-                                <div className="flex items-center justify-between">
-                                    <div className="flex-1 min-w-0">
-                                        <div className="flex items-center space-x-2 mb-1">
-                                            <span className="text-xs font-bold px-2 py-0.5 bg-emerald-600/20 text-emerald-400 rounded uppercase">
-                                                {result.attributes.language}
-                                            </span>
-                                            {result.attributes.hearing_impaired && (
-                                                <span className="text-xs px-2 py-0.5 bg-blue-600/20 text-blue-400 rounded">
-                                                    CC
-                                                </span>
-                                            )}
-                                        </div>
-                                        <p className="text-sm text-white truncate">
-                                            {result.attributes.release || result.attributes.files[0].file_name}
-                                        </p>
-                                        <p className="text-xs text-gray-500 mt-0.5">
-                                            {result.attributes.uploader?.name || 'Anônimo'} · {result.attributes.download_count} downloads
-                                        </p>
-                                    </div>
-                                    <div className="ml-3 flex-shrink-0">
-                                        {isDownloading === fileId ? (
-                                            <Loader2 size={20} className="text-emerald-500 animate-spin" />
-                                        ) : (
-                                            <Download size={20} className="text-gray-500 group-hover:text-emerald-400 transition-colors" />
+                {!isSearching && results.map((result) => {
+                    const fileId = result.attributes.files?.[0]?.file_id;
+                    if (!fileId) return null;
+
+                    return (
+                        <button
+                            key={result.id}
+                            onClick={() => handleDownload(fileId)}
+                            disabled={isDownloading !== null}
+                            data-focusable="true"
+                            className="w-full text-left p-3 bg-surface border border-line rounded-xl disabled:opacity-50"
+                        >
+                            <div className="flex items-center justify-between">
+                                <div className="flex-1 min-w-0">
+                                    <div className="flex items-center space-x-2 mb-1">
+                                        <Badge tone="ok">{result.attributes.language}</Badge>
+                                        {result.attributes.hearing_impaired && (
+                                            <Badge tone="neutral">CC</Badge>
                                         )}
                                     </div>
+                                    <p className="text-sm text-ink truncate">
+                                        {result.attributes.release || result.attributes.files[0].file_name}
+                                    </p>
+                                    <p className="text-xs text-ink-2 mt-0.5 tnum">
+                                        {result.attributes.uploader?.name || 'Anônimo'} · {result.attributes.download_count} downloads
+                                    </p>
                                 </div>
-                            </button>
-                        );
-                    })}
-                </div>
+                                <div className="ml-3 flex-shrink-0">
+                                    {isDownloading === fileId ? (
+                                        <Loader2 size={20} className="text-ink animate-spin" />
+                                    ) : (
+                                        <Download size={20} className="text-ink-3" />
+                                    )}
+                                </div>
+                            </div>
+                        </button>
+                    );
+                })}
             </div>
-        </div>
+        </Modal>
     );
 }

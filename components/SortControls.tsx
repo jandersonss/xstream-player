@@ -1,69 +1,41 @@
 'use client';
 
-import { ArrowDownAZ, ArrowUpAZ, Calendar, Clock, SortAsc } from 'lucide-react';
+import { SORT_LABELS } from '@/app/lib/catalogSort';
+import type { SortOption } from '@/app/lib/catalogSort';
 
-export type SortOption = 'name-asc' | 'name-desc' | 'added' | 'year';
+// Re-exported so existing consumers (e.g. `useSortPreference`) that import the
+// type from this file keep working without reaching into `catalogSort` directly.
+export type { SortOption };
 
-interface SortControlsProps {
-    currentSort: SortOption;
-    onSortChange: (sort: SortOption) => void;
-    showYear?: boolean;
+export interface SortControlsProps {
+    value: SortOption;
+    onChange: (next: SortOption) => void;
+    /** The caller decides which options exist (categories only sort by name). */
+    options: SortOption[];
 }
 
-export default function SortControls({ currentSort, onSortChange, showYear = false }: SortControlsProps) {
-    // flex gap needs Chrome 84+ (WebOS TVs lack it): child m-1 margins emulate gap-2 + p-1
+export default function SortControls({ value, onChange, options }: SortControlsProps) {
+    // `mr-2 mb-2` on each button emulates flex spacing without the `gap` utility (Chrome 84+, unavailable on webOS 4).
     return (
-        <div className="flex flex-wrap items-center bg-white/5 rounded-xl border border-white/10 w-fit">
-            <button
-                onClick={() => onSortChange('name-asc')}
-                data-focusable="true"
-                tabIndex={0}
-                className={`m-1 flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'name-asc'
-                    ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                    }`}
-            >
-                <ArrowDownAZ size={14} />
-                A-Z
-            </button>
-            <button
-                onClick={() => onSortChange('name-desc')}
-                data-focusable="true"
-                tabIndex={0}
-                className={`m-1 flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'name-desc'
-                    ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                    }`}
-            >
-                <ArrowUpAZ size={14} />
-                Z-A
-            </button>
-            <button
-                onClick={() => onSortChange('added')}
-                data-focusable="true"
-                tabIndex={0}
-                className={`m-1 flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'added'
-                    ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-                    : 'text-gray-400 hover:text-white hover:bg-white/5'
-                    }`}
-            >
-                <Clock size={14} />
-                Added
-            </button>
-            {showYear && (
-                <button
-                    onClick={() => onSortChange('year')}
-                    data-focusable="true"
-                    tabIndex={0}
-                    className={`m-1 flex items-center space-x-2 px-3 py-2 rounded-lg text-xs font-medium transition-all focus:outline-none focus:ring-2 focus:ring-red-600 ${currentSort === 'year'
-                        ? 'bg-red-600 text-white shadow-lg shadow-red-900/40'
-                        : 'text-gray-400 hover:text-white hover:bg-white/5'
-                        }`}
-                >
-                    <Calendar size={14} />
-                    Year
-                </button>
-            )}
+        <div className="flex flex-wrap items-center">
+            {options.map((option) => {
+                const isActive = option === value;
+                return (
+                    <button
+                        key={option}
+                        type="button"
+                        onClick={() => onChange(option)}
+                        data-focusable="true"
+                        tabIndex={0}
+                        className={[
+                            'mr-2 mb-2 h-9 px-3 rounded-lg text-sm font-medium transition-colors',
+                            isActive ? 'bg-surface-3 text-ink' : 'text-ink-2 border border-line',
+                        ].join(' ')}
+                    >
+                        {SORT_LABELS[option]}
+                    </button>
+                );
+            })}
         </div>
     );
 }

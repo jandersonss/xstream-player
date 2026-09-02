@@ -14,6 +14,8 @@ export interface FavoriteItem {
 
 interface FavoritesState {
     favorites: FavoriteItem[];
+    /** False until the initial backend/localStorage load resolves (fixes D8's flash of "empty"). */
+    isLoaded: boolean;
     addFavorite: (item: FavoriteItem) => void;
     removeFavorite: (id: string | number, type: 'live' | 'movie' | 'series') => void;
     isFavorite: (id: string | number, type: 'live' | 'movie' | 'series') => boolean;
@@ -103,7 +105,7 @@ export const FavoritesProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <FavoritesContext.Provider value={{ favorites, addFavorite, removeFavorite, isFavorite }}>
+        <FavoritesContext.Provider value={{ favorites, isLoaded, addFavorite, removeFavorite, isFavorite }}>
             {children}
         </FavoritesContext.Provider>
     );
