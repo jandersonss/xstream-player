@@ -30,10 +30,16 @@ export default function SortControls({ value, onChange, options }: SortControlsP
                         className={[
                             // `rounded-full` matches the other chip-style controls
                             // (search tabs, home shortcuts). `border-2` on both states
-                            // (only the color changes) so the active button doesn't
+                            // (only the colors change) so the active button doesn't
                             // grow and shift its neighbors.
                             'mr-2 mb-2 h-9 px-3 rounded-full text-sm font-medium border-2 transition-colors',
-                            isActive ? 'border-ink text-ink bg-surface-2' : 'border-line text-ink-2 bg-surface-2',
+                            // Active pulls up the whole neutral scale at once — fill
+                            // (surface-2 -> surface-3), border (line -> line-strong) and
+                            // text (ink-2 -> ink) — because a lone border-color swap on a
+                            // `border-line` (~8% white) chip is invisible at 3 m.
+                            isActive
+                                ? 'border-line-strong text-ink bg-surface-3'
+                                : 'border-line text-ink-2 bg-surface-2',
                         ].join(' ')}
                     >
                         {SORT_LABELS[option]}

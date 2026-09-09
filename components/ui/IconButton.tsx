@@ -54,7 +54,11 @@ export default function IconButton({
                 'disabled:opacity-40 disabled:cursor-not-allowed',
                 // Active state uses the neutral scale, not a stray accent color —
                 // spec 00 keeps the accent palette to focus (white) and brand (red).
-                active ? 'bg-surface-3 text-ink' : VARIANT_CLASSNAME[variant],
+                // The border is load-bearing: on the near-black player gradient a bare
+                // `bg-surface-3` fill is almost invisible at 3 m, and on a light
+                // (`bg-ink`) context the fill alone reads as a hover, not a locked-on
+                // state. `border-line-strong` gives the "on" a hard edge on both.
+                active ? 'bg-surface-3 text-ink border border-line-strong' : VARIANT_CLASSNAME[variant],
                 SIZE_CLASSNAME[size],
                 className,
             ].join(' ')}

@@ -178,6 +178,7 @@ export default function SubtitleSearchPanel({
                             value={selectedLanguage}
                             onChange={(e) => changeLanguage(e.target.value)}
                             data-focusable="true"
+                            tabIndex={0}
                             className={`${inputClassName} pl-9 appearance-none`}
                         >
                             {LANGUAGES.map(lang => (
@@ -205,7 +206,9 @@ export default function SubtitleSearchPanel({
                 )}
             </div>
 
-            <div className="max-h-96 overflow-y-auto space-y-2">
+            {/* `px-1 -mx-1` keeps the focus ring of the full-width result rows from
+                being clipped by this vertical scroller (spec 00 §4.4). */}
+            <div className="max-h-96 overflow-y-auto space-y-2 px-1 -mx-1">
                 {isSearching && (
                     <div className="flex items-center justify-center py-12">
                         <Loader2 size={32} className="text-ink animate-spin" />
@@ -232,7 +235,10 @@ export default function SubtitleSearchPanel({
                             disabled={isDownloading !== null}
                             data-focusable={isDownloading !== null ? undefined : 'true'}
                             tabIndex={isDownloading !== null ? undefined : 0}
-                            className="w-full text-left p-3 bg-surface border border-line rounded-xl disabled:opacity-50"
+                            // Dense list row inside a scroller: flat ring, no scale
+                            // (spec 00 §4) so the neighbours don't shift and the ring
+                            // isn't swallowed by the container's vertical overflow.
+                            className="focus-flat w-full text-left p-3 bg-surface border border-line rounded-xl disabled:opacity-50"
                         >
                             <div className="flex items-center justify-between">
                                 <div className="flex-1 min-w-0">

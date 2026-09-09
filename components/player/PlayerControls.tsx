@@ -122,6 +122,7 @@ export default function PlayerControls({
                                 type="button"
                                 onClick={() => onChangeFontSize(-0.1)}
                                 data-focusable="true"
+                                tabIndex={0}
                                 className="focus-flat text-ink-2 hover:text-ink p-1 transition-colors text-xs font-bold"
                                 title="Diminuir fonte ( [ )"
                                 aria-label="Diminuir fonte da legenda"
@@ -133,6 +134,7 @@ export default function PlayerControls({
                                 type="button"
                                 onClick={() => onChangeFontSize(0.1)}
                                 data-focusable="true"
+                                tabIndex={0}
                                 className="focus-flat text-ink-2 hover:text-ink p-1 transition-colors text-sm font-bold"
                                 title="Aumentar fonte ( ] )"
                                 aria-label="Aumentar fonte da legenda"

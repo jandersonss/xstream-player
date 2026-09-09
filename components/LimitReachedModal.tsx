@@ -45,7 +45,9 @@ export default function LimitReachedModal({ open, onClose }: LimitReachedModalPr
                 </div>
             }
         >
-            <div className="max-h-72 overflow-y-auto space-y-2">
+            {/* `px-1 -mx-1` gives the full-width row focus rings room inside this
+                vertical scroller (spec 00 §4.4). */}
+            <div className="max-h-72 overflow-y-auto space-y-2 px-1 -mx-1">
                 {loading && shares.length === 0 ? (
                     <p className="text-ink-2 text-sm py-4">Procurando transmissões...</p>
                 ) : shares.length === 0 ? (
@@ -60,7 +62,8 @@ export default function LimitReachedModal({ open, onClose }: LimitReachedModalPr
                             onClick={() => join(s)}
                             data-focusable="true"
                             tabIndex={0}
-                            className="w-full flex items-center space-x-3 p-3 rounded-xl bg-surface border border-line text-left"
+                            // Dense list row inside a scroller: flat ring, no scale (spec 00 §4).
+                            className="focus-flat w-full flex items-center space-x-3 p-3 rounded-xl bg-surface border border-line text-left"
                         >
                             <span className="flex items-center justify-center w-10 h-10 rounded-lg bg-brand-soft text-brand shrink-0">
                                 <Radio size={20} className="animate-pulse" />

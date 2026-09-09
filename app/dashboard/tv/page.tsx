@@ -66,6 +66,7 @@ function DeviceNameEditor() {
                         onChange={(e) => setDraft(e.target.value)}
                         onKeyDown={(e) => e.key === 'Enter' && save()}
                         data-focusable="true"
+                        tabIndex={0}
                         className={inputClassName}
                     />
                 </Field>
@@ -120,6 +121,7 @@ function SessionCard({
         <button
             onClick={() => onSelect(session)}
             data-focusable="true"
+            tabIndex={0}
             className="text-left bg-surface-2 border border-line rounded-xl overflow-hidden"
         >
             <div className="ratio ratio-wide bg-bg">

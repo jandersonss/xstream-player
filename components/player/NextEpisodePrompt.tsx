@@ -42,6 +42,7 @@ export default function NextEpisodePrompt({
                 type="button"
                 onClick={onNext}
                 data-focusable="true"
+                tabIndex={0}
                 className="focus-flat relative flex items-center space-x-2 overflow-hidden rounded-md bg-surface-2 px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-surface-3"
                 aria-label="Pular para o próximo episódio"
             >
@@ -59,6 +60,7 @@ export default function NextEpisodePrompt({
                 type="button"
                 onClick={onPostpone}
                 data-focusable="true"
+                tabIndex={0}
                 className="focus-flat rounded-md px-3 py-2 text-sm font-medium text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
             >
                 Adiar 1 min
