@@ -1,6 +1,7 @@
 'use client';
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { useT } from '@/app/context/I18nContext';
 
 interface Props {
     children?: ReactNode;
@@ -33,7 +34,18 @@ class ErrorBoundary extends Component<Props, State> {
 
     public render() {
         if (this.state.hasError) {
-            return (
+            return <ErrorFallback error={this.state.error} />;
+        }
+
+        return this.props.children;
+    }
+}
+
+/** Fallback UI. A function component so it can reach the i18n context (the
+    boundary itself is a class and cannot use hooks). */
+function ErrorFallback({ error }: { error: Error | null }) {
+    const t = useT();
+    return (
                 <div style={{
                     padding: '20px',
                     background: '#1a1a1a',
@@ -47,8 +59,8 @@ class ErrorBoundary extends Component<Props, State> {
                     fontFamily: 'monospace',
                     border: '5px solid #ff4d4d'
                 }}>
-                    <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>⚠️ Erro na Aplicação (TV Debug)</h1>
-                    <p style={{ color: '#ccc', marginBottom: '20px' }}>Ocorreu um erro ao renderizar a interface.</p>
+                    <h1 style={{ fontSize: '24px', marginBottom: '10px' }}>{t('errorBoundary.title')}</h1>
+                    <p style={{ color: '#ccc', marginBottom: '20px' }}>{t('errorBoundary.subtitle')}</p>
                     <div style={{
                         background: '#000',
                         padding: '15px',
@@ -60,9 +72,9 @@ class ErrorBoundary extends Component<Props, State> {
                         color: '#fff',
                         border: '1px solid #333'
                     }}>
-                        <p><strong>Mensagem:</strong> {this.state.error?.message}</p>
+                        <p><strong>{t('errorBoundary.message')}</strong> {error?.message}</p>
                         <details open style={{ marginTop: '10px' }}>
-                            <summary style={{ cursor: 'pointer', color: '#888' }}>Stack Trace</summary>
+                            <summary style={{ cursor: 'pointer', color: '#888' }}>{t('errorBoundary.stackTrace')}</summary>
                             <pre style={{
                                 marginTop: '10px',
                                 whiteSpace: 'pre-wrap',
@@ -70,7 +82,7 @@ class ErrorBoundary extends Component<Props, State> {
                                 fontSize: '10px',
                                 color: '#666'
                             }}>
-                                {this.state.error?.stack}
+                                {error?.stack}
                             </pre>
                         </details>
                     </div>
@@ -88,7 +100,7 @@ class ErrorBoundary extends Component<Props, State> {
                             cursor: 'pointer'
                         }}
                     >
-                        Recarregar App
+                        {t('errorBoundary.reload')}
                     </button>
                     <a
                         href="/debug"
@@ -100,14 +112,10 @@ class ErrorBoundary extends Component<Props, State> {
                             textDecoration: 'underline'
                         }}
                     >
-                        Abrir diagnóstico
+                        {t('errorBoundary.openDiagnostics')}
                     </a>
                 </div>
-            );
-        }
-
-        return this.props.children;
-    }
+    );
 }
 
 export default ErrorBoundary;

@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, useCallback, type CSSProperties } from 're
 import Hls from 'hls.js';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
 import { useProfile } from '@/app/context/ProfileContext';
+import { useT } from '@/app/context/I18nContext';
 import { getDeviceProfile } from '@/app/lib/deviceProfile';
 import { getDeviceToken, getServerBaseUrl } from '@/app/lib/apiClient';
 import PlayerTopBar from '@/components/player/PlayerTopBar';
@@ -189,6 +190,7 @@ export default function VideoPlayer({
     onSeekBeyondWindow
 }: VideoPlayerProps) {
     const { activeProfile, updatePrefs } = useProfile();
+    const t = useT();
     const videoRef = useRef<HTMLVideoElement>(null);
     const containerRef = useRef<HTMLDivElement>(null);
     const [isPlaying, setIsPlaying] = useState(false);
@@ -901,7 +903,7 @@ export default function VideoPlayer({
             hls.on(Hls.Events.ERROR, (_event, data) => {
                 console.error('[VideoPlayer] HLS Error:', data.type, data.details, data.fatal ? '(FATAL)' : '');
                 if (data.fatal) {
-                    setError(`Stream error: ${data.details}. Retrying...`);
+                    setError(t('player.errorPlayback', { message: String(data.details) }));
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
                             hls?.startLoad();
@@ -911,7 +913,7 @@ export default function VideoPlayer({
                             break;
                         default:
                             hls?.destroy();
-                            setError('Fatal playback error.');
+                            setError(t('player.errorFatal'));
                             break;
                     }
                 }
@@ -926,11 +928,11 @@ export default function VideoPlayer({
             video.addEventListener('error', () => {
                 const error = video.error;
                 if (isHLS && !supportsNativeHls && !Hls.isSupported()) {
-                    setError('Your browser does not support HLS playback.');
+                    setError(t('player.errorHlsUnsupported'));
                 } else if (!isHLS && !isDirectVideo) {
-                    setError('Unsupported video format.');
+                    setError(t('player.errorFormatUnsupported'));
                 } else {
-                    setError(`Playback Error: ${error?.message || 'The video could not be loaded.'}`);
+                    setError(t('player.errorPlayback', { message: error?.message || t('player.errorVideoLoad') }));
                 }
                 setIsBuffering(false);
             }, { once: true });
@@ -1047,7 +1049,7 @@ export default function VideoPlayer({
 
         const handleVideoError = () => {
             const error = video.error;
-            setError(`Playback Error: ${error?.message || 'The video could not be loaded.'}`);
+            setError(t('player.errorPlayback', { message: error?.message || t('player.errorVideoLoad') }));
             setIsBuffering(false);
         };
 
@@ -1095,7 +1097,8 @@ export default function VideoPlayer({
             video.removeEventListener('error', handleVideoError);
             video.removeEventListener('volumechange', handleVolumeChange);
         };
-    }, [src, autoPlay]);
+        // `initialTime` is applied by the dedicated late-seek effect below, not here.
+    }, [src, autoPlay, t]);
 
     useEffect(() => {
         const video = videoRef.current;
@@ -1188,7 +1191,7 @@ export default function VideoPlayer({
                         kind="subtitles"
                         src={subtitleUrl}
                         srcLang="pt-BR"
-                        label="Português (BR)"
+                        label={t('player.subtitleTrackLabel')}
                         default
                     />
                 )}

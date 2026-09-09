@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { Check, LogOut, MonitorSmartphone, Pencil, Plus, Trash2, Tv, X } from 'lucide-react';
 import { apiFetch } from '@/app/lib/apiClient';
+import { useT } from '@/app/context/I18nContext';
 import SectionHeader from '@/components/ui/SectionHeader';
 import Field, { inputClassName } from '@/components/ui/Field';
 import Button from '@/components/ui/Button';
@@ -25,18 +26,12 @@ interface Profile {
     name: string;
 }
 
-const PLATFORM_LABEL: Record<string, string> = {
-    webos: 'LG webOS',
-    tizen: 'Samsung Tizen',
-    androidtv: 'Android TV',
-    browser: 'Navegador',
-    unknown: 'Desconhecida'
-};
+const PLATFORM_KEYS = ['webos', 'tizen', 'androidtv', 'browser', 'unknown'] as const;
 
 const CODE_LENGTH = 6;
 
 function formatMoment(timestamp: number): string {
-    return new Date(timestamp).toLocaleString('pt-BR');
+    return new Date(timestamp).toLocaleString();
 }
 
 function DeviceRow({
@@ -52,6 +47,7 @@ function DeviceRow({
     onRename: (id: string, name: string) => Promise<void>;
     onRevoke: (id: string) => Promise<void>;
 }) {
+    const t = useT();
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState(device.name);
     const rowRef = useRef<HTMLLIElement>(null);
@@ -93,23 +89,23 @@ function DeviceRow({
                                 tabIndex={0}
                                 className={inputClassName}
                             />
-                            <IconButton icon={Check} label="Salvar nome" onClick={() => void save()} />
+                            <IconButton icon={Check} label={t('devices.saveName')} onClick={() => void save()} />
                             <IconButton
                                 icon={X}
-                                label="Cancelar"
+                                label={t('common.cancel')}
                                 onClick={() => { setDraft(device.name); setEditing(false); }}
                             />
                         </div>
                     ) : (
                         <p className="truncate font-semibold text-ink">
                             {device.name}
-                            {isCurrent && <span className="ml-2 text-xs font-normal text-ink-2">· este aparelho</span>}
+                            {isCurrent && <span className="ml-2 text-xs font-normal text-ink-2">· {t('devices.thisDevice')}</span>}
                         </p>
                     )}
                     <p className="mt-1 truncate text-xs text-ink-2">
-                        {PLATFORM_LABEL[device.platform] ?? PLATFORM_LABEL.unknown}
-                        {' · '}Último acesso: <span className="tnum">{formatMoment(device.lastSeenAt)}</span>
-                        {profileName ? ` · Perfil: ${profileName}` : ''}
+                        {t(`devices.platform.${(PLATFORM_KEYS as readonly string[]).includes(device.platform) ? device.platform : 'unknown'}`)}
+                        {' · '}{t('devices.lastAccess')}: <span className="tnum">{formatMoment(device.lastSeenAt)}</span>
+                        {profileName ? ` · ${t('devices.profilePrefix')}: ${profileName}` : ''}
                     </p>
                 </div>
             </div>
@@ -118,12 +114,12 @@ function DeviceRow({
                 <div className="flex flex-shrink-0 items-center space-x-1">
                     <IconButton
                         icon={Pencil}
-                        label="Renomear aparelho"
+                        label={t('devices.renameDevice')}
                         onClick={() => { setDraft(device.name); setEditing(true); }}
                     />
                     <IconButton
                         icon={Trash2}
-                        label="Revogar aparelho"
+                        label={t('devices.revokeDevice')}
                         onClick={() => void onRevoke(device.id)}
                     />
                 </div>
@@ -137,6 +133,7 @@ function DeviceRow({
  * origin (never inside the packaged TV client), so plain relative fetches are correct here.
  */
 export default function DevicesPage() {
+    const t = useT();
     const [devices, setDevices] = useState<Device[]>([]);
     const [profiles, setProfiles] = useState<Profile[]>([]);
     const [code, setCode] = useState('');
@@ -172,9 +169,9 @@ export default function DevicesPage() {
             setDevices(response.ok ? payload.data ?? [] : []);
             setCurrentDeviceId(response.ok ? payload.currentDeviceId ?? null : null);
         } catch {
-            setMessage({ type: 'error', text: 'Não foi possível carregar os aparelhos.' });
+            setMessage({ type: 'error', text: t('devices.loadError') });
         }
-    }, []);
+    }, [t]);
 
     // Best effort: close the packaged TV app after disconnecting, so relaunching
     // it drops straight onto the setup screen.
@@ -199,13 +196,13 @@ export default function DevicesPage() {
             const response = await apiFetch('/api/devices/session', { method: 'DELETE' });
             if (!response.ok) {
                 const payload = await response.json().catch(() => ({}));
-                setMessage({ type: 'error', text: payload.error ?? 'Falha ao desconectar.' });
+                setMessage({ type: 'error', text: payload.error ?? t('devices.disconnectError') });
                 return;
             }
             setDisconnected(true);
             setTimeout(attemptCloseTvApp, 1500);
         } catch {
-            setMessage({ type: 'error', text: 'Falha ao desconectar.' });
+            setMessage({ type: 'error', text: t('devices.disconnectError') });
         } finally {
             setDisconnecting(false);
         }
@@ -231,7 +228,7 @@ export default function DevicesPage() {
         const trimmedCode = code.trim().toUpperCase();
 
         if (trimmedCode.length !== CODE_LENGTH) {
-            setMessage({ type: 'error', text: `O código tem ${CODE_LENGTH} caracteres.` });
+            setMessage({ type: 'error', text: t('devices.codeLengthError', { n: CODE_LENGTH }) });
             return;
         }
 
@@ -250,18 +247,18 @@ export default function DevicesPage() {
             const payload = await response.json();
 
             if (!response.ok) {
-                setMessage({ type: 'error', text: payload.error ?? 'Falha ao aprovar o código.' });
+                setMessage({ type: 'error', text: payload.error ?? t('devices.approveError') });
                 return;
             }
 
-            setMessage({ type: 'success', text: `Aparelho "${payload.device.name}" pareado.` });
+            setMessage({ type: 'success', text: t('devices.devicePaired', { name: payload.device.name }) });
             setCode('');
             setCodeFromQr(false);
             setName('');
             setProfileId('');
             await loadDevices();
         } catch {
-            setMessage({ type: 'error', text: 'Falha ao aprovar o código.' });
+            setMessage({ type: 'error', text: t('devices.approveError') });
         } finally {
             setIsBusy(false);
         }
@@ -276,7 +273,7 @@ export default function DevicesPage() {
             });
             await loadDevices();
         } catch {
-            setMessage({ type: 'error', text: 'Falha ao renomear o aparelho.' });
+            setMessage({ type: 'error', text: t('devices.renameError') });
         }
     };
 
@@ -289,7 +286,7 @@ export default function DevicesPage() {
             });
             await loadDevices();
         } catch {
-            setMessage({ type: 'error', text: 'Falha ao revogar o aparelho.' });
+            setMessage({ type: 'error', text: t('devices.revokeError') });
         }
     };
 
@@ -297,8 +294,8 @@ export default function DevicesPage() {
         return (
             <EmptyState
                 icon={Tv}
-                title="Aparelho desconectado"
-                description="Feche e abra o app na TV de novo. Ele vai voltar para a tela de conexão, onde você pode confirmar o mesmo servidor ou informar outro."
+                title={t('devices.disconnectedTitle')}
+                description={t('devices.disconnectedDesc')}
             />
         );
     }
@@ -306,21 +303,20 @@ export default function DevicesPage() {
     return (
         <div className="px-6 md:px-10 lg:px-14 pt-6 pb-10">
             <SectionHeader
-                title="Aparelhos"
-                description={`Escaneie o QR code que a TV mostra, ou digite o código de ${CODE_LENGTH} caracteres. O código vale por 5 minutos e só pode ser usado uma vez.`}
+                title={t('devices.title')}
+                description={t('devices.intro', { n: CODE_LENGTH })}
             />
 
             {currentDeviceId && (
                 <section className="mt-8 pt-8 border-t border-line">
-                    <SectionHeader title="Esta TV" />
+                    <SectionHeader title={t('devices.thisTv')} />
                     <div className="bg-surface-2 border border-line rounded-xl p-5 flex flex-col md:flex-row md:items-center md:justify-between">
                         <div className="flex items-start space-x-3">
-                            <Badge tone="warn">Sessão ativa</Badge>
+                            <Badge tone="warn">{t('devices.sessionActive')}</Badge>
                             <div>
-                                <p className="font-semibold text-ink">Você está vendo esta tela pela TV</p>
+                                <p className="font-semibold text-ink">{t('devices.watchingViaTv')}</p>
                                 <p className="mt-1 text-sm text-ink-2">
-                                    Para apontar esta TV para outro servidor (ex.: alternar entre dev e prod),
-                                    desconecte e pareie de novo.
+                                    {t('devices.pointToOtherServer')}
                                 </p>
                             </div>
                         </div>
@@ -332,7 +328,7 @@ export default function DevicesPage() {
                                     disabled={disconnecting}
                                     onClick={() => setConfirmingDisconnect(false)}
                                 >
-                                    Cancelar
+                                    {t('common.cancel')}
                                 </Button>
                                 <Button
                                     variant="danger"
@@ -340,7 +336,7 @@ export default function DevicesPage() {
                                     disabled={disconnecting}
                                     onClick={() => void disconnectThisDevice()}
                                 >
-                                    {disconnecting ? 'Desconectando...' : 'Confirmar'}
+                                    {disconnecting ? t('devices.disconnecting') : t('devices.confirm')}
                                 </Button>
                             </div>
                         ) : (
@@ -351,7 +347,7 @@ export default function DevicesPage() {
                                 onClick={() => setConfirmingDisconnect(true)}
                                 className="mt-4 md:mt-0 md:ml-4 flex-shrink-0"
                             >
-                                Desconectar e trocar servidor
+                                {t('devices.disconnectSwitch')}
                             </Button>
                         )}
                     </div>
@@ -359,16 +355,16 @@ export default function DevicesPage() {
             )}
 
             <section className="mt-8 pt-8 border-t border-line">
-                <SectionHeader title="Parear aparelho" />
+                <SectionHeader title={t('devices.pairDevice')} />
 
                 {codeFromQr && (
                     <p className="mb-4 text-sm text-ok">
-                        Código preenchido pela TV. Confira o nome e o perfil e toque em Aprovar.
+                        {t('devices.codeFilled')}
                     </p>
                 )}
 
                 <div className="flex flex-col space-y-3 md:flex-row md:items-end md:space-y-0 md:space-x-3">
-                    <Field label="Código">
+                    <Field label={t('devices.codeLabel')}>
                         <input
                             value={code}
                             onChange={(event) => {
@@ -383,24 +379,24 @@ export default function DevicesPage() {
                         />
                     </Field>
 
-                    <Field label="Nome (opcional)">
+                    <Field label={t('devices.nameLabel')}>
                         <input
                             value={name}
                             onChange={(event) => setName(event.target.value)}
-                            placeholder="TV da sala"
+                            placeholder={t('devices.namePlaceholder')}
                             data-focusable="true"
                             className={`${inputClassName} w-56`}
                         />
                     </Field>
 
-                    <Field label="Perfil (opcional)">
+                    <Field label={t('devices.profileLabel')}>
                         <select
                             value={profileId}
                             onChange={(event) => setProfileId(event.target.value)}
                             data-focusable="true"
                             className={`${inputClassName} w-56`}
                         >
-                            <option value="">Perfil padrão</option>
+                            <option value="">{t('devices.defaultProfile')}</option>
                             {profiles.map(profile => (
                                 <option key={profile.id} value={profile.id}>{profile.name}</option>
                             ))}
@@ -413,7 +409,7 @@ export default function DevicesPage() {
                         disabled={isBusy}
                         onClick={() => void approve()}
                     >
-                        {isBusy ? 'Aprovando...' : 'Aprovar'}
+                        {isBusy ? t('devices.approving') : t('devices.approve')}
                     </Button>
                 </div>
 
@@ -425,13 +421,13 @@ export default function DevicesPage() {
             </section>
 
             <section className="mt-8 pt-8 border-t border-line">
-                <SectionHeader title="Aparelhos pareados" count={devices.length} />
+                <SectionHeader title={t('devices.pairedDevices')} count={devices.length} />
 
                 {devices.length === 0 ? (
                     <EmptyState
                         icon={Tv}
-                        title="Nenhum aparelho pareado ainda"
-                        description="A TV mostra um código ao abrir o app — digite-o acima para parear."
+                        title={t('devices.noDevicesTitle')}
+                        description={t('devices.noDevicesDesc')}
                         compact
                     />
                 ) : (

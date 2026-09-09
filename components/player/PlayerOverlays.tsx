@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { AlertTriangle, Loader2, Pause, Play } from 'lucide-react';
+import { useT } from '@/app/context/I18nContext';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
 
@@ -17,6 +18,7 @@ export interface PlayerOverlaysProps {
 }
 
 export default function PlayerOverlays({ isBuffering, showBufferingHelp, centerPlayPause, skipIndicator, error }: PlayerOverlaysProps) {
+    const t = useT();
     return (
         <>
             {isBuffering && (
@@ -25,14 +27,14 @@ export default function PlayerOverlays({ isBuffering, showBufferingHelp, centerP
                         <Loader2 className="w-12 h-12 text-brand animate-spin mx-auto" />
                         {showBufferingHelp && (
                             <div className="mt-4 text-ink text-sm pointer-events-auto">
-                                <p className="mb-2">O carregamento está demorando.</p>
+                                <p className="mb-2">{t('player.loadingSlow')}</p>
                                 <a
                                     href={DEBUG_PATH}
                                     data-focusable="true"
                                     tabIndex={0}
                                     className="text-ink-2 underline font-semibold"
                                 >
-                                    Abrir diagnóstico
+                                    {t('common.openDiagnostics')}
                                 </a>
                             </div>
                         )}
@@ -70,7 +72,7 @@ export default function PlayerOverlays({ isBuffering, showBufferingHelp, centerP
                                 variant="secondary"
                                 onClick={() => { window.location.href = DEBUG_PATH; }}
                             >
-                                Abrir diagnóstico
+                                {t('common.openDiagnostics')}
                             </Button>
                         }
                     />

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useRouter } from 'next/navigation';
 import * as db from '../lib/db';
 import { apiFetch } from '../lib/apiClient';
+import { useT } from './I18nContext';
 
 interface UserInfo {
     username: string;
@@ -92,6 +93,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     const [isAuthenticated, setIsAuthenticated] = useState(false);
     const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
+    const t = useT();
 
     useEffect(() => {
         const initAuth = async () => {
@@ -158,7 +160,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
             const data = await res.json();
 
             if (!res.ok) {
-                throw new Error(data.error || 'Falha no login');
+                throw new Error(data.error || t('login.failedShort'));
             }
 
             const userInfo = data.user_info;

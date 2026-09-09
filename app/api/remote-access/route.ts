@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import {
     createRemoteAccessSession,
     getCookieValue,
@@ -6,11 +6,11 @@ import {
     getRequestHost,
     isRemoteAccessRequired,
     isValidRemoteAccessPin,
-    PIN_RULE_MESSAGE,
     REMOTE_ACCESS_COOKIE_NAME,
     REMOTE_ACCESS_SESSION_SECONDS,
     verifyOrCreateRemoteAccessPin,
 } from '@/app/lib/remoteAccess';
+import { translateForRequest } from '@/app/lib/i18n';
 
 export const runtime = 'nodejs';
 
@@ -27,7 +27,7 @@ export async function GET(request: Request) {
     return NextResponse.json(state);
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     if (!isRemoteAccessRequired(getRequestHost(request))) {
         return NextResponse.json({ success: true, bypass: true });
     }
@@ -36,13 +36,13 @@ export async function POST(request: Request) {
     const { pin } = body;
 
     if (!isValidRemoteAccessPin(pin)) {
-        return NextResponse.json({ error: PIN_RULE_MESSAGE }, { status: 400 });
+        return NextResponse.json({ error: translateForRequest(request, 'serverErrors.pinRuleViolation') }, { status: 400 });
     }
 
     const pinHash = await verifyOrCreateRemoteAccessPin(pin);
 
     if (!pinHash) {
-        return NextResponse.json({ error: 'PIN inválido' }, { status: 401 });
+        return NextResponse.json({ error: translateForRequest(request, 'serverErrors.pinInvalid') }, { status: 401 });
     }
 
     const response = NextResponse.json({ success: true });

@@ -4,6 +4,7 @@ import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
+import { useT } from '@/app/context/I18nContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import type Hls from 'hls.js';
 import { ArrowLeft, Play, Calendar, Star, Clock, Subtitles } from 'lucide-react';
@@ -55,6 +56,7 @@ export default function WatchMoviePage() {
     const { getCachedDetail, saveCachedDetail } = useData();
     const { searchMovie, isConfigured: tmdbConfigured } = useTMDb();
     const { getSavedSubtitle } = useSubtitle();
+    const t = useT();
     const params = useParams();
     const router = useRouter();
     const streamId = params.streamId as string;
@@ -161,18 +163,18 @@ export default function WatchMoviePage() {
                     // Lazy cache the detail
                     await saveCachedDetail('movie', streamId, data);
                 } else {
-                    setError("Detalhes do filme não encontrados.");
+                    setError(t('watch.movieDetailsNotFound'));
                 }
             } catch (err) {
                 console.error(err);
-                setError("Falha ao carregar detalhes do filme.");
+                setError(t('watch.movieDetailsError'));
             } finally {
                 setLoading(false);
             }
         };
 
         loadMovieInfo();
-    }, [credentials, streamId, isJoining, getCachedDetail, saveCachedDetail]);
+    }, [credentials, streamId, isJoining, getCachedDetail, saveCachedDetail, t]);
 
     // Resolve TMDB ID for better subtitle matching
     useEffect(() => {
@@ -275,7 +277,7 @@ export default function WatchMoviePage() {
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {canSync && <SyncButton role="viewer" onClick={sync} />}
-                                <Badge tone="live" dot>Modo TV</Badge>
+                                <Badge tone="live" dot>{t('watch.tvMode')}</Badge>
                             </div>
                         }
                     />
@@ -290,10 +292,10 @@ export default function WatchMoviePage() {
         return (
             <div className="min-h-screen bg-bg flex flex-col items-center justify-center">
                 <EmptyState
-                    title={error || 'Filme não encontrado'}
+                    title={error || t('watch.movieNotFound')}
                     action={
                         <Button variant="secondary" icon={ArrowLeft} onClick={() => router.back()}>
-                            Voltar
+                            {t('common.back')}
                         </Button>
                     }
                 />
@@ -407,7 +409,7 @@ export default function WatchMoviePage() {
 
             <div className="relative z-10 px-6 md:px-10 lg:px-14 py-8">
                 <Button variant="ghost" icon={ArrowLeft} onClick={() => router.back()} className="mb-8">
-                    Voltar
+                    {t('common.back')}
                 </Button>
 
                 <div className="flex flex-col lg:flex-row space-y-10 lg:space-y-0 lg:space-x-16 items-start">
@@ -448,20 +450,20 @@ export default function WatchMoviePage() {
                         </div>
 
                         <p className="text-sm md:text-base text-ink-2 leading-relaxed max-w-3xl">
-                            {movie.info.plot || "Nenhuma descrição disponível."}
+                            {movie.info.plot || t('watch.noDescription')}
                         </p>
 
                         <div className="space-y-1 text-sm text-ink-2">
-                            {movie.info.genre && <p><span className="text-ink font-medium">Gênero:</span> {movie.info.genre}</p>}
-                            {movie.info.director && <p><span className="text-ink font-medium">Diretor:</span> {movie.info.director}</p>}
+                            {movie.info.genre && <p><span className="text-ink font-medium">{t('watch.genre')}</span> {movie.info.genre}</p>}
+                            {movie.info.director && <p><span className="text-ink font-medium">{t('watch.director')}</span> {movie.info.director}</p>}
                         </div>
 
                         <div className="flex items-center space-x-3">
                             <Button variant="primary" size="lg" icon={Play} onClick={handlePlay}>
-                                {hasProgress ? <>Retomar · <span className="tnum ml-1">{formatDuration(resumeTime)}</span></> : 'Assistir'}
+                                {hasProgress ? <>{t('watch.resume')} · <span className="tnum ml-1">{formatDuration(resumeTime)}</span></> : t('watch.watch')}
                             </Button>
                             <Button variant="secondary" size="lg" icon={Subtitles} onClick={() => setShowSubtitlePanel(true)}>
-                                {subtitleUrl ? 'Legendas ✓' : 'Legendas'}
+                                {subtitleUrl ? t('watch.subtitlesReady') : t('watch.subtitles')}
                             </Button>
                             <FavoriteButton
                                 item={{

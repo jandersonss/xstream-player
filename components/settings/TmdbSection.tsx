@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { useTMDb } from '@/app/context/TMDbContext';
+import { useT } from '@/app/context/I18nContext';
 import Button from '@/components/ui/Button';
 import Field, { inputClassName } from '@/components/ui/Field';
 import Badge from '@/components/ui/Badge';
@@ -10,6 +11,7 @@ import SectionHeader from '@/components/ui/SectionHeader';
 /** TMDb API key — moved out of the home promo card into Ajustes (spec 02 §5.5). */
 export default function TmdbSection() {
     const { config, saveConfig, clearConfig, isConfigured } = useTMDb();
+    const t = useT();
     const [apiKey, setApiKey] = useState(config?.apiKey || '');
     // Mirrors the last config value applied to `apiKey`, so the field can pick up
     // the async config load by adjusting state during render (React's documented
@@ -25,7 +27,7 @@ export default function TmdbSection() {
 
     const handleSave = async () => {
         if (!apiKey.trim()) {
-            setError('Por favor, insira uma chave de API');
+            setError(t('settings.tmdb.enterApiKey'));
             return;
         }
 
@@ -35,7 +37,7 @@ export default function TmdbSection() {
         setIsSaving(false);
 
         if (!result) {
-            setError('Chave de API inválida. Verifique e tente novamente.');
+            setError(t('settings.tmdb.invalidApiKey'));
         }
     };
 
@@ -48,19 +50,19 @@ export default function TmdbSection() {
     return (
         <div>
             <SectionHeader
-                title="TMDb"
-                description="Ativa carrosséis personalizados na Início, filtrados pelo que já está no catálogo."
-                action={isConfigured ? <Badge tone="ok">Configurado</Badge> : undefined}
+                title={t('settings.tmdb.title')}
+                description={t('settings.tmdb.description')}
+                action={isConfigured ? <Badge tone="ok">{t('settings.tmdb.configured')}</Badge> : undefined}
             />
 
-            <Field label="Chave de API (v3)" htmlFor="tmdb-api-key" error={error || undefined}>
+            <Field label={t('settings.tmdb.apiKeyLabel')} htmlFor="tmdb-api-key" error={error || undefined}>
                 <input
                     id="tmdb-api-key"
                     type="text"
                     value={apiKey}
                     onChange={(e) => setApiKey(e.target.value)}
                     disabled={isSaving}
-                    placeholder="Digite sua chave de API do TMDb"
+                    placeholder={t('settings.tmdb.apiKeyPlaceholder')}
                     data-focusable={isSaving ? undefined : 'true'}
                     tabIndex={isSaving ? undefined : 0}
                     className={inputClassName}
@@ -69,11 +71,11 @@ export default function TmdbSection() {
 
             <div className="flex space-x-2 mt-3">
                 <Button onClick={handleSave} loading={isSaving} disabled={isSaving}>
-                    Salvar
+                    {t('settings.tmdb.save')}
                 </Button>
                 {isConfigured && (
                     <Button variant="ghost" onClick={handleClear} disabled={isSaving}>
-                        Remover
+                        {t('settings.tmdb.remove')}
                     </Button>
                 )}
             </div>

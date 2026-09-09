@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { useProfile } from '@/app/context/ProfileContext';
+import { useT } from '@/app/context/I18nContext';
 import Button from '@/components/ui/Button';
 import IconButton from '@/components/ui/IconButton';
 import Field, { inputClassName } from '@/components/ui/Field';
@@ -12,6 +13,7 @@ import { Pencil, Trash2, Plus, User } from 'lucide-react';
 /** Profile management, inline (the logic behind ProfileModal, without the modal). */
 export default function ProfilesSection() {
     const { profiles, activeProfile, selectProfile, createProfile, renameProfile, deleteProfile } = useProfile();
+    const t = useT();
     const [newName, setNewName] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
@@ -44,7 +46,7 @@ export default function ProfilesSection() {
             setNewName('');
             setError(null);
         } catch {
-            setError('Não foi possível criar o perfil.');
+            setError(t('profiles.createError'));
         }
     };
 
@@ -62,7 +64,7 @@ export default function ProfilesSection() {
             await renameProfile(id, trimmed);
             setError(null);
         } catch {
-            setError('Não foi possível renomear o perfil.');
+            setError(t('profiles.renameError'));
         }
     };
 
@@ -74,7 +76,7 @@ export default function ProfilesSection() {
 
     return (
         <div>
-            <SectionHeader title="Perfis" />
+            <SectionHeader title={t('profiles.title')} />
             <div className="space-y-2 mb-4">
                 {profiles.map((profile) => {
                     const isActive = profile.id === activeProfile?.id;
@@ -87,13 +89,13 @@ export default function ProfilesSection() {
                                 className="flex items-center justify-between px-3 py-2.5 space-x-3 rounded-lg border border-line bg-surface"
                             >
                                 <p className="text-sm text-ink flex-1">
-                                    Excluir &quot;{profile.name}&quot;? A Minha Lista e o progresso serão apagados.
+                                    {t('profiles.deleteConfirm', { name: profile.name })}
                                 </p>
                                 <Button variant="ghost" size="sm" onClick={() => setDeletingId(null)}>
-                                    Cancelar
+                                    {t('profiles.cancel')}
                                 </Button>
                                 <Button variant="danger" size="sm" onClick={() => void handleConfirmDelete(profile.id)}>
-                                    Excluir
+                                    {t('profiles.delete')}
                                 </Button>
                             </div>
                         );
@@ -136,13 +138,13 @@ export default function ProfilesSection() {
 
                             {isActive && (
                                 <span className="ml-2 flex-shrink-0">
-                                    <Badge tone="ok">Ativo</Badge>
+                                    <Badge tone="ok">{t('profiles.active')}</Badge>
                                 </span>
                             )}
 
                             <IconButton
                                 icon={Pencil}
-                                label={`Renomear ${profile.name}`}
+                                label={t('profiles.renameLabel', { name: profile.name })}
                                 size="sm"
                                 onClick={() => startRename(profile.id, profile.name)}
                                 className="ml-2 flex-shrink-0"
@@ -151,7 +153,7 @@ export default function ProfilesSection() {
                             {profiles.length > 1 && (
                                 <IconButton
                                     icon={Trash2}
-                                    label={`Excluir ${profile.name}`}
+                                    label={t('profiles.deleteLabel', { name: profile.name })}
                                     size="sm"
                                     onClick={() => setDeletingId(profile.id)}
                                     className="ml-1 flex-shrink-0"
@@ -164,13 +166,13 @@ export default function ProfilesSection() {
 
             <div className="flex items-end space-x-2">
                 <div className="flex-1">
-                    <Field label="Novo perfil" htmlFor="new-profile-name">
+                    <Field label={t('profiles.newProfile')} htmlFor="new-profile-name">
                         <input
                             id="new-profile-name"
                             value={newName}
                             onChange={(e) => setNewName(e.target.value)}
                             onKeyDown={(e) => e.key === 'Enter' && handleCreate()}
-                            placeholder="Nome do perfil"
+                            placeholder={t('profiles.namePlaceholder')}
                             data-focusable="true"
                             tabIndex={0}
                             className={inputClassName}
@@ -178,7 +180,7 @@ export default function ProfilesSection() {
                     </Field>
                 </div>
                 <Button icon={Plus} onClick={handleCreate}>
-                    Criar
+                    {t('profiles.create')}
                 </Button>
             </div>
 

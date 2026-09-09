@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, useMemo, useCallback, memo } from 'react';
 import { Search, AlertCircle, Loader as LoaderIcon } from 'lucide-react';
 
 import { useData } from '@/app/context/DataContext';
+import { useT } from '@/app/context/I18nContext';
 import { useInfiniteScroll } from '@/app/hooks/useInfiniteScroll';
 import { getDeviceProfile, type DeviceTier } from '@/app/lib/deviceProfile';
 import { toCatalogItems, type CatalogItem } from '@/app/lib/catalogItem';
@@ -32,17 +33,17 @@ const SEARCH_TUNING: Record<DeviceTier, { debounceMs: number; limit: number; ini
     'ultra-high': { debounceMs: 250, limit: 300, initialBatch: 30, loadBatch: 20 },
 };
 
-const TABS: { id: SearchCategory; label: string }[] = [
-    { id: 'all', label: 'Tudo' },
-    { id: 'live', label: 'TV ao vivo' },
-    { id: 'movie', label: 'Filmes' },
-    { id: 'series', label: 'Séries' },
+const TAB_IDS: { id: SearchCategory; labelKey: string }[] = [
+    { id: 'all', labelKey: 'search.tabAll' },
+    { id: 'live', labelKey: 'search.tabLive' },
+    { id: 'movie', labelKey: 'search.tabMovie' },
+    { id: 'series', labelKey: 'search.tabSeries' },
 ];
 
-const BADGE_LABEL: Record<'live' | 'movie' | 'series', string> = {
-    live: 'Ao vivo',
-    movie: 'Filme',
-    series: 'Série',
+const BADGE_LABEL_KEY: Record<'live' | 'movie' | 'series', string> = {
+    live: 'search.badgeLive',
+    movie: 'search.badgeMovie',
+    series: 'search.badgeSeries',
 };
 
 /**
@@ -58,6 +59,7 @@ const SearchInput = memo(function SearchInput({
     isSearching: boolean;
     onCommit: (value: string) => void;
 }) {
+    const t = useT();
     const [value, setValue] = useState('');
 
     useEffect(() => {
@@ -80,7 +82,7 @@ const SearchInput = memo(function SearchInput({
                 type="text"
                 value={value}
                 onChange={(e) => setValue(e.target.value)}
-                placeholder="Digite para pesquisar..."
+                placeholder={t('search.placeholder')}
                 data-focusable="true"
                 tabIndex={0}
                 className={[inputClassName, 'h-14 pl-12 pr-12'].join(' ')}
@@ -96,6 +98,7 @@ const SearchInput = memo(function SearchInput({
 });
 
 const SearchResultCard = memo(function SearchResultCard({ item }: { item: CatalogItem }) {
+    const t = useT();
     return (
         <Poster
             href={item.href}
@@ -103,7 +106,7 @@ const SearchResultCard = memo(function SearchResultCard({ item }: { item: Catalo
             image={item.image}
             ratio={item.type === 'live' ? 'square' : 'poster'}
             rating={item.rating}
-            badge={{ text: BADGE_LABEL[item.type] }}
+            badge={{ text: t(BADGE_LABEL_KEY[item.type]) }}
         />
     );
 });
@@ -135,6 +138,7 @@ const SearchResultsGrid = memo(function SearchResultsGrid({
 
 export default function SearchPage() {
     const { searchCachedStreams } = useData();
+    const t = useT();
     const tuning = useMemo(() => SEARCH_TUNING[getDeviceProfile().tier], []);
 
     const [query, setQuery] = useState('');
@@ -182,14 +186,14 @@ export default function SearchPage() {
                 if (cancelled || requestId !== latestRequestRef.current) return;
                 console.error('Search request failed', err);
                 setResults([]);
-                setError('Falha ao buscar no catálogo sincronizado.');
+                setError(t('search.failed'));
             } finally {
                 if (!cancelled && requestId === latestRequestRef.current) setIsSearching(false);
             }
         })();
 
         return () => { cancelled = true; };
-    }, [query, activeTab, searchCachedStreams, tuning.limit]);
+    }, [query, activeTab, searchCachedStreams, tuning.limit, t]);
 
     const { visibleItems, hasMore, sentinelRef } = useInfiniteScroll(results, {
         initialBatchSize: tuning.initialBatch,
@@ -202,14 +206,14 @@ export default function SearchPage() {
         <div className="min-h-full flex flex-col space-y-8 p-4 md:p-6 lg:p-10">
             <div className="flex flex-col space-y-6">
                 <div>
-                    <h1 className="text-2xl md:text-3xl font-semibold text-ink tracking-tight">Pesquisar</h1>
-                    <p className="text-ink-2 mt-1 text-sm md:text-base">Encontre seus filmes, séries e canais favoritos.</p>
+                    <h1 className="text-2xl md:text-3xl font-semibold text-ink tracking-tight">{t('search.title')}</h1>
+                    <p className="text-ink-2 mt-1 text-sm md:text-base">{t('search.subtitle')}</p>
                 </div>
 
                 <SearchInput debounceMs={tuning.debounceMs} isSearching={isSearching} onCommit={handleCommit} />
 
                 <div className="flex flex-wrap">
-                    {TABS.map((tab) => {
+                    {TAB_IDS.map((tab) => {
                         const isActive = activeTab === tab.id;
                         return (
                             <button
@@ -222,7 +226,7 @@ export default function SearchPage() {
                                     isActive ? 'bg-ink text-bg' : 'bg-surface-2 text-ink-2 border border-line',
                                 ].join(' ')}
                             >
-                                {tab.label}
+                                {t(tab.labelKey)}
                             </button>
                         );
                     })}
@@ -231,7 +235,7 @@ export default function SearchPage() {
 
             <div className="flex-1 min-h-[300px]">
                 {showEmptyHint ? (
-                    <EmptyState icon={Search} title="Comece a digitar para pesquisar" />
+                    <EmptyState icon={Search} title={t('search.startTyping')} />
                 ) : error ? (
                     <EmptyState icon={AlertCircle} title={error} />
                 ) : isSearching && results.length === 0 ? (
@@ -243,7 +247,7 @@ export default function SearchPage() {
                         ))}
                     </CardGrid>
                 ) : results.length === 0 ? (
-                    <EmptyState icon={AlertCircle} title={`Nenhum resultado encontrado para "${query}"`} />
+                    <EmptyState icon={AlertCircle} title={t('search.noResults', { query })} />
                 ) : (
                     <SearchResultsGrid
                         items={visibleItems}

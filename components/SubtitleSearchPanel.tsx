@@ -4,6 +4,7 @@ import { useState, useCallback, useEffect } from 'react';
 import { Search, Download, Loader2, Subtitles, Globe } from 'lucide-react';
 import { useSubtitle, SubtitleResult } from '../app/context/SubtitleContext';
 import { useProfile } from '../app/context/ProfileContext';
+import { useT } from '../app/context/I18nContext';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
@@ -59,6 +60,7 @@ export default function SubtitleSearchPanel({
 }: SubtitleSearchPanelProps) {
     const { searchSubtitles, downloadSubtitle, isConfigured, isConfigResolved, remainingDownloads, ensureConfigLoaded } = useSubtitle();
     const { activeProfile, updatePrefs } = useProfile();
+    const t = useT();
     const [results, setResults] = useState<SubtitleResult[]>([]);
     const [isSearching, setIsSearching] = useState(false);
     const [isDownloading, setIsDownloading] = useState<number | null>(null);
@@ -133,7 +135,7 @@ export default function SubtitleSearchPanel({
     // message at a user who does have a key saved.
     if (!isConfigResolved) {
         return (
-            <Modal isOpen onClose={onClose} title="Legendas" size="lg">
+            <Modal isOpen onClose={onClose} title={t('subtitlePanel.title')} size="lg">
                 <div className="flex items-center justify-center py-12">
                     <Loader2 size={32} className="text-ink animate-spin" />
                 </div>
@@ -143,12 +145,12 @@ export default function SubtitleSearchPanel({
 
     if (!isConfigured) {
         return (
-            <Modal isOpen onClose={onClose} title="Legendas" size="sm">
+            <Modal isOpen onClose={onClose} title={t('subtitlePanel.title')} size="sm">
                 <EmptyState
                     icon={Subtitles}
-                    title="Legendas não configuradas"
-                    description="Configure sua chave de API do OpenSubtitles em Ajustes para buscar legendas."
-                    action={<Button variant="secondary" onClick={onClose}>Fechar</Button>}
+                    title={t('subtitlePanel.notConfiguredTitle')}
+                    description={t('subtitlePanel.notConfiguredDesc')}
+                    action={<Button variant="secondary" onClick={onClose}>{t('subtitlePanel.close')}</Button>}
                 />
             </Modal>
         );
@@ -158,7 +160,7 @@ export default function SubtitleSearchPanel({
         <Modal
             isOpen
             onClose={onClose}
-            title="Legendas"
+            title={t('subtitlePanel.title')}
             description={title}
             size="lg"
         >
@@ -166,7 +168,7 @@ export default function SubtitleSearchPanel({
                 <div className="flex items-center space-x-2">
                     {remainingDownloads !== null && (
                         <Badge tone={remainingDownloads <= 3 ? 'warn' : 'ok'}>
-                            {remainingDownloads} restantes
+                            {t('subtitlePanel.remaining', { n: remainingDownloads })}
                         </Badge>
                     )}
                 </div>
@@ -195,13 +197,13 @@ export default function SubtitleSearchPanel({
                         loading={isSearching}
                         onClick={handleSearch}
                     >
-                        Buscar
+                        {t('subtitlePanel.search')}
                     </Button>
                 </div>
 
                 {seasonNumber !== undefined && episodeNumber !== undefined && (
                     <p className="text-xs text-ink-2">
-                        Temporada {seasonNumber}, Episódio {episodeNumber}
+                        {t('subtitlePanel.seasonEpisode', { season: seasonNumber, episode: episodeNumber })}
                     </p>
                 )}
             </div>
@@ -218,8 +220,8 @@ export default function SubtitleSearchPanel({
                 {!isSearching && hasSearched && results.length === 0 && (
                     <EmptyState
                         icon={Subtitles}
-                        title="Nenhuma legenda encontrada"
-                        description="Tente outro idioma ou verifique o nome do conteúdo."
+                        title={t('subtitlePanel.noneFoundTitle')}
+                        description={t('subtitlePanel.noneFoundDesc')}
                         compact
                     />
                 )}
@@ -252,7 +254,7 @@ export default function SubtitleSearchPanel({
                                         {result.attributes.release || result.attributes.files[0].file_name}
                                     </p>
                                     <p className="text-xs text-ink-2 mt-0.5 tnum">
-                                        {result.attributes.uploader?.name || 'Anônimo'} · {result.attributes.download_count} downloads
+                                        {result.attributes.uploader?.name || t('subtitlePanel.anonymous')} · {result.attributes.download_count} {t('subtitlePanel.downloads')}
                                     </p>
                                 </div>
                                 <div className="ml-3 flex-shrink-0">

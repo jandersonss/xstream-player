@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { useSubtitle } from '@/app/context/SubtitleContext';
 import { useProfile } from '@/app/context/ProfileContext';
+import { useT } from '@/app/context/I18nContext';
 import Button from '@/components/ui/Button';
 import IconButton from '@/components/ui/IconButton';
 import Field, { inputClassName } from '@/components/ui/Field';
@@ -40,6 +41,7 @@ function clampFontSize(size: number): number {
 export default function SubtitlesSection() {
     const { config, saveConfig, clearConfig, isConfigured, ensureConfigLoaded } = useSubtitle();
     const { activeProfile, updatePrefs } = useProfile();
+    const t = useT();
     const [apiKey, setApiKey] = useState(config?.apiKey || '');
     // Mirrors the last config value applied to `apiKey`, so the field can pick up
     // the async config load by adjusting state during render (React's documented
@@ -59,7 +61,7 @@ export default function SubtitlesSection() {
 
     const handleSave = async () => {
         if (!apiKey.trim()) {
-            setError('Por favor, insira uma chave de API');
+            setError(t('settings.subtitles.enterApiKey'));
             return;
         }
 
@@ -69,7 +71,7 @@ export default function SubtitlesSection() {
         setIsSaving(false);
 
         if (!result) {
-            setError('Chave de API inválida. Verifique e tente novamente.');
+            setError(t('settings.subtitles.invalidApiKey'));
         }
     };
 
@@ -85,19 +87,19 @@ export default function SubtitlesSection() {
     return (
         <div>
             <SectionHeader
-                title="Legendas"
-                action={isConfigured ? <Badge tone="ok">Configurado</Badge> : undefined}
+                title={t('settings.subtitles.title')}
+                action={isConfigured ? <Badge tone="ok">{t('settings.subtitles.configured')}</Badge> : undefined}
             />
 
             <div className="space-y-3 mb-6">
-                <Field label="Chave de API (OpenSubtitles)" htmlFor="subtitle-api-key" error={error || undefined}>
+                <Field label={t('settings.subtitles.apiKeyLabel')} htmlFor="subtitle-api-key" error={error || undefined}>
                     <input
                         id="subtitle-api-key"
                         type="text"
                         value={apiKey}
                         onChange={(e) => setApiKey(e.target.value)}
                         disabled={isSaving}
-                        placeholder="Digite sua chave de API do OpenSubtitles"
+                        placeholder={t('settings.subtitles.apiKeyPlaceholder')}
                         data-focusable={isSaving ? undefined : 'true'}
                         tabIndex={isSaving ? undefined : 0}
                         className={inputClassName}
@@ -105,18 +107,18 @@ export default function SubtitlesSection() {
                 </Field>
                 <div className="flex space-x-2">
                     <Button onClick={handleSave} loading={isSaving} disabled={isSaving}>
-                        Salvar
+                        {t('settings.subtitles.save')}
                     </Button>
                     {isConfigured && (
                         <Button variant="ghost" onClick={handleClear} disabled={isSaving}>
-                            Remover
+                            {t('settings.subtitles.remove')}
                         </Button>
                     )}
                 </div>
             </div>
 
             <div className="mb-6">
-                <Field label="Idioma padrão das legendas" htmlFor="subtitle-language">
+                <Field label={t('settings.subtitles.defaultLanguageLabel')} htmlFor="subtitle-language">
                     <select
                         id="subtitle-language"
                         value={language}
@@ -135,11 +137,11 @@ export default function SubtitlesSection() {
             </div>
 
             <div>
-                <p className="text-sm text-ink-2 mb-1.5">Tamanho da fonte</p>
+                <p className="text-sm text-ink-2 mb-1.5">{t('settings.subtitles.fontSize')}</p>
                 <div className="flex items-center space-x-3">
                     <IconButton
                         icon={Minus}
-                        label="Diminuir fonte"
+                        label={t('settings.subtitles.decreaseFont')}
                         size="sm"
                         variant="secondary"
                         onClick={() => updatePrefs({ subtitleFontSize: clampFontSize(fontSize - FONT_SIZE_STEP) })}
@@ -147,7 +149,7 @@ export default function SubtitlesSection() {
                     <span className="text-sm text-ink tnum w-10 text-center">{fontSize.toFixed(1)}</span>
                     <IconButton
                         icon={Plus}
-                        label="Aumentar fonte"
+                        label={t('settings.subtitles.increaseFont')}
                         size="sm"
                         variant="secondary"
                         onClick={() => updatePrefs({ subtitleFontSize: clampFontSize(fontSize + FONT_SIZE_STEP) })}

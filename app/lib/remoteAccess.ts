@@ -31,7 +31,6 @@ export const REMOTE_ACCESS_SESSION_SECONDS = 7 * 24 * 60 * 60;
  * is just the cookie that lets the same-origin app skip the PIN gate.
  */
 export const REMOTE_ACCESS_DEVICE_SESSION_SECONDS = 365 * 24 * 60 * 60;
-export const PIN_RULE_MESSAGE = 'Use 4 a 64 caracteres, com letras e números, sem símbolos.';
 
 interface RemoteAccessConfig {
     pinHash?: string;

@@ -56,7 +56,7 @@ Ao adicionar uma capacidade: crie/estenda a lib server-only, exponha via API rou
 - Indentação de **4 espaços**; `strict: true` — evite `any` (prefira tipos/`unknown` + narrowing).
 - Import de módulos internos via alias `@/...`.
 - **Código e comentários sempre em inglês** (comentário explica o *porquê*, não o *o quê*).
-- **Textos visíveis na interface em pt-BR** (labels, títulos, mensagens ao usuário).
+- **Textos visíveis na interface passam por i18n**, nunca literais no JSX/TSX. Client: `const t = useT()` (de `@/app/context/I18nContext`) e `t('namespace.key', { var })`. API route: `translateForRequest(request, 'serverErrors.key')` (de `@/app/lib/i18n`). Adicione a chave em **`app/lib/i18n/translations/pt-BR.json` e `en.json`** (pt-BR é a fonte da verdade). Idiomas novos = 1 JSON + 1 linha em `LOCALES`. **pt-BR** é o `DEFAULT_LOCALE` (fallback de chave ausente e de escolha salva inválida). Primeira visita sem cookie: `layout.tsx` detecta pelo `Accept-Language`; sem match → **en** (`AUTODETECT_FALLBACK_LOCALE`).
 - **Mensagens de commit em inglês**, no imperativo (ex.: `feat: add batch subtitle download`). **PRs e release notes em pt-BR.**
 - Nada de credenciais/segredos no código — vivem em `data/config.json`.
 

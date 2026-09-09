@@ -9,6 +9,7 @@ import { toCatalogItems, type CatalogItem } from '@/app/lib/catalogItem';
 import { sortCatalogItems, type SortOption } from '@/app/lib/catalogSort';
 import { useSortPreference } from '@/app/hooks/useSortPreference';
 import { useInfiniteScroll } from '@/app/hooks/useInfiniteScroll';
+import { useT } from '@/app/context/I18nContext';
 import CardGrid from '@/components/CardGrid';
 import SectionHeader from '@/components/ui/SectionHeader';
 import SortControls from '@/components/SortControls';
@@ -36,6 +37,7 @@ const SKELETON_COUNT = 12;
 
 export default function CatalogListing({ type, categoryId, backHref, fallbackTitle }: CatalogListingProps) {
     const router = useRouter();
+    const t = useT();
     const { getCachedStreams, getCachedCategories } = useData();
 
     const [items, setItems] = useState<CatalogItem[]>([]);
@@ -56,11 +58,11 @@ export default function CatalogListing({ type, categoryId, backHref, fallbackTit
             setCategoryName(category?.category_name ?? '');
             setItems(toCatalogItems(streams));
         } catch {
-            setError('Não foi possível carregar os itens desta categoria.');
+            setError(t('catalog.loadItemsError'));
         } finally {
             setLoading(false);
         }
-    }, [categoryId, getCachedCategories, getCachedStreams, type]);
+    }, [categoryId, getCachedCategories, getCachedStreams, type, t]);
 
     useEffect(() => {
         loadData();
@@ -76,7 +78,7 @@ export default function CatalogListing({ type, categoryId, backHref, fallbackTit
         <div className="p-4 md:p-6 lg:p-10 space-y-6">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between">
                 <Button variant="ghost" icon={ArrowLeft} onClick={() => router.push(backHref)}>
-                    Voltar
+                    {t('common.back')}
                 </Button>
                 <SortControls value={sort} onChange={setSort} options={SORT_OPTIONS_BY_TYPE[type]} />
             </div>
@@ -98,10 +100,10 @@ export default function CatalogListing({ type, categoryId, backHref, fallbackTit
                 <EmptyState
                     icon={AlertCircle}
                     title={error}
-                    action={<Button onClick={loadData}>Tentar de novo</Button>}
+                    action={<Button onClick={loadData}>{t('common.tryAgain')}</Button>}
                 />
             ) : items.length === 0 ? (
-                <EmptyState title="Nenhum item nesta categoria." />
+                <EmptyState title={t('catalog.noItems')} />
             ) : (
                 <>
                     <CardGrid base={2} sm={3} md={4} lg={5} xl={6} gap={gap}>

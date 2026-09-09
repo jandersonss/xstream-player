@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { useT } from '@/app/context/I18nContext';
 
 interface LoaderProps {
     size?: 'small' | 'large';
@@ -10,6 +11,7 @@ interface LoaderProps {
 export default function Loader({ size = 'large', helpDelayMs = 15000 }: LoaderProps) {
     const isSmall = size === 'small';
     const [showHelp, setShowHelp] = useState(false);
+    const t = useT();
 
     // Diagnostic escape hatch for a silently stuck TV: if loading never resolves
     // within helpDelayMs, surface a link to /debug instead of spinning forever.
@@ -31,9 +33,9 @@ export default function Loader({ size = 'large', helpDelayMs = 15000 }: LoaderPr
             </div>
             {showHelp && (
                 <div className="mt-6 text-center text-sm text-ink-2">
-                    <p className="mb-2">Carregamento demorando mais que o esperado.</p>
+                    <p className="mb-2">{t('loader.slow')}</p>
                     <a href="/debug" className="text-ink underline font-semibold">
-                        Abrir diagnóstico
+                        {t('common.openDiagnostics')}
                     </a>
                 </div>
             )}

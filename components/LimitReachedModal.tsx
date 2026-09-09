@@ -4,6 +4,7 @@ import { useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { Radio, Tv, ArrowRight } from 'lucide-react';
 import { useLiveSessions, excludeSelf, joinHref, type ShareSession } from '@/app/hooks/useLiveShare';
+import { useT } from '@/app/context/I18nContext';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 
@@ -22,6 +23,7 @@ interface LimitReachedModalProps {
  */
 export default function LimitReachedModal({ open, onClose }: LimitReachedModalProps) {
     const router = useRouter();
+    const t = useT();
     const { sessions, loading } = useLiveSessions(6000);
     const shares = useMemo(() => excludeSelf(sessions), [sessions]);
 
@@ -33,14 +35,14 @@ export default function LimitReachedModal({ open, onClose }: LimitReachedModalPr
         <Modal
             isOpen={open}
             onClose={onClose}
-            title="Limite de conexões atingido"
-            description="Todas as conexões da sua conta estão em uso. Você pode entrar, sem gastar uma nova conexão, no que outro aparelho está transmitindo agora."
+            title={t('limitModal.title')}
+            description={t('limitModal.description')}
             size="md"
             footer={
                 <div className="flex justify-end space-x-3">
-                    <Button variant="ghost" onClick={onClose}>Fechar</Button>
+                    <Button variant="ghost" onClick={onClose}>{t('limitModal.close')}</Button>
                     <Button variant="primary" icon={Radio} onClick={() => router.push('/dashboard/tv')}>
-                        Abrir Modo TV
+                        {t('limitModal.openTvMode')}
                     </Button>
                 </div>
             }
@@ -49,11 +51,11 @@ export default function LimitReachedModal({ open, onClose }: LimitReachedModalPr
                 vertical scroller (spec 00 §4.4). */}
             <div className="max-h-72 overflow-y-auto space-y-2 px-1 -mx-1">
                 {loading && shares.length === 0 ? (
-                    <p className="text-ink-2 text-sm py-4">Procurando transmissões...</p>
+                    <p className="text-ink-2 text-sm py-4">{t('limitModal.searching')}</p>
                 ) : shares.length === 0 ? (
                     <div className="text-center py-8 text-ink-2">
                         <Tv size={36} className="mx-auto mb-2 opacity-40" />
-                        <p className="text-sm">Nenhuma transmissão ativa no momento.</p>
+                        <p className="text-sm">{t('limitModal.noActive')}</p>
                     </div>
                 ) : (
                     shares.map((s) => (

@@ -7,6 +7,7 @@ import { useData } from '@/app/context/DataContext';
 import type { CachedCategory, ContentType } from '@/app/lib/dbTypes';
 import { sortCategories } from '@/app/lib/catalogSort';
 import { useSortPreference } from '@/app/hooks/useSortPreference';
+import { useT } from '@/app/context/I18nContext';
 import CardGrid from '@/components/CardGrid';
 import SectionHeader from '@/components/ui/SectionHeader';
 import SortControls from '@/components/SortControls';
@@ -36,6 +37,7 @@ const SKELETON_COUNT = 12;
 
 export default function CategoryBrowser({ type, title, hero }: CategoryBrowserProps) {
     const { getCachedCategories } = useData();
+    const t = useT();
     const [categories, setCategories] = useState<CachedCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
@@ -48,11 +50,11 @@ export default function CategoryBrowser({ type, title, hero }: CategoryBrowserPr
             const cached = await getCachedCategories(type);
             setCategories(cached);
         } catch {
-            setError('Não foi possível carregar as categorias.');
+            setError(t('catalog.loadCategoriesError'));
         } finally {
             setLoading(false);
         }
-    }, [getCachedCategories, type]);
+    }, [getCachedCategories, type, t]);
 
     useEffect(() => {
         loadCategories();
@@ -88,10 +90,10 @@ export default function CategoryBrowser({ type, title, hero }: CategoryBrowserPr
                     <EmptyState
                         icon={AlertCircle}
                         title={error}
-                        action={<Button onClick={loadCategories}>Tentar de novo</Button>}
+                        action={<Button onClick={loadCategories}>{t('common.tryAgain')}</Button>}
                     />
                 ) : sortedCategories.length === 0 ? (
-                    <EmptyState title="Nenhuma categoria disponível. Atualize o catálogo em Ajustes." />
+                    <EmptyState title={t('catalog.noCategories')} />
                 ) : (
                     <CardGrid base={2} md={3} lg={4} xl={5} gap={4}>
                         {sortedCategories.map((category) => (

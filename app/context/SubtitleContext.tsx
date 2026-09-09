@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, ReactNode, useCallback, useRef } from 'react';
 import { SavedSubtitle } from '../lib/db';
 import { useProfile } from './ProfileContext';
+import { useT } from './I18nContext';
 import { apiFetch } from '../lib/apiClient';
 
 interface SubtitleConfig {
@@ -106,6 +107,7 @@ const SubtitleContext = createContext<SubtitleContextType | undefined>(undefined
 
 export function SubtitleProvider({ children }: { children: ReactNode }) {
     const { activeProfile } = useProfile();
+    const t = useT();
     // The stored subtitle cache is keyed by language, so every read/write has to
     // carry the language this profile watches in.
     const profileLanguage = activeProfile?.prefs.subtitleLanguage ?? 'pt-BR';
@@ -308,14 +310,14 @@ export function SubtitleProvider({ children }: { children: ReactNode }) {
         const result = await performDownload(fileId, streamId, profileLanguage);
 
         if (result.quotaExceeded) {
-            alert('Limite diário de downloads atingido. Tente novamente amanhã (reset à meia-noite UTC).');
+            alert(t('subtitlePanel.dailyLimitAlert'));
             return null;
         }
         if (!result.ok || !result.vtt) return null;
 
         const blob = new Blob([result.vtt], { type: 'text/vtt' });
         return URL.createObjectURL(blob);
-    }, [ensureConfigLoaded, performDownload, profileLanguage]);
+    }, [ensureConfigLoaded, performDownload, profileLanguage, t]);
 
     const getSavedSubtitle = useCallback(async (streamId: string) => {
         try {

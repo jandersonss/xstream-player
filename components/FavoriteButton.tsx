@@ -3,6 +3,7 @@
 import { Bookmark } from 'lucide-react';
 import Button, { type ButtonSize } from './ui/Button';
 import { useFavorites, type FavoriteItem } from '../app/context/FavoritesContext';
+import { useT } from '../app/context/I18nContext';
 
 export interface FavoriteButtonProps {
     /** The card payload to store when the item is added. */
@@ -23,6 +24,7 @@ const ICON_SIZE: Record<ButtonSize, number> = { sm: 16, md: 18, lg: 20 };
  */
 export default function FavoriteButton({ item, size = 'lg' }: FavoriteButtonProps) {
     const { isFavorite, addFavorite, removeFavorite } = useFavorites();
+    const t = useT();
     const saved = isFavorite(item.id, item.type);
 
     return (
@@ -37,7 +39,7 @@ export default function FavoriteButton({ item, size = 'lg' }: FavoriteButtonProp
                 className="mr-2"
                 fill={saved ? 'currentColor' : 'none'}
             />
-            {saved ? 'Na sua lista' : 'Minha lista'}
+            {saved ? t('favorites.inList') : t('favorites.addToList')}
         </Button>
     );
 }

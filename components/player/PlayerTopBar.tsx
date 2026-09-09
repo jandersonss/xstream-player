@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { ArrowLeft } from 'lucide-react';
+import { useT } from '@/app/context/I18nContext';
 import IconButton from '@/components/ui/IconButton';
 
 export interface PlayerTopBarProps {
@@ -14,6 +15,7 @@ export interface PlayerTopBarProps {
 }
 
 export default function PlayerTopBar({ title, subtitle, onBack, rightSlot, visible }: PlayerTopBarProps) {
+    const t = useT();
     return (
         <div
             className="absolute top-0 left-0 w-full p-4 bg-gradient-to-b from-black/85 to-transparent flex items-center justify-between space-x-3"
@@ -21,7 +23,7 @@ export default function PlayerTopBar({ title, subtitle, onBack, rightSlot, visib
         >
             <div className="flex items-center space-x-3 min-w-0">
                 {onBack && (
-                    <IconButton icon={ArrowLeft} label="Voltar" onClick={onBack} className="focus-flat flex-shrink-0" />
+                    <IconButton icon={ArrowLeft} label={t('common.back')} onClick={onBack} className="focus-flat flex-shrink-0" />
                 )}
                 {title && (
                     <div className="min-w-0">

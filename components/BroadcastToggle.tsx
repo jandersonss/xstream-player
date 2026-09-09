@@ -1,6 +1,7 @@
 'use client';
 
 import { Radio } from 'lucide-react';
+import { useT } from '@/app/context/I18nContext';
 
 export interface BroadcastToggleProps {
     active: boolean;
@@ -16,6 +17,7 @@ export interface BroadcastToggleProps {
  * uses of the brand red (spec 00 §2.1).
  */
 export default function BroadcastToggle({ active, onToggle, disabled = false }: BroadcastToggleProps) {
+    const t = useT();
     return (
         <button
             onClick={onToggle}
@@ -27,10 +29,10 @@ export default function BroadcastToggle({ active, onToggle, disabled = false }: 
                 'disabled:opacity-40 disabled:cursor-not-allowed',
                 active ? 'bg-brand text-ink' : 'bg-surface-2 text-ink-2 border border-line',
             ].join(' ')}
-            title={active ? 'Transmitindo para o Modo TV' : 'Transmitir no Modo TV'}
+            title={active ? t('broadcast.toTvModeTitle') : t('broadcast.inTvModeTitle')}
         >
             <Radio size={18} className={active ? 'animate-pulse' : ''} />
-            <span>{active ? 'Transmitindo' : 'Transmitir'}</span>
+            <span>{active ? t('broadcast.broadcasting') : t('broadcast.start')}</span>
         </button>
     );
 }

@@ -2,6 +2,7 @@
 
 import React, { type RefObject } from 'react';
 import { SkipForward } from 'lucide-react';
+import { useT } from '@/app/context/I18nContext';
 
 export interface NextEpisodePromptProps {
     visible: boolean;
@@ -27,6 +28,7 @@ export default function NextEpisodePrompt({
     nextButtonRef,
     postponeButtonRef,
 }: NextEpisodePromptProps) {
+    const t = useT();
     if (!visible) return null;
 
     return (
@@ -44,10 +46,10 @@ export default function NextEpisodePrompt({
                 data-focusable="true"
                 tabIndex={0}
                 className="focus-flat relative flex items-center space-x-2 overflow-hidden rounded-md bg-surface-2 px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-surface-3"
-                aria-label="Pular para o próximo episódio"
+                aria-label={t('player.skipToNext')}
             >
                 <SkipForward size={16} aria-hidden="true" />
-                <span>Próximo episódio</span>
+                <span>{t('player.nextEpisode')}</span>
                 <span className="tnum text-xs text-ink-2" aria-hidden="true">{secondsLeft}s</span>
                 <span
                     className="absolute bottom-0 left-0 h-0.5 bg-ink transition-[width] duration-300 ease-linear"
@@ -63,7 +65,7 @@ export default function NextEpisodePrompt({
                 tabIndex={0}
                 className="focus-flat rounded-md px-3 py-2 text-sm font-medium text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink"
             >
-                Adiar 1 min
+                {t('player.postpone')}
             </button>
         </div>
     );

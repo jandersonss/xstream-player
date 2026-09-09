@@ -3,6 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Trash2, Pencil } from 'lucide-react';
 import { useProfile } from '@/app/context/ProfileContext';
+import { useT } from '@/app/context/I18nContext';
 import Modal from '@/components/ui/Modal';
 import Field, { inputClassName } from '@/components/ui/Field';
 import Button from '@/components/ui/Button';
@@ -16,6 +17,7 @@ interface ProfileModalProps {
 
 export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     const { profiles, activeProfile, selectProfile, createProfile, renameProfile, deleteProfile } = useProfile();
+    const t = useT();
     const [newName, setNewName] = useState('');
     const [editingId, setEditingId] = useState<string | null>(null);
     const [editingName, setEditingName] = useState('');
@@ -48,7 +50,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             setNewName('');
             setError(null);
         } catch {
-            setError('Não foi possível criar o perfil.');
+            setError(t('profiles.createError'));
         }
     };
 
@@ -61,7 +63,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             setEditingId(null);
             setError(null);
         } catch {
-            setError('Não foi possível renomear o perfil.');
+            setError(t('profiles.renameError'));
         }
     };
 
@@ -72,7 +74,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
     };
 
     return (
-        <Modal isOpen={isOpen} onClose={onClose} title="Perfis" size="sm">
+        <Modal isOpen={isOpen} onClose={onClose} title={t('profiles.title')} size="sm">
             <div className="space-y-2 mb-6">
                 {profiles.map(profile => {
                     const isActive = profile.id === activeProfile?.id;
@@ -86,13 +88,13 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                             {isDeleting ? (
                                 <div className="flex items-center justify-between px-3 py-2.5 space-x-3">
                                     <p className="text-sm text-ink flex-1">
-                                        Excluir &quot;{profile.name}&quot;? A Minha Lista e o progresso serão apagados.
+                                        {t('profiles.deleteConfirm', { name: profile.name })}
                                     </p>
                                     <Button variant="ghost" size="sm" onClick={() => setDeletingId(null)}>
-                                        Cancelar
+                                        {t('profiles.cancel')}
                                     </Button>
                                     <Button variant="danger" size="sm" onClick={() => void handleConfirmDelete(profile.id)}>
-                                        Excluir
+                                        {t('profiles.delete')}
                                     </Button>
                                 </div>
                             ) : (
@@ -129,11 +131,11 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                         </button>
                                     )}
 
-                                    {isActive && <Badge tone="ok">Ativo</Badge>}
+                                    {isActive && <Badge tone="ok">{t('profiles.active')}</Badge>}
 
                                     <IconButton
                                         icon={Pencil}
-                                        label={`Renomear ${profile.name}`}
+                                        label={t('profiles.renameLabel', { name: profile.name })}
                                         onClick={() => {
                                             setEditingId(profile.id);
                                             setEditingName(profile.name);
@@ -143,7 +145,7 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
                                     {profiles.length > 1 && (
                                         <IconButton
                                             icon={Trash2}
-                                            label={`Excluir ${profile.name}`}
+                                            label={t('profiles.deleteLabel', { name: profile.name })}
                                             onClick={() => setDeletingId(profile.id)}
                                         />
                                     )}
@@ -155,19 +157,19 @@ export default function ProfileModal({ isOpen, onClose }: ProfileModalProps) {
             </div>
 
             <div className="flex items-end space-x-2">
-                <Field label="Novo perfil">
+                <Field label={t('profiles.newProfile')}>
                     <input
                         value={newName}
                         onChange={e => setNewName(e.target.value)}
                         onKeyDown={e => e.key === 'Enter' && handleCreate()}
-                        placeholder="Nome do perfil"
+                        placeholder={t('profiles.namePlaceholder')}
                         data-focusable="true"
                         tabIndex={0}
                         className={inputClassName}
                     />
                 </Field>
                 <Button variant="primary" icon={Plus} onClick={handleCreate}>
-                    Criar
+                    {t('profiles.create')}
                 </Button>
             </div>
 

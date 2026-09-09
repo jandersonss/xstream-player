@@ -3,6 +3,7 @@
 import { useState } from 'react';
 import { Plus } from 'lucide-react';
 import { useProfile } from '@/app/context/ProfileContext';
+import { useT } from '@/app/context/I18nContext';
 import { inputClassName } from '@/components/ui/Field';
 
 /**
@@ -14,6 +15,7 @@ import { inputClassName } from '@/components/ui/Field';
  */
 export default function ProfileSelector() {
     const { profiles, selectProfile, createProfile } = useProfile();
+    const t = useT();
     const [isCreating, setIsCreating] = useState(false);
     const [name, setName] = useState('');
     const [error, setError] = useState<string | null>(null);
@@ -30,13 +32,13 @@ export default function ProfileSelector() {
             setIsCreating(false);
             setError(null);
         } catch {
-            setError('Não foi possível criar o perfil.');
+            setError(t('profiles.createError'));
         }
     };
 
     return (
         <div className="fixed inset-0 z-[100] bg-bg flex flex-col items-center justify-center p-6">
-            <h1 className="text-2xl md:text-4xl font-semibold text-ink mb-10">Quem está assistindo?</h1>
+            <h1 className="text-2xl md:text-4xl font-semibold text-ink mb-10">{t('profiles.whoWatching')}</h1>
 
             {/* Flexbox gap spacing needs Chrome 84+ (WebOS TVs lack it): child m-3 plus a
                 negative margin on the container reproduces the same 24px spacing. */}
@@ -73,7 +75,7 @@ export default function ProfileSelector() {
                                 if (e.key === 'Enter') handleCreate();
                                 if (e.key === 'Escape') setIsCreating(false);
                             }}
-                            placeholder="Nome do perfil"
+                            placeholder={t('profiles.namePlaceholder')}
                             data-focusable="true"
                             tabIndex={0}
                             className={`${inputClassName} w-32 text-center`}
@@ -90,7 +92,7 @@ export default function ProfileSelector() {
                             <Plus size={40} className="text-ink-3" />
                         </div>
                         <span className="text-ink-2 text-sm md:text-base font-medium">
-                            Adicionar perfil
+                            {t('profiles.addProfile')}
                         </span>
                     </button>
                 )}

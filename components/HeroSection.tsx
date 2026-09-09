@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, TouchEvent } from 'react';
 import { useRouter } from 'next/navigation';
 import { Play, Star } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
+import { useT } from '../app/context/I18nContext';
 import { apiFetch } from '../app/lib/apiClient';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
@@ -33,6 +34,7 @@ const VIDEO_START_DELAY = 5000;
 
 export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const { user } = useAuth();
+    const t = useT();
     const router = useRouter();
     const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
@@ -220,7 +222,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         keeps its baseline descender space, which made the badge
                         carrying the monospace rating sit higher than its siblings. */}
                     <div className="flex items-center mb-3">
-                        <Badge tone="neutral">{currentItem.type === 'movie' ? 'Filme' : 'Série'}</Badge>
+                        <Badge tone="neutral">{currentItem.type === 'movie' ? t('hero.movie') : t('hero.series')}</Badge>
                         <div className="ml-2">
                             <Badge tone="neutral">{currentItem.year}</Badge>
                         </div>
@@ -251,7 +253,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                     {/* Explicit actions — the D-pad reaches these, not the hero itself */}
                     <div className="flex items-center">
                         <Button variant="primary" size="lg" icon={Play} onClick={handleWatch} className="mr-3">
-                            Assistir
+                            {t('hero.watch')}
                         </Button>
                         <FavoriteButton
                             item={{
@@ -279,7 +281,7 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         data-focusable="true"
                         tabIndex={0}
                         className="focus-flat px-2 py-3 flex items-center justify-center"
-                        aria-label={`Ir para slide ${idx + 1}`}
+                        aria-label={t('hero.goToSlide', { n: idx + 1 })}
                         aria-current={idx === currentIndex ? 'true' : undefined}
                     >
                         <span

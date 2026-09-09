@@ -6,7 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Xstream Player — web app (Next.js 16 App Router, React 19, TypeScript) para reproduzir IPTV via API Xtream Codes. Uso em rede privada apenas: não há autenticação robusta e as credenciais IPTV ficam salvas em texto puro em `data/config.json`.
 
-Idioma: **código e comentários sempre em inglês**; **textos de UI em pt-BR**; **mensagens de commit em inglês** (imperativo); **PRs e release notes em pt-BR**.
+Idioma: **código e comentários sempre em inglês**; **textos de UI via i18n** (`useT()` / `translateForRequest`, chaves em `app/lib/i18n/translations/{pt-BR,en}.json`; pt-BR é o padrão e a fonte da verdade); **mensagens de commit em inglês** (imperativo); **PRs e release notes em pt-BR**.
 
 **Padrão de projeto para novas implementações:** siga `.claude/rules/project-standards.md` (carregado automaticamente).
 

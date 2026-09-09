@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Maximize, Minimize, Pause, Play, RotateCcw, RotateCw, SkipBack, SkipForward, Subtitles } from 'lucide-react';
+import { useT } from '@/app/context/I18nContext';
 import Badge from '@/components/ui/Badge';
 import IconButton from '@/components/ui/IconButton';
 import SeekBar, { type SeekBarProps } from './SeekBar';
@@ -62,6 +63,7 @@ export default function PlayerControls({
     seek,
     volume,
 }: PlayerControlsProps) {
+    const t = useT();
     // D10 fix: only render when the callback exists AND the prop says there is
     // somewhere to go — the old code always evaluated the has-next/has-previous
     // check as true, which made those props inert.
@@ -79,23 +81,23 @@ export default function PlayerControls({
             <div className="flex items-center justify-between space-x-2">
                 <div className="flex items-center space-x-2">
                     {showPrevious && (
-                        <IconButton icon={SkipBack} label="Episódio anterior" onClick={onPrevious} className="focus-flat" />
+                        <IconButton icon={SkipBack} label={t('player.previousEpisode')} onClick={onPrevious} className="focus-flat" />
                     )}
 
-                    <IconButton icon={RotateCcw} label="Voltar 10 segundos" onClick={() => onSkip(-10)} className="focus-flat" />
+                    <IconButton icon={RotateCcw} label={t('player.back10')} onClick={() => onSkip(-10)} className="focus-flat" />
 
                     <IconButton
                         icon={isPlaying ? Pause : Play}
-                        label={isPlaying ? 'Pausar' : 'Reproduzir'}
+                        label={isPlaying ? t('player.pause') : t('player.play')}
                         onClick={onTogglePlay}
                         size="lg"
                         className="focus-flat"
                     />
 
-                    <IconButton icon={RotateCw} label="Avançar 10 segundos" onClick={() => onSkip(10)} className="focus-flat" />
+                    <IconButton icon={RotateCw} label={t('player.forward10')} onClick={() => onSkip(10)} className="focus-flat" />
 
                     {showNext && (
-                        <IconButton icon={SkipForward} label="Próximo episódio" onClick={onNext} className="focus-flat" />
+                        <IconButton icon={SkipForward} label={t('player.nextEpisode')} onClick={onNext} className="focus-flat" />
                     )}
 
                     {!isLive && (
@@ -110,7 +112,7 @@ export default function PlayerControls({
 
                     {isLive && (
                         <div className="ml-2">
-                            <Badge tone="live" dot>Ao vivo</Badge>
+                            <Badge tone="live" dot>{t('player.live')}</Badge>
                         </div>
                     )}
                 </div>
@@ -124,8 +126,8 @@ export default function PlayerControls({
                                 data-focusable="true"
                                 tabIndex={0}
                                 className="focus-flat text-ink-2 hover:text-ink p-1 transition-colors text-xs font-bold"
-                                title="Diminuir fonte ( [ )"
-                                aria-label="Diminuir fonte da legenda"
+                                title={t('player.decreaseSubFontTitle')}
+                                aria-label={t('player.decreaseSubFont')}
                             >
                                 A-
                             </button>
@@ -136,8 +138,8 @@ export default function PlayerControls({
                                 data-focusable="true"
                                 tabIndex={0}
                                 className="focus-flat text-ink-2 hover:text-ink p-1 transition-colors text-sm font-bold"
-                                title="Aumentar fonte ( ] )"
-                                aria-label="Aumentar fonte da legenda"
+                                title={t('player.increaseSubFontTitle')}
+                                aria-label={t('player.increaseSubFont')}
                             >
                                 A+
                             </button>
@@ -147,7 +149,7 @@ export default function PlayerControls({
                     {subtitlesAvailable && (
                         <IconButton
                             icon={Subtitles}
-                            label={subtitlesEnabled ? 'Desativar legendas' : 'Ativar legendas'}
+                            label={subtitlesEnabled ? t('player.disableSubtitles') : t('player.enableSubtitles')}
                             onClick={onToggleSubtitles}
                             active={subtitlesEnabled}
                             className="focus-flat"
@@ -156,7 +158,7 @@ export default function PlayerControls({
 
                     <IconButton
                         icon={isFullscreen ? Minimize : Maximize}
-                        label={isFullscreen ? 'Sair do modo tela cheia' : 'Modo tela cheia'}
+                        label={isFullscreen ? t('player.exitFullscreen') : t('player.enterFullscreen')}
                         onClick={onToggleFullscreen}
                         className="focus-flat"
                     />

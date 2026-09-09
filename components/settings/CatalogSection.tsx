@@ -1,6 +1,7 @@
 'use client';
 
 import { useData } from '@/app/context/DataContext';
+import { useT } from '@/app/context/I18nContext';
 import Button from '@/components/ui/Button';
 import SectionHeader from '@/components/ui/SectionHeader';
 import { RefreshCw } from 'lucide-react';
@@ -8,14 +9,15 @@ import { RefreshCw } from 'lucide-react';
 /** Catalog sync — moved out of the nav rail (spec 02 §5.2). */
 export default function CatalogSection() {
     const { syncData, isSyncing, syncProgress, lastSync } = useData();
+    const t = useT();
 
     return (
         <div>
-            <SectionHeader title="Catálogo" />
+            <SectionHeader title={t('settings.catalog.title')} />
             <p className="text-sm text-ink-2 mb-4">
                 {lastSync
-                    ? `Última atualização em ${new Date(lastSync).toLocaleDateString()}`
-                    : 'Catálogo ainda não sincronizado'}
+                    ? t('settings.catalog.lastUpdate', { date: new Date(lastSync).toLocaleDateString() })
+                    : t('settings.catalog.notSynced')}
             </p>
 
             {isSyncing && (
@@ -26,12 +28,12 @@ export default function CatalogSection() {
                             style={{ width: `${syncProgress}%` }}
                         />
                     </div>
-                    <p className="text-xs text-ink-2 mt-1.5 tnum">{syncProgress}% concluído</p>
+                    <p className="text-xs text-ink-2 mt-1.5 tnum">{t('settings.catalog.percentDone', { n: syncProgress })}</p>
                 </div>
             )}
 
             <Button icon={RefreshCw} onClick={syncData} loading={isSyncing} disabled={isSyncing}>
-                {isSyncing ? 'Sincronizando...' : 'Atualizar catálogo'}
+                {isSyncing ? t('settings.catalog.syncing') : t('settings.catalog.update')}
             </Button>
         </div>
     );

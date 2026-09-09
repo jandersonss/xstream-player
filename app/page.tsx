@@ -2,12 +2,14 @@
 
 import { useState, useEffect } from 'react';
 import { useAuth } from './context/AuthContext';
+import { useT } from './context/I18nContext';
 import { useRouter } from 'next/navigation';
 import Field, { inputClassName } from '@/components/ui/Field';
 import Button from '@/components/ui/Button';
 
 export default function LoginPage() {
     const { login, isAuthenticated, isLoading } = useAuth();
+    const t = useT();
     const router = useRouter();
 
     const [hostUrl, setHostUrl] = useState('');
@@ -28,7 +30,7 @@ export default function LoginPage() {
         setIsSubmitting(true);
 
         if (!hostUrl || !username || !password) {
-            setError('Por favor, preencha todos os campos');
+            setError(t('login.fillAllFields'));
             setIsSubmitting(false);
             return;
         }
@@ -36,7 +38,7 @@ export default function LoginPage() {
         try {
             await login(hostUrl, username, password);
         } catch (err: unknown) {
-            setError(err instanceof Error ? err.message : 'Falha no login. Por favor, verifique suas credenciais.');
+            setError(err instanceof Error ? err.message : t('login.failed'));
         } finally {
             setIsSubmitting(false);
         }
@@ -57,11 +59,11 @@ export default function LoginPage() {
                     <h1 className="text-3xl font-semibold text-ink tracking-tight">
                         <span className="text-brand">X</span>stream
                     </h1>
-                    <p className="text-ink-2 text-sm mt-2">Insira suas credenciais IPTV para transmitir</p>
+                    <p className="text-ink-2 text-sm mt-2">{t('login.tagline')}</p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-5">
-                    <Field label="URL do Servidor" htmlFor="host-url">
+                    <Field label={t('login.serverUrl')} htmlFor="host-url">
                         <input
                             id="host-url"
                             type="url"
@@ -74,11 +76,11 @@ export default function LoginPage() {
                         />
                     </Field>
 
-                    <Field label="Usuário" htmlFor="username">
+                    <Field label={t('login.username')} htmlFor="username">
                         <input
                             id="username"
                             type="text"
-                            placeholder="Usuário"
+                            placeholder={t('login.usernamePlaceholder')}
                             value={username}
                             onChange={(e) => setUsername(e.target.value)}
                             className={inputClassName}
@@ -87,11 +89,11 @@ export default function LoginPage() {
                         />
                     </Field>
 
-                    <Field label="Senha" htmlFor="password">
+                    <Field label={t('login.password')} htmlFor="password">
                         <input
                             id="password"
                             type="password"
-                            placeholder="Senha"
+                            placeholder={t('login.passwordPlaceholder')}
                             value={password}
                             onChange={(e) => setPassword(e.target.value)}
                             className={inputClassName}
@@ -103,12 +105,12 @@ export default function LoginPage() {
                     {error && <p className="text-brand text-sm">{error}</p>}
 
                     <Button type="submit" variant="primary" size="lg" fullWidth loading={isSubmitting}>
-                        Entrar
+                        {t('login.signIn')}
                     </Button>
                 </form>
 
                 <div className="mt-8 text-center border-t border-line pt-6">
-                    <p className="text-xs text-ink-3 font-mono">Compatível com Xtream Codes API</p>
+                    <p className="text-xs text-ink-3 font-mono">{t('login.compat')}</p>
                 </div>
             </div>
         </div>

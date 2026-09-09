@@ -10,6 +10,12 @@ import {
   getRemoteAccessState,
   REMOTE_ACCESS_COOKIE_NAME,
 } from "@/app/lib/remoteAccess";
+import { I18nProvider } from "@/app/context/I18nContext";
+import {
+  LOCALE_COOKIE,
+  isSupportedLocale,
+  localeFromAcceptLanguage,
+} from "@/app/lib/i18n";
 
 export const metadata: Metadata = {
   title: "XStream Player",
@@ -123,23 +129,31 @@ export default async function RootLayout({
     cookiesList.get(REMOTE_ACCESS_COOKIE_NAME)?.value
   );
   const shouldGateRemoteAccess = remoteAccess.required && !remoteAccess.authorized;
+  // The saved choice wins; on the first visit (no cookie) fall back to the
+  // browser's own language preference so a fresh install opens localized.
+  const savedLocale = cookiesList.get(LOCALE_COOKIE)?.value;
+  const locale = isSupportedLocale(savedLocale)
+    ? savedLocale
+    : localeFromAcceptLanguage(headersList.get("accept-language"));
 
   return (
-    <html lang="en">
+    <html lang={locale}>
       <body className="antialiased font-sans">
         {/* Order matters: polyfills first, then the error trap and the legacy
             redirect. Both run before any application bundle. */}
         <script dangerouslySetInnerHTML={{ __html: polyfillScript }} />
         <script dangerouslySetInnerHTML={{ __html: legacyRedirectScript }} />
-        {shouldGateRemoteAccess ? (
-          <RemoteAccessGate mode={remoteAccess.configured ? "verify" : "setup"} />
-        ) : (
-          <ErrorBoundary>
-            <ClientProviders>
-              {children}
-            </ClientProviders>
-          </ErrorBoundary>
-        )}
+        <I18nProvider initialLocale={locale}>
+          {shouldGateRemoteAccess ? (
+            <RemoteAccessGate mode={remoteAccess.configured ? "verify" : "setup"} />
+          ) : (
+            <ErrorBoundary>
+              <ClientProviders>
+                {children}
+              </ClientProviders>
+            </ErrorBoundary>
+          )}
+        </I18nProvider>
       </body>
     </html>
   );

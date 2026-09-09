@@ -3,6 +3,7 @@
 import { useMemo, useState } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
+import { useT } from '@/app/context/I18nContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import type Hls from 'hls.js';
 import SyncButton from '@/components/SyncButton';
@@ -14,6 +15,7 @@ import { apiUrl } from '@/app/lib/apiClient';
 
 export default function WatchLivePage() {
     const { credentials } = useAuth();
+    const t = useT();
     const params = useParams();
     const router = useRouter();
     const searchParams = useSearchParams();
@@ -21,7 +23,7 @@ export default function WatchLivePage() {
 
     // Coming from "Modo TV": I watch another device broadcast (via relay, 0 new connection).
     const isJoining = searchParams.get('join') === '1';
-    const title = searchParams.get('title') || `Canal ${streamId}`;
+    const title = searchParams.get('title') || t('watch.channelFallback', { id: streamId });
     const poster = searchParams.get('poster') || undefined;
 
     // Broadcast toggle (starts on if the device is in "broadcast everything").
@@ -60,7 +62,7 @@ export default function WatchLivePage() {
     if (!streamUrl) {
         return (
             <div className="min-h-screen bg-bg flex items-center justify-center text-ink-2">
-                Preparando stream...
+                {t('watch.preparingStream')}
             </div>
         );
     }
@@ -68,7 +70,7 @@ export default function WatchLivePage() {
     const shareToggle = !isJoining ? (
         <BroadcastToggle active={isSharing} onToggle={() => setIsSharing((v) => !v)} />
     ) : (
-        <Badge tone="live" dot>Modo TV</Badge>
+        <Badge tone="live" dot>{t('watch.tvMode')}</Badge>
     );
 
     return (

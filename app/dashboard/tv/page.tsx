@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
+import { useT } from '@/app/context/I18nContext';
 import { Radio, Tv, Film, Layers, Pencil, Check, PowerOff, Play } from 'lucide-react';
 import { useLiveSessions, excludeSelf, joinHref, type ShareSession } from '@/app/hooks/useLiveShare';
 import { getDeviceName, setDeviceName } from '@/app/lib/device';
@@ -16,21 +17,24 @@ import Badge from '@/components/ui/Badge';
 import EmptyState from '@/components/ui/EmptyState';
 
 const TYPE_ICON = { live: Tv, movie: Film, series: Layers } as const;
-const TYPE_LABEL = { live: 'Canal ao vivo', movie: 'Filme', series: 'Série' } as const;
+const TYPE_LABEL_KEY = { live: 'tv.channelLive', movie: 'tv.movie', series: 'tv.series' } as const;
 
-function formatElapsed(ms: number): string {
+type Translate = (key: string, vars?: Record<string, string | number>) => string;
+
+function formatElapsed(ms: number, t: Translate): string {
     const totalSeconds = Math.max(0, Math.floor(ms / 1000));
     const minutes = Math.floor(totalSeconds / 60);
     const seconds = totalSeconds % 60;
     if (minutes >= 60) {
         const hours = Math.floor(minutes / 60);
-        return `${hours}h ${minutes % 60}min`;
+        return t('tv.elapsedHours', { h: hours, m: minutes % 60 });
     }
-    if (minutes > 0) return `${minutes}min ${seconds}s`;
-    return `${seconds}s`;
+    if (minutes > 0) return t('tv.elapsedMinutes', { m: minutes, s: seconds });
+    return t('tv.elapsedSeconds', { s: seconds });
 }
 
 function DeviceNameEditor() {
+    const t = useT();
     const [name, setName] = useState(() => getDeviceName());
     const [editing, setEditing] = useState(false);
     const [draft, setDraft] = useState('');
@@ -59,7 +63,7 @@ function DeviceNameEditor() {
     if (editing) {
         return (
             <div className="flex items-end space-x-2">
-                <Field label="Este aparelho">
+                <Field label={t('tv.thisDevice')}>
                     <input
                         autoFocus
                         value={draft}
@@ -73,10 +77,10 @@ function DeviceNameEditor() {
                 <Button
                     icon={Check}
                     variant="secondary"
-                    aria-label="Salvar nome"
+                    aria-label={t('tv.saveName')}
                     onClick={save}
                 >
-                    Salvar
+                    {t('common.save')}
                 </Button>
             </div>
         );
@@ -84,14 +88,14 @@ function DeviceNameEditor() {
 
     return (
         <div className="flex items-center space-x-2 text-sm text-ink-2">
-            <span>Este aparelho:</span>
+            <span>{t('tv.thisDevice')}</span>
             <span className="text-ink font-semibold">{name}</span>
             <button
                 ref={editButtonRef}
                 onClick={() => { setDraft(name); setEditing(true); }}
                 data-focusable="true"
                 tabIndex={0}
-                aria-label="Editar nome do aparelho"
+                aria-label={t('tv.editName')}
                 className="p-1 text-ink-2 hover:text-ink"
             >
                 <Pencil size={16} />
@@ -111,11 +115,12 @@ function SessionCard({
     now: number;
     onSelect: (s: ShareSession) => void;
 }) {
+    const t = useT();
     const Icon = TYPE_ICON[session.contentType];
     // `updatedAt` is refreshed on every heartbeat (~20s), not the original broadcast
     // start — the backend (tvModeStore.ts) does not track a separate start timestamp.
     // It is still the closest available proxy for "how long it has been going".
-    const elapsed = formatElapsed(now - session.updatedAt);
+    const elapsed = formatElapsed(now - session.updatedAt, t);
 
     return (
         <button
@@ -135,17 +140,17 @@ function SessionCard({
                 </div>
                 <span className="absolute top-2 left-2">
                     <Badge tone="live" dot>
-                        {session.contentType === 'live' ? 'AO VIVO' : 'TRANSMITINDO'}
+                        {session.contentType === 'live' ? t('tv.live') : t('tv.broadcasting')}
                     </Badge>
                 </span>
             </div>
             <div className="p-3">
                 <p className="text-ink font-semibold truncate">{session.title}</p>
                 <p className="text-xs text-ink-2 mt-1 truncate">
-                    {TYPE_LABEL[session.contentType]} · {session.deviceName}
+                    {t(TYPE_LABEL_KEY[session.contentType])} · {session.deviceName}
                     {session.ip ? ` · ${session.ip}` : ''}
                 </p>
-                <p className="text-xs text-ink-3 mt-1 tnum">Há {elapsed}</p>
+                <p className="text-xs text-ink-3 mt-1 tnum">{t('tv.timeAgo', { time: elapsed })}</p>
             </div>
         </button>
     );
@@ -171,6 +176,7 @@ function SessionActionsDialog({
     onClose: () => void;
 }) {
     const [confirming, setConfirming] = useState(false);
+    const t = useT();
 
     // On a TV the remote's back button would otherwise leave the page with the dialog open.
     // Modal itself also registers onClose via useNavigationOverride; this override sits on
@@ -184,11 +190,11 @@ function SessionActionsDialog({
     );
 
     return (
-        <Modal isOpen onClose={onClose} title={session.title} description={`${TYPE_LABEL[session.contentType]} · ${session.deviceName}`} size="sm">
+        <Modal isOpen onClose={onClose} title={session.title} description={`${t(TYPE_LABEL_KEY[session.contentType])} · ${session.deviceName}`} size="sm">
             {confirming ? (
                 <div className="space-y-3">
                     <p className="text-sm text-ink-2">
-                        Encerrar esta transmissão? Todos os aparelhos assistindo serão desconectados.
+                        {t('tv.stopConfirm')}
                     </p>
                     <div className="space-y-3">
                         <Button
@@ -198,7 +204,7 @@ function SessionActionsDialog({
                             disabled={busy}
                             onClick={onStop}
                         >
-                            {busy ? 'Encerrando...' : 'Encerrar agora'}
+                            {busy ? t('tv.stopping') : t('tv.stopNow')}
                         </Button>
                         <Button
                             variant="secondary"
@@ -206,20 +212,20 @@ function SessionActionsDialog({
                             disabled={busy}
                             onClick={() => setConfirming(false)}
                         >
-                            Voltar
+                            {t('tv.back')}
                         </Button>
                     </div>
                 </div>
             ) : (
                 <div className="space-y-3">
                     <Button variant="primary" icon={Play} fullWidth onClick={onJoin}>
-                        Assistir
+                        {t('tv.watch')}
                     </Button>
                     <Button variant="danger" icon={PowerOff} fullWidth onClick={() => setConfirming(true)}>
-                        Encerrar transmissão
+                        {t('tv.stopBroadcast')}
                     </Button>
                     <Button variant="ghost" fullWidth onClick={onClose}>
-                        Cancelar
+                        {t('tv.cancel')}
                     </Button>
                 </div>
             )}
@@ -229,6 +235,7 @@ function SessionActionsDialog({
 
 export default function ModoTvPage() {
     const router = useRouter();
+    const t = useT();
     const { sessions, loading, refresh } = useLiveSessions(8000);
     const [selected, setSelected] = useState<ShareSession | null>(null);
     const [stopping, setStopping] = useState(false);
@@ -265,8 +272,8 @@ export default function ModoTvPage() {
         <div className="px-6 md:px-10 lg:px-14 pt-6 pb-10">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-8">
                 <SectionHeader
-                    title="Modo TV"
-                    description="Assista, sem gastar uma nova conexão, ao que outros aparelhos estão transmitindo agora. Para transmitir, ligue Transmitir ao assistir um canal."
+                    title={t('tv.title')}
+                    description={t('tv.description')}
                 />
                 <div className="mt-4 md:mt-0">
                     <DeviceNameEditor />
@@ -274,13 +281,13 @@ export default function ModoTvPage() {
             </div>
 
             {loading && visible.length === 0 ? (
-                <p className="text-ink-2 text-sm">Procurando transmissões...</p>
+                <p className="text-ink-2 text-sm">{t('tv.searching')}</p>
             ) : visible.length === 0 ? (
                 <EmptyState
                     icon={Radio}
-                    title="Nenhuma transmissão ativa"
-                    description='Ligue "Transmitir" em qualquer aparelho assistindo um canal para a sessão aparecer aqui.'
-                    action={<Button variant="ghost" onClick={refresh}>Atualizar</Button>}
+                    title={t('tv.noActiveTitle')}
+                    description={t('tv.noActiveDesc')}
+                    action={<Button variant="ghost" onClick={refresh}>{t('tv.refresh')}</Button>}
                 />
             ) : (
                 <CardGrid base={1} sm={2} lg={3} gap={4}>

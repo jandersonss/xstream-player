@@ -7,6 +7,7 @@ import { useAuth } from '@/app/context/AuthContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import type Hls from 'hls.js';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
+import { useT } from '@/app/context/I18nContext';
 import { ArrowLeft, Play, Calendar, Star, Clock, Subtitles, Download, Loader2, X, Search, Check } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
@@ -106,6 +107,7 @@ export default function WatchSeriesPage() {
         ensureConfigLoaded: ensureSubtitleConfigLoaded,
     } = useSubtitle();
     const { activeProfile } = useProfile();
+    const t = useT();
     const params = useParams();
     const router = useRouter();
     const seriesId = params.seriesId as string;
@@ -251,18 +253,18 @@ export default function WatchSeriesPage() {
                         setActiveSeason(seasons[0]);
                     }
                 } else {
-                    setError("Detalhes da série não encontrados.");
+                    setError(t('watch.seriesDetailsNotFound'));
                 }
             } catch (err) {
                 console.error(err);
-                setError("Falha ao carregar detalhes da série.");
+                setError(t('watch.seriesDetailsError'));
             } finally {
                 setLoading(false);
             }
         };
 
         loadSeriesInfo();
-    }, [credentials, seriesId, isJoining, getCachedDetail, saveCachedDetail]);
+    }, [credentials, seriesId, isJoining, getCachedDetail, saveCachedDetail, t]);
 
     // Resolve TMDB ID for better subtitle matching
     useEffect(() => {
@@ -561,7 +563,7 @@ export default function WatchSeriesPage() {
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {canSync && <SyncButton role="viewer" onClick={sync} />}
-                                <Badge tone="live" dot>Modo TV</Badge>
+                                <Badge tone="live" dot>{t('watch.tvMode')}</Badge>
                             </div>
                         }
                     />
@@ -576,10 +578,10 @@ export default function WatchSeriesPage() {
         return (
             <div className="min-h-screen bg-bg flex flex-col items-center justify-center">
                 <EmptyState
-                    title={error || 'Série não encontrada'}
+                    title={error || t('watch.seriesNotFound')}
                     action={
                         <Button variant="secondary" icon={ArrowLeft} onClick={() => router.back()}>
-                            Voltar
+                            {t('common.back')}
                         </Button>
                     }
                 />
@@ -689,7 +691,7 @@ export default function WatchSeriesPage() {
                                 {autoSubLoading && (
                                     <span className="flex items-center space-x-2 h-10 px-3 rounded-full bg-surface-2 text-ok text-sm">
                                         <Loader2 size={16} className="animate-spin" />
-                                        <span>Legenda…</span>
+                                        <span>{t('broadcast.subtitleShort')}</span>
                                     </span>
                                 )}
                                 {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}
@@ -747,7 +749,7 @@ export default function WatchSeriesPage() {
 
             <div className="relative z-10 px-6 md:px-10 lg:px-14 py-8">
                 <Button variant="ghost" icon={ArrowLeft} onClick={() => router.back()} className="mb-8">
-                    Voltar
+                    {t('common.back')}
                 </Button>
 
                 <div className="flex flex-col lg:flex-row space-y-10 lg:space-y-0 lg:space-x-16 items-start mb-14">
@@ -781,13 +783,13 @@ export default function WatchSeriesPage() {
                         </div>
 
                         <p className="text-sm md:text-base text-ink-2 leading-relaxed max-w-3xl">
-                            {series.info.plot || "Nenhuma sinopse disponível."}
+                            {series.info.plot || t('watch.noSynopsis')}
                         </p>
 
                         <div className="space-y-1 text-sm text-ink-2">
-                            {series.info.genre && <p><span className="text-ink font-medium">Gênero:</span> {series.info.genre}</p>}
-                            {series.info.cast && <p><span className="text-ink font-medium">Elenco:</span> {series.info.cast}</p>}
-                            {series.info.director && <p><span className="text-ink font-medium">Diretor:</span> {series.info.director}</p>}
+                            {series.info.genre && <p><span className="text-ink font-medium">{t('watch.genre')}</span> {series.info.genre}</p>}
+                            {series.info.cast && <p><span className="text-ink font-medium">{t('watch.cast')}</span> {series.info.cast}</p>}
+                            {series.info.director && <p><span className="text-ink font-medium">{t('watch.director')}</span> {series.info.director}</p>}
                         </div>
 
                         <div className="flex items-center space-x-3">
@@ -811,11 +813,11 @@ export default function WatchSeriesPage() {
                         <div className="flex items-center justify-between mb-2">
                             <h2 className="text-sm font-semibold text-ink flex items-center">
                                 <Subtitles size={15} className="mr-2 text-ink-3 flex-shrink-0" />
-                                Legendas da série
+                                {t('watch.seriesSubtitles')}
                             </h2>
                             {subtitlesConfigured && remainingDownloads !== null && (
                                 <Badge tone={remainingDownloads <= 0 ? 'warn' : 'ok'}>
-                                    <span className="tnum">{remainingDownloads}</span> restante{remainingDownloads === 1 ? '' : 's'} hoje
+                                    {t(remainingDownloads === 1 ? 'watch.remainingTodayOne' : 'watch.remainingTodayOther', { n: remainingDownloads })}
                                 </Badge>
                             )}
                         </div>
@@ -828,7 +830,7 @@ export default function WatchSeriesPage() {
                                way on a TV as in a browser — no separate path needed for either. */
                             <div className="flex flex-wrap items-center justify-between">
                                 <p className="text-xs text-ink-2 mr-3">
-                                    Configure o OpenSubtitles em Ajustes para buscar e baixar legendas.
+                                    {t('watch.configureOpenSubtitles')}
                                 </p>
                                 <Link
                                     href="/dashboard/settings#legendas"
@@ -836,21 +838,21 @@ export default function WatchSeriesPage() {
                                     tabIndex={0}
                                     className="inline-flex items-center h-9 px-3 rounded-lg bg-surface-3 text-ink text-sm font-medium flex-shrink-0"
                                 >
-                                    Abrir Ajustes
+                                    {t('watch.openSettings')}
                                 </Link>
                             </div>
                         ) : (
                             <>
                                 {seriesHasSubs && (
                                     <p className="text-xs text-ink-2 mb-2">
-                                        Episódio sem legenda baixa uma automaticamente ao abrir (consome a cota diária).
+                                        {t('watch.autoDownloadNote')}
                                     </p>
                                 )}
 
                                 {/* flex gap needs Chrome 84+ (WebOS TVs lack it): child m-1.5 emulates gap-3 */}
                                 <div className="flex flex-wrap items-end">
                                     <div className="w-full sm:w-48 m-1.5">
-                                        <Field label="Idioma">
+                                        <Field label={t('watch.language')}>
                                             <select
                                                 value={batchLanguage}
                                                 onChange={(e) => setBatchLanguage(e.target.value)}
@@ -873,16 +875,16 @@ export default function WatchSeriesPage() {
                                                 icon={X}
                                                 onClick={() => { batchCancelRef.current = true; }}
                                             >
-                                                Cancelar
+                                                {t('watch.cancel')}
                                             </Button>
                                         ) : (
                                             <>
                                                 <Button variant="secondary" icon={Search} onClick={handleBatchSearch}>
-                                                    Buscar legendas
+                                                    {t('watch.searchSubtitles')}
                                                 </Button>
                                                 {availableCount > 0 && (
                                                     <Button variant="secondary" icon={Download} onClick={handleBatchDownload}>
-                                                        Baixar {availableCount} legenda{availableCount > 1 ? 's' : ''}
+                                                        {t(availableCount === 1 ? 'watch.downloadSubtitlesOne' : 'watch.downloadSubtitlesOther', { n: availableCount })}
                                                     </Button>
                                                 )}
                                             </>
@@ -893,17 +895,19 @@ export default function WatchSeriesPage() {
                                         <div className="m-1.5 flex items-center space-x-2 text-xs text-ink-2 tnum ml-auto">
                                             {isBatchBusy && <Loader2 size={14} className="animate-spin" />}
                                             <span>
-                                                {batch.phase === 'searching' && `Buscando ${batch.done}/${batch.total}…`}
-                                                {batch.phase === 'downloading' && `Baixando ${batch.done}/${batch.total}…`}
+                                                {batch.phase === 'searching' && t('watch.batchSearching', { done: batch.done, total: batch.total })}
+                                                {batch.phase === 'downloading' && t('watch.batchDownloading', { done: batch.done, total: batch.total })}
                                                 {batch.phase === 'searched' && (
                                                     availableCount > 0
-                                                        ? `${availableCount} disponível(is) · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
-                                                        : `Nenhuma legenda nova encontrada · ${downloadedCount} já baixada(s) · ${unavailableCount} sem legenda`
+                                                        ? t('watch.batchSearchedAvailable', { available: availableCount, downloaded: downloadedCount, unavailable: unavailableCount })
+                                                        : t('watch.batchSearchedNone', { downloaded: downloadedCount, unavailable: unavailableCount })
                                                 )}
                                                 {batch.phase === 'done' && (
                                                     batch.quotaHit
-                                                        ? `Cota diária atingida. ${batch.downloadedNow} baixada(s) — o resto continua amanhã.`
-                                                        : `Concluído: ${batch.downloadedNow} baixada(s)${batch.failed > 0 ? ` · ${batch.failed} falharam` : ''}.`
+                                                        ? t('watch.batchDoneQuota', { n: batch.downloadedNow })
+                                                        : batch.failed > 0
+                                                            ? t('watch.batchDoneOkFailed', { n: batch.downloadedNow, failed: batch.failed })
+                                                            : t('watch.batchDoneOk', { n: batch.downloadedNow })
                                                 )}
                                             </span>
                                         </div>
@@ -927,7 +931,7 @@ export default function WatchSeriesPage() {
                                     activeSeason === season ? 'bg-ink text-bg' : 'bg-surface-2 text-ink-2 border border-line',
                                 ].join(' ')}
                             >
-                                Temporada {season}
+                                {t('watch.season', { n: season })}
                             </button>
                         ))}
                     </div>
@@ -995,13 +999,13 @@ export default function WatchSeriesPage() {
                                                 )}
                                                 <div className="flex items-center mt-2">
                                                     {status === 'downloaded' && (
-                                                        <Badge tone="ok"><Check size={12} className="mr-1" /> Legenda</Badge>
+                                                        <Badge tone="ok"><Check size={12} className="mr-1" /> {t('watch.subtitleBadge')}</Badge>
                                                     )}
                                                     {status === 'available' && (
-                                                        <Badge>Disponível</Badge>
+                                                        <Badge>{t('watch.available')}</Badge>
                                                     )}
                                                     {status === 'unavailable' && (
-                                                        <Badge>Sem legenda</Badge>
+                                                        <Badge>{t('watch.unavailable')}</Badge>
                                                     )}
                                                 </div>
                                             </div>
@@ -1009,7 +1013,7 @@ export default function WatchSeriesPage() {
 
                                         <IconButton
                                             icon={Subtitles}
-                                            label="Buscar legenda deste episódio"
+                                            label={t('watch.searchEpisodeSubtitle')}
                                             variant="secondary"
                                             className="ml-3 flex-shrink-0 focus-flat"
                                             onClick={() => {
@@ -1037,7 +1041,7 @@ export default function WatchSeriesPage() {
                             );
                         })}
                         {currentEpisodes.length === 0 && (
-                            <EmptyState compact title="Nenhum episódio encontrado para esta temporada." />
+                            <EmptyState compact title={t('watch.noEpisodes')} />
                         )}
                     </div>
                 </div>

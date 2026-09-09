@@ -1,7 +1,7 @@
 'use client';
 
-import { SORT_LABELS } from '@/app/lib/catalogSort';
 import type { SortOption } from '@/app/lib/catalogSort';
+import { useT } from '@/app/context/I18nContext';
 
 // Re-exported so existing consumers (e.g. `useSortPreference`) that import the
 // type from this file keep working without reaching into `catalogSort` directly.
@@ -15,6 +15,7 @@ export interface SortControlsProps {
 }
 
 export default function SortControls({ value, onChange, options }: SortControlsProps) {
+    const t = useT();
     // `mr-2 mb-2` on each button emulates flex spacing without the `gap` utility (Chrome 84+, unavailable on webOS 4).
     return (
         <div className="flex flex-wrap items-center">
@@ -42,7 +43,7 @@ export default function SortControls({ value, onChange, options }: SortControlsP
                                 : 'border-line text-ink-2 bg-surface-2',
                         ].join(' ')}
                     >
-                        {SORT_LABELS[option]}
+                        {t(`catalog.sort.${option}`)}
                     </button>
                 );
             })}

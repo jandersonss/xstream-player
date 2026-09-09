@@ -3,6 +3,7 @@
 import { useRouter } from 'next/navigation';
 import { Bookmark, Trash2 } from 'lucide-react';
 import { useFavorites, type FavoriteItem } from '@/app/context/FavoritesContext';
+import { useT } from '@/app/context/I18nContext';
 import CardGrid from '@/components/CardGrid';
 import SectionHeader from '@/components/ui/SectionHeader';
 import EmptyState from '@/components/ui/EmptyState';
@@ -25,6 +26,7 @@ interface FavoritesSectionProps {
 }
 
 function FavoritesSection({ title, items, emptyMessage, onRemove }: FavoritesSectionProps) {
+    const t = useT();
     return (
         <div className="space-y-3">
             <SectionHeader title={title} count={items.length} />
@@ -47,7 +49,7 @@ function FavoritesSection({ title, items, emptyMessage, onRemove }: FavoritesSec
                             <div className="mt-1 flex justify-end">
                                 <IconButton
                                     icon={Trash2}
-                                    label="Remover dos favoritos"
+                                    label={t('favorites.removeFromList')}
                                     size="sm"
                                     onClick={() => onRemove(item)}
                                 />
@@ -62,6 +64,7 @@ function FavoritesSection({ title, items, emptyMessage, onRemove }: FavoritesSec
 
 export default function FavoritesPage() {
     const router = useRouter();
+    const t = useT();
     const { favorites, removeFavorite, isLoaded } = useFavorites();
 
     const liveItems = favorites.filter((f) => f.type === 'live');
@@ -73,8 +76,8 @@ export default function FavoritesPage() {
     return (
         <div className="p-4 md:p-6 lg:p-10 space-y-10">
             <div>
-                <h1 className="text-2xl md:text-3xl font-semibold text-ink tracking-tight">Minha lista</h1>
-                <p className="text-ink-2 text-sm md:text-base mt-1">Sua coleção personalizada de conteúdo.</p>
+                <h1 className="text-2xl md:text-3xl font-semibold text-ink tracking-tight">{t('favorites.title')}</h1>
+                <p className="text-ink-2 text-sm md:text-base mt-1">{t('favorites.subtitle')}</p>
             </div>
 
             {!isLoaded ? (
@@ -88,28 +91,28 @@ export default function FavoritesPage() {
             ) : favorites.length === 0 ? (
                 <EmptyState
                     icon={Bookmark}
-                    title="Sua lista ainda está vazia."
-                    description="Explore o conteúdo para adicionar alguns!"
-                    action={<Button onClick={() => router.push('/dashboard/search')}>Explorar catálogo</Button>}
+                    title={t('favorites.emptyTitle')}
+                    description={t('favorites.emptyDescription')}
+                    action={<Button onClick={() => router.push('/dashboard/search')}>{t('favorites.browseCatalog')}</Button>}
                 />
             ) : (
                 <>
                     <FavoritesSection
-                        title="TV ao vivo"
+                        title={t('favorites.liveSection')}
                         items={liveItems}
-                        emptyMessage="Nenhum canal na lista."
+                        emptyMessage={t('favorites.noChannels')}
                         onRemove={handleRemove}
                     />
                     <FavoritesSection
-                        title="Filmes"
+                        title={t('favorites.moviesSection')}
                         items={movieItems}
-                        emptyMessage="Nenhum filme na lista."
+                        emptyMessage={t('favorites.noMovies')}
                         onRemove={handleRemove}
                     />
                     <FavoritesSection
-                        title="Séries"
+                        title={t('favorites.seriesSection')}
                         items={seriesItems}
-                        emptyMessage="Nenhuma série na lista."
+                        emptyMessage={t('favorites.noSeries')}
                         onRemove={handleRemove}
                     />
                 </>

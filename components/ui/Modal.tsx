@@ -3,6 +3,7 @@
 import React, { useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 import { useNavigationOverride } from '@/app/context/NavigationContext';
+import { useT } from '@/app/context/I18nContext';
 import IconButton from './IconButton';
 
 export interface ModalProps {
@@ -30,6 +31,7 @@ export default function Modal({
     footer,
     size = 'md',
 }: ModalProps) {
+    const t = useT();
     const cardRef = useRef<HTMLDivElement>(null);
     // Whatever opened the modal (a poster, an icon button…) — restored on
     // close so the D-pad cursor doesn't fall back to `body` and jump to the
@@ -97,7 +99,7 @@ export default function Modal({
                         <h2 className="text-lg md:text-xl font-semibold text-ink">{title}</h2>
                         {description && <p className="text-xs md:text-sm text-ink-2 mt-1">{description}</p>}
                     </div>
-                    <IconButton icon={X} label="Fechar" onClick={onClose} className="focus-flat" />
+                    <IconButton icon={X} label={t('modal.close')} onClick={onClose} className="focus-flat" />
                 </div>
 
                 {children}

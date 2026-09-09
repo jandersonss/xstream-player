@@ -17,32 +17,35 @@ import {
 } from 'lucide-react';
 import { useData } from '@/app/context/DataContext';
 import { useProfile } from '@/app/context/ProfileContext';
+import { useT } from '@/app/context/I18nContext';
 import ProfileModal from './ProfileModal';
 
 interface NavItem {
-    name: string;
+    /** i18n key under `nav`. */
+    labelKey: string;
     icon: typeof Home;
     path: string;
 }
 
 const CONTENT_ITEMS: NavItem[] = [
-    { name: 'Início', icon: Home, path: '/dashboard' },
-    { name: 'Buscar', icon: Search, path: '/dashboard/search' },
-    { name: 'Minha lista', icon: Bookmark, path: '/dashboard/favorites' },
-    { name: 'Ao vivo', icon: Tv, path: '/dashboard/live' },
-    { name: 'Filmes', icon: Film, path: '/dashboard/movies' },
-    { name: 'Séries', icon: Layers, path: '/dashboard/series' },
+    { labelKey: 'home', icon: Home, path: '/dashboard' },
+    { labelKey: 'search', icon: Search, path: '/dashboard/search' },
+    { labelKey: 'myList', icon: Bookmark, path: '/dashboard/favorites' },
+    { labelKey: 'live', icon: Tv, path: '/dashboard/live' },
+    { labelKey: 'movies', icon: Film, path: '/dashboard/movies' },
+    { labelKey: 'series', icon: Layers, path: '/dashboard/series' },
 ];
 
 const SYSTEM_ITEMS: NavItem[] = [
-    { name: 'Modo TV', icon: Radio, path: '/dashboard/tv' },
-    { name: 'Aparelhos', icon: MonitorSmartphone, path: '/dashboard/devices' },
-    { name: 'Ajustes', icon: Settings, path: '/dashboard/settings' },
+    { labelKey: 'tvMode', icon: Radio, path: '/dashboard/tv' },
+    { labelKey: 'devices', icon: MonitorSmartphone, path: '/dashboard/devices' },
+    { labelKey: 'settings', icon: Settings, path: '/dashboard/settings' },
 ];
 
 /** Content-only navigation rail — administrative controls live in Ajustes now. */
 export default function NavRail() {
     const pathname = usePathname();
+    const t = useT();
     const { isSyncing, syncProgress } = useData();
     const { activeProfile } = useProfile();
     const [showProfileModal, setShowProfileModal] = useState(false);
@@ -63,6 +66,7 @@ export default function NavRail() {
     const renderItem = (item: NavItem) => {
         const active = isActive(item.path);
         const Icon = item.icon;
+        const name = t(`nav.${item.labelKey}`);
 
         return (
             <Link
@@ -77,7 +81,7 @@ export default function NavRail() {
             >
                 {active && <span className="absolute left-0 top-0 bottom-0 w-[3px] bg-ink" />}
                 <Icon size={22} className="flex-shrink-0" />
-                {isExpanded && <span className="ml-3 text-sm truncate">{item.name}</span>}
+                {isExpanded && <span className="ml-3 text-sm truncate">{name}</span>}
             </Link>
         );
     };
@@ -110,14 +114,14 @@ export default function NavRail() {
                     onClick={() => setShowProfileModal(true)}
                     data-focusable="true"
                     tabIndex={0}
-                    title="Trocar perfil"
+                    title={t('nav.switchProfile')}
                     className="w-full flex items-center px-3 py-2 rounded-lg text-ink-2 hover:text-ink"
                 >
                     <span className="w-8 h-8 flex-shrink-0 rounded-lg bg-surface-2 flex items-center justify-center text-ink text-xs font-bold uppercase">
                         {activeProfile?.name?.charAt(0) ?? <User size={16} />}
                     </span>
                     {isExpanded && (
-                        <span className="ml-3 text-sm text-ink truncate">{activeProfile?.name ?? 'Perfil'}</span>
+                        <span className="ml-3 text-sm text-ink truncate">{activeProfile?.name ?? t('nav.profileFallback')}</span>
                     )}
                 </button>
             </div>

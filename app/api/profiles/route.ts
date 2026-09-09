@@ -1,5 +1,6 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { enforceApiAccess } from '@/app/lib/apiAuth';
+import { translateForRequest } from '@/app/lib/i18n';
 import { listProfiles, createProfile, updateProfile, deleteProfile, ProfilePrefs } from '@/app/lib/userStore';
 
 export const runtime = 'nodejs';
@@ -26,7 +27,7 @@ export async function GET(request: Request) {
     }
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
     const accessResponse = await enforceApiAccess(request);
     if (accessResponse) return accessResponse;
 
@@ -37,33 +38,33 @@ export async function POST(request: Request) {
             case 'create': {
                 const name = body.name?.trim();
                 if (!name) {
-                    return NextResponse.json({ error: 'Nome do perfil é obrigatório' }, { status: 400 });
+                    return NextResponse.json({ error: translateForRequest(request, 'serverErrors.profileNameRequired') }, { status: 400 });
                 }
                 return NextResponse.json({ data: createProfile(name) });
             }
 
             case 'update': {
                 if (!body.id) {
-                    return NextResponse.json({ error: 'ID do perfil é obrigatório' }, { status: 400 });
+                    return NextResponse.json({ error: translateForRequest(request, 'serverErrors.profileIdRequired') }, { status: 400 });
                 }
                 const name = body.name?.trim();
                 if (body.name !== undefined && !name) {
-                    return NextResponse.json({ error: 'Nome do perfil é obrigatório' }, { status: 400 });
+                    return NextResponse.json({ error: translateForRequest(request, 'serverErrors.profileNameRequired') }, { status: 400 });
                 }
                 const profile = updateProfile(body.id, { name, prefs: body.prefs });
                 if (!profile) {
-                    return NextResponse.json({ error: 'Perfil não encontrado' }, { status: 404 });
+                    return NextResponse.json({ error: translateForRequest(request, 'serverErrors.profileNotFound') }, { status: 404 });
                 }
                 return NextResponse.json({ data: profile });
             }
 
             case 'delete': {
                 if (!body.id) {
-                    return NextResponse.json({ error: 'ID do perfil é obrigatório' }, { status: 400 });
+                    return NextResponse.json({ error: translateForRequest(request, 'serverErrors.profileIdRequired') }, { status: 400 });
                 }
                 if (!deleteProfile(body.id)) {
                     return NextResponse.json(
-                        { error: 'Não é possível excluir o último perfil' },
+                        { error: translateForRequest(request, 'serverErrors.cannotDeleteLastProfile') },
                         { status: 400 }
                     );
                 }

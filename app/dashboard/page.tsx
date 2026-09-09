@@ -3,6 +3,7 @@
 import { useData } from '../context/DataContext';
 import { useWatchProgress } from '../context/WatchProgressContext';
 import { useTMDb } from '../context/TMDbContext';
+import { useT } from '../context/I18nContext';
 import { useRouter } from 'next/navigation';
 import { useEffect, useState, useMemo, useRef } from 'react';
 import { apiFetch } from '@/app/lib/apiClient';
@@ -30,6 +31,7 @@ interface CarouselData {
 }
 
 export default function Dashboard() {
+    const t = useT();
     const { lastSync } = useData();
     const { progressMap } = useWatchProgress();
     // Kept only as an effect dependency: carousels can include TMDb-sourced
@@ -124,7 +126,7 @@ export default function Dashboard() {
                 <HomeShortcuts />
 
                 {continueWatching.length > 0 && (
-                    <Row title="Continuar assistindo" itemWidth="wide">
+                    <Row title={t('home.continueWatching')} itemWidth="wide">
                         {continueWatching.map(item => (
                             <Poster
                                 key={`${item.id}`}
@@ -180,7 +182,7 @@ export default function Dashboard() {
                             onClick={() => setVisibleCarouselCount(prev => Math.min(prev + CAROUSEL_BATCH_SIZE, carouselData.length))}
                             className="px-4 py-2 text-sm text-ink-2 hover:text-ink border border-line rounded-lg"
                         >
-                            Carregar mais categorias
+                            {t('home.loadMoreCategories')}
                         </button>
                     </div>
                 )}

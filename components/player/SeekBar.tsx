@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
+import { useT } from '@/app/context/I18nContext';
 
 export interface SeekBarProps {
     currentTime: number;
@@ -17,6 +18,7 @@ export default function SeekBar({ currentTime, duration, bufferedPercent, disabl
     // The track thickens on focus so it stays legible from a couch without
     // being visually noisy the rest of the time.
     const [focused, setFocused] = useState(false);
+    const t = useT();
 
     return (
         <div className="mb-1">
@@ -57,7 +59,7 @@ export default function SeekBar({ currentTime, duration, bufferedPercent, disabl
                             [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5
                             [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-ink
                             [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-none"
-                            aria-label="Progresso do vídeo"
+                            aria-label={t('player.videoProgress')}
                         />
                     </>
                 )}

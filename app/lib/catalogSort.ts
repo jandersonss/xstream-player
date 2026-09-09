@@ -3,12 +3,8 @@ import type { CatalogItem } from './catalogItem';
 
 export type SortOption = 'name-asc' | 'name-desc' | 'added' | 'year';
 
-export const SORT_LABELS: Record<SortOption, string> = {
-    'name-asc': 'A-Z',
-    'name-desc': 'Z-A',
-    added: 'Adicionados',
-    year: 'Ano',
-};
+// User-facing labels live in the i18n dictionaries under `catalog.sort.<option>`
+// and are resolved by `components/SortControls.tsx`.
 
 function compareNames(a: string, b: string): number {
     return a.localeCompare(b, 'pt-BR', { sensitivity: 'base' });

@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { Radio, Play, RotateCcw, Minus, Plus } from 'lucide-react';
+import { useT } from '@/app/context/I18nContext';
 import Modal from '@/components/ui/Modal';
 import Button from '@/components/ui/Button';
 import IconButton from '@/components/ui/IconButton';
@@ -43,6 +44,7 @@ export default function BroadcastStartModal({
     onCancel,
     onConfirm,
 }: BroadcastStartModalProps) {
+    const t = useT();
     const maxSeconds = duration && duration > END_MARGIN_S ? duration - END_MARGIN_S : undefined;
     const [seconds, setSeconds] = useState(() => (resumeTime > 0 ? Math.floor(resumeTime) : 0));
 
@@ -63,13 +65,13 @@ export default function BroadcastStartModal({
         <Modal
             isOpen
             onClose={onCancel}
-            title="De onde começar a transmitir"
-            description="Quem entrar depois pega a transmissão no ponto em que ela estiver, como um canal."
+            title={t('broadcast.startModal.title')}
+            description={t('broadcast.startModal.description')}
             size="sm"
             footer={
                 <div className="flex justify-end space-x-3">
-                    <Button variant="ghost" onClick={onCancel}>Cancelar</Button>
-                    <Button variant="primary" icon={Radio} onClick={() => onConfirm(seconds)}>Transmitir</Button>
+                    <Button variant="ghost" onClick={onCancel}>{t('broadcast.startModal.cancel')}</Button>
+                    <Button variant="primary" icon={Radio} onClick={() => onConfirm(seconds)}>{t('broadcast.startModal.broadcast')}</Button>
                 </div>
             }
         >
@@ -81,7 +83,7 @@ export default function BroadcastStartModal({
                     className={`justify-start ${optionClassName(isAtStart)}`}
                     onClick={() => setSeconds(0)}
                 >
-                    Do início
+                    {t('broadcast.startModal.fromStart')}
                 </Button>
 
                 {hasResume && (
@@ -92,24 +94,24 @@ export default function BroadcastStartModal({
                         className={`justify-start ${optionClassName(isAtResume)}`}
                         onClick={() => setSeconds(Math.floor(resumeTime))}
                     >
-                        De onde parei · {formatTime(resumeTime)}
+                        {t('broadcast.startModal.fromResume', { time: formatTime(resumeTime) })}
                     </Button>
                 )}
             </div>
 
             <div className="mt-4">
-                <p className="text-xs text-ink-2 mb-2">Ajustar ponto</p>
+                <p className="text-xs text-ink-2 mb-2">{t('broadcast.startModal.adjustPoint')}</p>
                 <div className="flex items-center justify-between bg-surface rounded-lg p-2">
                     <div className="flex items-center space-x-1">
                         <Button
                             variant="ghost"
                             size="sm"
-                            aria-label="Voltar 5 minutos"
+                            aria-label={t('broadcast.startModal.back5Label')}
                             onClick={() => step(-5)}
                         >
-                            −5m
+                            {t('broadcast.startModal.back5')}
                         </Button>
-                        <IconButton icon={Minus} label="Voltar 1 minuto" onClick={() => step(-1)} />
+                        <IconButton icon={Minus} label={t('broadcast.startModal.back1Label')} onClick={() => step(-1)} />
                     </div>
 
                     <span className="text-lg font-semibold text-ink tnum px-2">
@@ -117,19 +119,19 @@ export default function BroadcastStartModal({
                     </span>
 
                     <div className="flex items-center space-x-1">
-                        <IconButton icon={Plus} label="Avançar 1 minuto" onClick={() => step(1)} />
+                        <IconButton icon={Plus} label={t('broadcast.startModal.forward1Label')} onClick={() => step(1)} />
                         <Button
                             variant="ghost"
                             size="sm"
-                            aria-label="Avançar 5 minutos"
+                            aria-label={t('broadcast.startModal.forward5Label')}
                             onClick={() => step(5)}
                         >
-                            +5m
+                            {t('broadcast.startModal.forward5')}
                         </Button>
                     </div>
                 </div>
                 <p className="text-xs text-ink-3 mt-2">
-                    A transmissão começa no keyframe mais próximo, alguns segundos antes do ponto escolhido.
+                    {t('broadcast.startModal.keyframeNote')}
                 </p>
             </div>
         </Modal>

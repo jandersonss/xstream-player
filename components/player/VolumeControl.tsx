@@ -2,6 +2,7 @@
 
 import React, { useRef, useState } from 'react';
 import { Volume2, VolumeX } from 'lucide-react';
+import { useT } from '@/app/context/I18nContext';
 import IconButton from '@/components/ui/IconButton';
 
 export interface VolumeControlProps {
@@ -15,6 +16,7 @@ export default function VolumeControl({ volume, muted, onToggleMute, onVolumeCha
     // Visible on hover (desktop) or while the button/slider itself holds focus
     // (D-pad) — no longer hover-only, which made it unreachable on a TV (D6).
     const [visible, setVisible] = useState(false);
+    const t = useT();
     const containerRef = useRef<HTMLDivElement>(null);
     const volumePercent = Math.round(volume * 100);
 
@@ -47,7 +49,7 @@ export default function VolumeControl({ volume, muted, onToggleMute, onVolumeCha
         >
             <IconButton
                 icon={muted || volume === 0 ? VolumeX : Volume2}
-                label={muted ? 'Ativar som' : 'Silenciar'}
+                label={muted ? t('player.unmute') : t('player.mute')}
                 onClick={onToggleMute}
                 onFocus={() => setVisible(true)}
                 onBlur={handleBlur}
@@ -77,7 +79,7 @@ export default function VolumeControl({ volume, muted, onToggleMute, onVolumeCha
                             [&::-moz-range-thumb]:w-3.5 [&::-moz-range-thumb]:h-3.5
                             [&::-moz-range-thumb]:rounded-full [&::-moz-range-thumb]:bg-ink
                             [&::-moz-range-thumb]:cursor-pointer [&::-moz-range-thumb]:border-none"
-                            aria-label="Controle de volume"
+                            aria-label={t('player.volumeControl')}
                         />
                     </div>
                 </div>
