@@ -15,7 +15,17 @@ const DEVICE_TOKEN_KEY = 'xstream_device_token';
 /** Mirrors the `xstream_profile` cookie for origins where cookies are unavailable. */
 const PROFILE_KEY = 'xstream_profile';
 
+/** Fired when the stored device token was rejected as invalid/revoked and cleared. */
 export const UNAUTHORIZED_EVENT = 'xstream:unauthorized';
+/**
+ * Fired on a 401 that is NOT the device token's fault (an expired remote-access cookie).
+ * The token is kept; a listener can silently re-run `/api/devices/session?token=…` to
+ * mint a fresh session cookie instead of dropping the TV back to the pairing screen.
+ */
+export const SESSION_EXPIRED_EVENT = 'xstream:session-expired';
+/** Server marker (see app/lib/apiAuth.ts) that a 401 means the device token itself is bad. */
+const DEVICE_AUTH_HEADER = 'X-Xstream-Device-Auth';
+const DEVICE_AUTH_INVALID = 'invalid';
 
 function readStored(key: string): string | null {
     if (typeof window === 'undefined') return null;
@@ -154,12 +164,15 @@ export function apiFetch(path: string, init?: RequestInit): Promise<Response> {
     }
 
     return fetch(apiUrl(path), request).then((response) => {
-        // Only a device token can be invalidated server-side; the web app's 401s
-        // come from the remote-access gate and must keep their current handling.
-        if (response.status === 401 && token) {
-            setDeviceToken(null);
-            if (typeof window !== 'undefined') {
+        if (response.status === 401 && token && typeof window !== 'undefined') {
+            // A 401 only means "re-pair" when the server marks the device token itself
+            // as bad. A bare 401 is the remote-access cookie expiring — recoverable by
+            // re-minting the session, so the token must survive it.
+            if (response.headers.get(DEVICE_AUTH_HEADER) === DEVICE_AUTH_INVALID) {
+                setDeviceToken(null);
                 window.dispatchEvent(new Event(UNAUTHORIZED_EVENT));
+            } else {
+                window.dispatchEvent(new Event(SESSION_EXPIRED_EVENT));
             }
         }
         return response;

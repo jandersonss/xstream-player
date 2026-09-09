@@ -6,7 +6,7 @@ import {
     getRemoteAccessPinHash,
     getRequestHost,
     REMOTE_ACCESS_COOKIE_NAME,
-    REMOTE_ACCESS_SESSION_SECONDS
+    REMOTE_ACCESS_DEVICE_SESSION_SECONDS
 } from '@/app/lib/remoteAccess';
 import { authenticateToken, revokeDevice } from '@/app/lib/deviceStore';
 import { PROFILE_COOKIE_NAME } from '@/app/lib/userStore';
@@ -58,19 +58,19 @@ export async function GET(request: Request) {
 
         // The remote-access session is signed with the PIN hash: with no PIN configured
         // there is nothing to sign, and the gate is not active either, so skip it.
-        // The session lasts REMOTE_ACCESS_SESSION_SECONDS (3h); the TV renews it by
-        // coming back through this route whenever a request answers 401.
+        // The session lasts a year (REMOTE_ACCESS_DEVICE_SESSION_SECONDS); the TV can still
+        // renew it by coming back through this route whenever a request answers 401.
         const pinHash = await getRemoteAccessPinHash();
 
         if (pinHash) {
             response.cookies.set({
                 name: REMOTE_ACCESS_COOKIE_NAME,
-                value: createRemoteAccessSession(pinHash),
+                value: createRemoteAccessSession(pinHash, REMOTE_ACCESS_DEVICE_SESSION_SECONDS),
                 httpOnly: true,
                 sameSite: 'lax',
                 secure: isSecureRequest(request),
                 path: '/',
-                maxAge: REMOTE_ACCESS_SESSION_SECONDS
+                maxAge: REMOTE_ACCESS_DEVICE_SESSION_SECONDS
             });
         }
 

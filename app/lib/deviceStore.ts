@@ -83,6 +83,8 @@ interface DeviceRow {
     platform: DevicePlatform;
     token_hash: string;
     profile_id: string | null;
+    /** Stable client-generated id (localStorage `xstream_device_id`), when the client sent one. */
+    client_id: string | null;
     created_at: number;
     last_seen_at: number;
     revoked_at: number | null;
@@ -93,6 +95,7 @@ interface PairingRow {
     pairing_id: string;
     device_name: string;
     platform: DevicePlatform;
+    client_id: string | null;
     expires_at: number;
     approved_device_id: string | null;
     approved_token: string | null;
@@ -131,7 +134,19 @@ function getConnection(): Database.Database {
         );
     `);
 
+    // `client_id` was added later, to dedupe a TV that re-pairs against its old row.
+    // Idempotent so an existing devices.sqlite is upgraded in place, not recreated.
+    addColumnIfMissing(sqlite, 'devices', 'client_id', 'TEXT');
+    addColumnIfMissing(sqlite, 'pairing_codes', 'client_id', 'TEXT');
+
     return sqlite;
+}
+
+function addColumnIfMissing(db: Database.Database, table: string, column: string, definition: string): void {
+    const columns = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[];
+    if (!columns.some((c) => c.name === column)) {
+        db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+    }
 }
 
 // --- Hashing (same format as the remote-access PIN, kept local so this store owns its secrets) ---
@@ -231,25 +246,30 @@ function prunePairings(db: Database.Database, now: number): void {
 // --- Pairing ---
 
 /** Creates a pairing request for a TV waiting on the "type this code" screen. */
-export function createPairingCode(deviceName: string, platform: DevicePlatform): PairingRequest {
+export function createPairingCode(
+    deviceName: string,
+    platform: DevicePlatform,
+    clientId?: string | null
+): PairingRequest {
     const db = getConnection();
     const now = Date.now();
     const expiresAt = now + PAIRING_TTL_MS;
     const pairingId = crypto.randomUUID();
+    const normalizedClientId = clientId?.trim() || null;
 
     return db.transaction(() => {
         prunePairings(db, now);
 
         const insert = db.prepare(
-            `INSERT INTO pairing_codes (code, pairing_id, device_name, platform, expires_at)
-             VALUES (?, ?, ?, ?, ?)`
+            `INSERT INTO pairing_codes (code, pairing_id, device_name, platform, client_id, expires_at)
+             VALUES (?, ?, ?, ?, ?, ?)`
         );
 
         for (let attempt = 0; attempt < CODE_ATTEMPTS; attempt += 1) {
             const code = generateCode();
 
             try {
-                insert.run(code, pairingId, deviceName, platform, expiresAt);
+                insert.run(code, pairingId, deviceName, platform, normalizedClientId, expiresAt);
                 return { code, pairingId, expiresAt };
             } catch {
                 // Code already taken by another live pairing: draw another one.
@@ -331,20 +351,46 @@ export function approvePairingCode(code: string, name?: string, profileId?: stri
 
         const deviceId = crypto.randomUUID();
         const token = generateToken(deviceId);
+        const resolvedName = name?.trim() || row.device_name;
+
+        // Dedupe a re-pairing TV: the same physical device that pairs again would
+        // otherwise leave its old row behind forever, filling the list with ghosts.
+        // Exact match when the client sent a stable id; otherwise a best-effort
+        // heuristic on platform + name (the only other identity signal we have).
+        const superseded = row.client_id
+            ? (db
+                .prepare('SELECT id FROM devices WHERE revoked_at IS NULL AND client_id = ?')
+                .all(row.client_id) as { id: string }[])
+            : (db
+                .prepare(
+                    `SELECT id FROM devices
+                     WHERE revoked_at IS NULL AND client_id IS NULL
+                       AND platform = ? AND lower(trim(name)) = lower(trim(?))`
+                )
+                .all(row.platform, resolvedName) as { id: string }[]);
+
+        for (const stale of superseded) {
+            db.prepare('UPDATE devices SET revoked_at = ? WHERE id = ?').run(now, stale.id);
+            for (const [key, entry] of tokenCache) {
+                if (entry.deviceId === stale.id) tokenCache.delete(key);
+            }
+        }
+
         const deviceRow: DeviceRow = {
             id: deviceId,
-            name: name?.trim() || row.device_name,
+            name: resolvedName,
             platform: row.platform,
             token_hash: hashSecret(token),
             profile_id: profileId ?? null,
+            client_id: row.client_id ?? null,
             created_at: now,
             last_seen_at: now,
             revoked_at: null
         };
 
         db.prepare(
-            `INSERT INTO devices (id, name, platform, token_hash, profile_id, created_at, last_seen_at, revoked_at)
-             VALUES (@id, @name, @platform, @token_hash, @profile_id, @created_at, @last_seen_at, @revoked_at)`
+            `INSERT INTO devices (id, name, platform, token_hash, profile_id, client_id, created_at, last_seen_at, revoked_at)
+             VALUES (@id, @name, @platform, @token_hash, @profile_id, @client_id, @created_at, @last_seen_at, @revoked_at)`
         ).run(deviceRow);
 
         db.prepare(

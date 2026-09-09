@@ -14,6 +14,15 @@ import { enforceRemoteAccessForApi } from './remoteAccess';
  * so a paired TV can never enroll a second one.
  */
 
+/**
+ * Response marker for "the device token itself is bad" (unknown, malformed or revoked),
+ * as opposed to a 401 from the remote-access PIN gate (an expired cookie the TV can just
+ * renew). The TV client keys its "wipe the stored token and re-pair" behaviour on this
+ * header, so a recoverable cookie 401 no longer drops a working device back to pairing.
+ */
+export const DEVICE_AUTH_HEADER = 'X-Xstream-Device-Auth';
+export const DEVICE_AUTH_INVALID = 'invalid';
+
 /** Reads a `Authorization: Bearer <token>` header, if present and well formed. */
 function readBearerToken(request: Request): string | null {
     const header = request.headers.get('authorization');
@@ -71,7 +80,10 @@ export async function enforceApiAccess(request: Request): Promise<NextResponse |
             return null;
         }
 
-        return NextResponse.json({ error: 'Dispositivo não autorizado' }, { status: 401 });
+        return NextResponse.json(
+            { error: 'Dispositivo não autorizado' },
+            { status: 401, headers: { [DEVICE_AUTH_HEADER]: DEVICE_AUTH_INVALID } }
+        );
     }
 
     return enforceRemoteAccessForApi(request);

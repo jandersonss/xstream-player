@@ -9,9 +9,13 @@ export const dynamic = 'force-dynamic';
 interface PairStartRequestBody {
     deviceName?: string;
     platform?: string;
+    /** Stable per-install id from the client (localStorage `xstream_device_id`), used to
+     *  dedupe when the same TV re-pairs. Optional: older bootstraps do not send it. */
+    clientId?: string;
 }
 
 const MAX_NAME_LENGTH = 64;
+const MAX_CLIENT_ID_LENGTH = 128;
 
 const RATE_LIMIT_WINDOW_MS = 60 * 1000;
 const RATE_LIMIT_MAX = 10;
@@ -81,8 +85,9 @@ export async function POST(request: Request) {
 
         const body = await request.json().catch(() => ({})) as PairStartRequestBody;
         const deviceName = body.deviceName?.trim().slice(0, MAX_NAME_LENGTH) || 'TV';
+        const clientId = body.clientId?.trim().slice(0, MAX_CLIENT_ID_LENGTH) || null;
 
-        const pairing = createPairingCode(deviceName, normalizePlatform(body.platform));
+        const pairing = createPairingCode(deviceName, normalizePlatform(body.platform), clientId);
 
         const origin = getRequestOrigin(request);
         const approvalUrl = origin ? buildPairingApprovalUrl(origin, pairing.code) : null;

@@ -14,7 +14,23 @@ const SCRYPT_P = 1;
 const KEY_LENGTH = 64;
 
 export const REMOTE_ACCESS_COOKIE_NAME = 'xstream_remote_access';
-export const REMOTE_ACCESS_SESSION_SECONDS = 3 * 60 * 60;
+/**
+ * Lifetime of an interactive PIN-login session (the owner's browser going through
+ * `RemoteAccessGate` / `/api/remote-access`). Kept moderate on purpose: this session is
+ * born from a human typing the PIN, and a browser is a place where "stay signed in for a
+ * week" is the expected bargain — long enough to not nag on a trip, short enough that a
+ * borrowed or public browser forgets on its own.
+ */
+export const REMOTE_ACCESS_SESSION_SECONDS = 7 * 24 * 60 * 60;
+/**
+ * Lifetime of the remote-access session minted for a *paired TV* by
+ * `/api/devices/session`. A TV is a fixed appliance that already proved itself with a
+ * long-lived device token; making it re-authenticate every few hours only produced
+ * logouts and duplicate device rows. One year matches the device-session and profile
+ * cookies the same route sets. The device token itself stays the real credential — this
+ * is just the cookie that lets the same-origin app skip the PIN gate.
+ */
+export const REMOTE_ACCESS_DEVICE_SESSION_SECONDS = 365 * 24 * 60 * 60;
 export const PIN_RULE_MESSAGE = 'Use 4 a 64 caracteres, com letras e números, sem símbolos.';
 
 interface RemoteAccessConfig {
@@ -127,8 +143,8 @@ function verifyPin(pin: string, storedHash: string) {
     }
 }
 
-export function createRemoteAccessSession(pinHash: string) {
-    const expiresAt = Date.now() + REMOTE_ACCESS_SESSION_SECONDS * 1000;
+export function createRemoteAccessSession(pinHash: string, ttlSeconds: number = REMOTE_ACCESS_SESSION_SECONDS) {
+    const expiresAt = Date.now() + ttlSeconds * 1000;
     const nonce = crypto.randomBytes(16).toString('base64url');
     const payload = `${expiresAt}.${nonce}`;
     const signature = signSessionPayload(payload, pinHash);

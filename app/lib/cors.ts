@@ -17,6 +17,12 @@
 const ALLOWED_HEADERS = 'Content-Type, Authorization, X-Xstream-Profile';
 const ALLOWED_METHODS = 'GET, POST, PATCH, DELETE, OPTIONS';
 const MAX_AGE_SECONDS = '86400';
+/**
+ * Response headers the foreign-origin TV client is allowed to read. `X-Xstream-Device-Auth`
+ * tells it whether a 401 means "the device token is dead, re-pair" or just "session cookie
+ * expired" — without exposing it, a cross-origin `fetch` cannot see the header at all.
+ */
+const EXPOSED_HEADERS = 'X-Xstream-Device-Auth';
 
 /** Adds the CORS headers to a response, echoing the request Origin (including `null`). */
 export function withCors<T extends Response>(response: T, request: Request): T {
@@ -29,6 +35,7 @@ export function withCors<T extends Response>(response: T, request: Request): T {
     response.headers.set('Access-Control-Allow-Origin', origin);
     response.headers.set('Access-Control-Allow-Headers', ALLOWED_HEADERS);
     response.headers.set('Access-Control-Allow-Methods', ALLOWED_METHODS);
+    response.headers.set('Access-Control-Expose-Headers', EXPOSED_HEADERS);
     response.headers.set('Access-Control-Max-Age', MAX_AGE_SECONDS);
     // Caches must not serve one origin's response to another.
     response.headers.append('Vary', 'Origin');
