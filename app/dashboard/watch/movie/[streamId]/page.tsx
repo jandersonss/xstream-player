@@ -3,21 +3,21 @@
 import { useEffect, useState, useMemo } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/app/context/AuthContext';
-import { useFavorites } from '@/app/context/FavoritesContext';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import type Hls from 'hls.js';
-import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, Subtitles } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import LimitReachedModal from '@/components/LimitReachedModal';
 import { apiFetch } from '@/app/lib/apiClient';
+import { formatRating } from '@/app/lib/formatRating';
 import BroadcastStartModal from '@/components/BroadcastStartModal';
 import BroadcastToggle from '@/components/BroadcastToggle';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
-import IconButton from '@/components/ui/IconButton';
 import EmptyState from '@/components/ui/EmptyState';
+import FavoriteButton from '@/components/FavoriteButton';
 import { useConnectionLimit } from '@/app/hooks/useConnectionLimit';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
 import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
@@ -51,7 +51,6 @@ import { useSubtitle } from '@/app/context/SubtitleContext';
 
 export default function WatchMoviePage() {
     const { credentials } = useAuth();
-    const { isFavorite, addFavorite, removeFavorite } = useFavorites();
     const { updateProgress, getProgress, isLoaded: progressLoaded, loadingDetails } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
     const { searchMovie, isConfigured: tmdbConfigured } = useTMDb();
@@ -227,22 +226,6 @@ export default function WatchMoviePage() {
         setIsPlaying(true);
     };
 
-    const toggleFavorite = () => {
-        if (!movie) return;
-        const id = movie.movie_data.stream_id;
-        if (isFavorite(id, 'movie')) {
-            removeFavorite(id, 'movie');
-        } else {
-            addFavorite({
-                id: id,
-                type: 'movie',
-                name: movie.info.name,
-                image: movie.info.movie_image,
-                rating: movie.info.rating
-            });
-        }
-    };
-
     const handleProgress = (currentTime: number, duration: number) => {
         if (!movie) return;
         updateProgress({
@@ -407,8 +390,8 @@ export default function WatchMoviePage() {
     }
 
     // Details View
-    const favorited = isFavorite(movie.movie_data.stream_id, 'movie');
     const hasProgress = resumeTime > 0;
+    const ratingLabel = formatRating(movie.info.rating);
 
     return (
         <div className="min-h-screen bg-bg text-ink">
@@ -450,9 +433,9 @@ export default function WatchMoviePage() {
                                     </Badge>
                                 </span>
                             )}
-                            {movie.info.rating && (
+                            {ratingLabel && (
                                 <span className="mr-2 mb-2 flex items-center text-sm text-ink-2 tnum">
-                                    <Star size={16} className="mr-1 text-ink-2" fill="currentColor" /> {movie.info.rating}
+                                    <Star size={16} className="mr-1 text-ink-2" fill="currentColor" /> {ratingLabel}
                                 </span>
                             )}
                             {movie.info.duration && (
@@ -480,12 +463,14 @@ export default function WatchMoviePage() {
                             <Button variant="secondary" size="lg" icon={Subtitles} onClick={() => setShowSubtitlePanel(true)}>
                                 {subtitleUrl ? 'Legendas ✓' : 'Legendas'}
                             </Button>
-                            <IconButton
-                                icon={Bookmark}
-                                label={favorited ? 'Remover da minha lista' : 'Adicionar à minha lista'}
-                                variant="secondary"
-                                active={favorited}
-                                onClick={toggleFavorite}
+                            <FavoriteButton
+                                item={{
+                                    id: movie.movie_data.stream_id,
+                                    type: 'movie',
+                                    name: movie.info.name,
+                                    image: movie.info.movie_image,
+                                    rating: movie.info.rating,
+                                }}
                             />
                         </div>
                     </div>

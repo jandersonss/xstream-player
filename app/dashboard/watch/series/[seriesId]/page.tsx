@@ -4,21 +4,22 @@ import { useEffect, useState, useMemo, useRef } from 'react';
 import { useParams, useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '@/app/context/AuthContext';
-import { useFavorites } from '@/app/context/FavoritesContext';
 import VideoPlayer from '@/components/VideoPlayer';
 import type Hls from 'hls.js';
 import { useWatchProgress } from '@/app/context/WatchProgressContext';
-import { ArrowLeft, Play, Calendar, Star, Clock, Bookmark, Subtitles, Download, Loader2, X, Search, Check } from 'lucide-react';
+import { ArrowLeft, Play, Calendar, Star, Clock, Subtitles, Download, Loader2, X, Search, Check } from 'lucide-react';
 import Loader from '@/components/Loader';
 import SubtitleSearchPanel from '@/components/SubtitleSearchPanel';
 import SyncButton from '@/components/SyncButton';
 import { apiFetch } from '@/app/lib/apiClient';
+import { formatRating } from '@/app/lib/formatRating';
 import BroadcastStartModal from '@/components/BroadcastStartModal';
 import BroadcastToggle from '@/components/BroadcastToggle';
 import Badge from '@/components/ui/Badge';
 import Button from '@/components/ui/Button';
 import IconButton from '@/components/ui/IconButton';
 import EmptyState from '@/components/ui/EmptyState';
+import FavoriteButton from '@/components/FavoriteButton';
 import Field, { inputClassName } from '@/components/ui/Field';
 import { useShareBroadcast, useSyncPlayback, syncKey, relaySrc } from '@/app/hooks/useLiveShare';
 import { useVodRelayHeartbeat } from '@/app/hooks/useVodRelayHeartbeat';
@@ -96,7 +97,6 @@ const BATCH_LANGUAGES = [
 
 export default function WatchSeriesPage() {
     const { credentials } = useAuth();
-    const { isFavorite, addFavorite, removeFavorite } = useFavorites();
     const { updateProgress, getProgress, loadDetail, isLoaded: progressLoaded, loadingDetails } = useWatchProgress();
     const { getCachedDetail, saveCachedDetail } = useData();
     const { searchTV, isConfigured: tmdbConfigured } = useTMDb();
@@ -731,8 +731,7 @@ export default function WatchSeriesPage() {
     const availableCount = availabilityList.filter(s => s.status === 'available').length;
     const downloadedCount = availabilityList.filter(s => s.status === 'downloaded').length;
     const unavailableCount = availabilityList.filter(s => s.status === 'unavailable').length;
-
-    const favorited = isFavorite(seriesId, 'series');
+    const ratingLabel = formatRating(series.info.rating);
 
     return (
         <div className="min-h-screen bg-bg text-ink">
@@ -774,9 +773,9 @@ export default function WatchSeriesPage() {
                                     </Badge>
                                 </span>
                             )}
-                            {series.info.rating && (
+                            {ratingLabel && (
                                 <span className="mr-2 mb-2 flex items-center text-sm text-ink-2 tnum">
-                                    <Star size={16} className="mr-1 text-ink-2" fill="currentColor" /> {series.info.rating}
+                                    <Star size={16} className="mr-1 text-ink-2" fill="currentColor" /> {ratingLabel}
                                 </span>
                             )}
                         </div>
@@ -792,23 +791,13 @@ export default function WatchSeriesPage() {
                         </div>
 
                         <div className="flex items-center space-x-3">
-                            <IconButton
-                                icon={Bookmark}
-                                label={favorited ? 'Remover da minha lista' : 'Adicionar à minha lista'}
-                                variant="secondary"
-                                active={favorited}
-                                onClick={() => {
-                                    if (favorited) {
-                                        removeFavorite(seriesId, 'series');
-                                    } else {
-                                        addFavorite({
-                                            id: seriesId,
-                                            type: 'series',
-                                            name: series.info.name,
-                                            image: series.info.cover,
-                                            rating: series.info.rating
-                                        });
-                                    }
+                            <FavoriteButton
+                                item={{
+                                    id: seriesId,
+                                    type: 'series',
+                                    name: series.info.name,
+                                    image: series.info.cover,
+                                    rating: series.info.rating,
                                 }}
                             />
                         </div>

@@ -63,7 +63,10 @@ export default function IconButton({
                 className,
             ].join(' ')}
         >
-            <Icon size={ICON_SIZE[size]} />
+            {/* A filled glyph is the primary "locked-on" signal — it survives TV
+                overscan and gamma where the surface/border shift alone does not,
+                and costs no accent colour (spec 00 §2.1). */}
+            <Icon size={ICON_SIZE[size]} fill={active ? 'currentColor' : 'none'} />
         </button>
     );
 }

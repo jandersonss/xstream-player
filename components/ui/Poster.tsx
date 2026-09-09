@@ -4,6 +4,7 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { Star } from 'lucide-react';
 import Badge from './Badge';
+import { formatRating } from '@/app/lib/formatRating';
 
 export type PosterRatio = 'poster' | 'wide' | 'square';
 
@@ -46,6 +47,8 @@ export default function Poster({
     const [imageFailed, setImageFailed] = useState(false);
     const showImage = Boolean(image) && !imageFailed;
     const initial = title.trim().charAt(0).toUpperCase() || '?';
+
+    const ratingLabel = formatRating(rating);
 
     return (
         <Link
@@ -94,12 +97,12 @@ export default function Poster({
             <div className="mt-2">
                 <p className="text-sm md:text-base font-medium text-ink truncate">{title}</p>
                 {subtitle && <p className="text-xs md:text-sm text-ink-2 truncate">{subtitle}</p>}
-                {(rating !== undefined || year !== undefined) && (
+                {(ratingLabel !== null || year !== undefined) && (
                     <p className="text-xs md:text-sm text-ink-2 flex items-center tnum">
-                        {rating !== undefined && (
+                        {ratingLabel !== null && (
                             <span className="flex items-center mr-2">
                                 <Star size={12} className="mr-1 text-warn" fill="currentColor" />
-                                {rating}
+                                {ratingLabel}
                             </span>
                         )}
                         {year !== undefined && <span>{year}</span>}

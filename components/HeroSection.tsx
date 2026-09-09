@@ -2,12 +2,12 @@
 
 import { useState, useEffect, useCallback, useRef, TouchEvent } from 'react';
 import { useRouter } from 'next/navigation';
-import { Play, Bookmark, Star } from 'lucide-react';
+import { Play, Star } from 'lucide-react';
 import { useAuth } from '../app/context/AuthContext';
-import { useFavorites } from '../app/context/FavoritesContext';
 import { apiFetch } from '../app/lib/apiClient';
 import Button from './ui/Button';
 import Badge from './ui/Badge';
+import FavoriteButton from './FavoriteButton';
 
 interface HeroItem {
     id: string;
@@ -34,8 +34,6 @@ const VIDEO_START_DELAY = 5000;
 export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     const { user } = useAuth();
     const router = useRouter();
-    const { addFavorite, removeFavorite, isFavorite } = useFavorites();
-
     const [heroItems, setHeroItems] = useState<HeroItem[]>([]);
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isLoading, setIsLoading] = useState(true);
@@ -60,22 +58,6 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                 : `/dashboard/watch/series/${item.id}`
         );
     }, [heroItems, currentIndex, router]);
-
-    const handleToggleFavorite = useCallback(() => {
-        if (!heroItems.length) return;
-        const item = heroItems[currentIndex];
-        if (isFavorite(item.id, item.type)) {
-            removeFavorite(item.id, item.type);
-        } else {
-            addFavorite({
-                id: item.id,
-                type: item.type,
-                name: item.title,
-                image: item.poster || item.backdrop,
-                rating: item.rating.toFixed(1),
-            });
-        }
-    }, [heroItems, currentIndex, isFavorite, addFavorite, removeFavorite]);
 
     // Slides are browsed through the indicators below, which switch on focus —
     // not by hijacking Left/Right on the action buttons. Intercepting the keys
@@ -188,7 +170,6 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
     if (isLoading || heroItems.length === 0) return null;
 
     const currentItem = heroItems[currentIndex];
-    const isCurrentFavorite = isFavorite(currentItem.id, currentItem.type);
 
     return (
         <div
@@ -272,18 +253,15 @@ export default function HeroSection({ type = 'all' }: HeroSectionProps) {
                         <Button variant="primary" size="lg" icon={Play} onClick={handleWatch} className="mr-3">
                             Assistir
                         </Button>
-                        <Button
-                            variant="secondary"
-                            size="lg"
-                            onClick={handleToggleFavorite}
-                        >
-                            <Bookmark
-                                size={20}
-                                className="mr-2"
-                                fill={isCurrentFavorite ? 'currentColor' : 'none'}
-                            />
-                            {isCurrentFavorite ? 'Na sua lista' : 'Minha lista'}
-                        </Button>
+                        <FavoriteButton
+                            item={{
+                                id: currentItem.id,
+                                type: currentItem.type,
+                                name: currentItem.title,
+                                image: currentItem.poster || currentItem.backdrop,
+                                rating: currentItem.rating.toFixed(1),
+                            }}
+                        />
                     </div>
                 </div>
             </div>
