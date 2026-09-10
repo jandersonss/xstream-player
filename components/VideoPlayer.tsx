@@ -656,17 +656,21 @@ export default function VideoPlayer({
                 return;
             }
 
-            // OK / Enter: toggle play only when the press is not meant for a
-            // focusable control (a control-bar button, the next-episode prompt,
-            // the diagnostics link). Those activate natively on Enter, so
-            // stealing the key here would make them unclickable by remote.
+            // OK / Enter. webOS does not reliably synthesize a `click` from an
+            // Enter press on a focused element, so a control-bar button focused
+            // by the D-pad never activated by remote. Drive it explicitly:
+            // preventDefault() suppresses the native activation where it does
+            // happen (desktop), then one manual click fires everywhere. With
+            // nothing focused, OK toggles play like the video click does.
             if (isOkKey(e)) {
-                const activeElement = document.activeElement;
-                const onFocusable = activeElement instanceof Element
-                    && activeElement !== document.body
-                    && activeElement.closest('button, a, input, [data-focusable="true"]');
-                if (!onFocusable) {
-                    e.preventDefault();
+                e.preventDefault();
+                const active = document.activeElement;
+                const control = active instanceof HTMLElement && active !== document.body
+                    ? active.closest<HTMLElement>('button, a, [role="button"], [data-focusable="true"]')
+                    : null;
+                if (control) {
+                    control.click();
+                } else {
                     togglePlay();
                 }
                 return;
