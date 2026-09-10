@@ -6,6 +6,7 @@ import { useNavigationOverride } from '@/app/context/NavigationContext';
 import { useProfile } from '@/app/context/ProfileContext';
 import { useT } from '@/app/context/I18nContext';
 import { getDeviceProfile } from '@/app/lib/deviceProfile';
+import { getMediaKeyAction, isOkKey } from '@/app/lib/platform/keys';
 import { getDeviceToken, getServerBaseUrl } from '@/app/lib/apiClient';
 import PlayerTopBar from '@/components/player/PlayerTopBar';
 import PlayerControls from '@/components/player/PlayerControls';
@@ -375,13 +376,17 @@ export default function VideoPlayer({
     const onProgressRef = useRef(onProgress);
     const onMetadataRef = useRef(onMetadata);
     const onNextRef = useRef(onNext);
+    const onPreviousRef = useRef(onPrevious);
+    const onBackRef = useRef(onBack);
     const isSeekingRef = useRef(isSeeking);
 
     useEffect(() => {
         onProgressRef.current = onProgress;
         onMetadataRef.current = onMetadata;
         onNextRef.current = onNext;
-    }, [onProgress, onMetadata, onNext]);
+        onPreviousRef.current = onPrevious;
+        onBackRef.current = onBack;
+    }, [onProgress, onMetadata, onNext, onPrevious, onBack]);
 
     useEffect(() => {
         isSeekingRef.current = isSeeking;
@@ -614,6 +619,58 @@ export default function VideoPlayer({
             }
 
             const key = e.key.toLowerCase();
+
+            // Dedicated transport keys on a TV remote (Play/Pause/Stop/FF/Rew/
+            // Track). They carry an explicit intent, so they act regardless of
+            // what is focused — unlike OK below, which must yield to buttons.
+            const mediaAction = getMediaKeyAction(e);
+            if (mediaAction) {
+                e.preventDefault();
+                switch (mediaAction) {
+                    case 'playpause':
+                        togglePlay();
+                        break;
+                    case 'play':
+                        if (videoRef.current?.paused) togglePlay();
+                        break;
+                    case 'pause':
+                        if (videoRef.current && !videoRef.current.paused) togglePlay();
+                        break;
+                    case 'stop':
+                        if (videoRef.current && !videoRef.current.paused) togglePlay();
+                        onBackRef.current?.();
+                        break;
+                    case 'forward':
+                        skip(10);
+                        break;
+                    case 'rewind':
+                        skip(-10);
+                        break;
+                    case 'next':
+                        onNextRef.current?.();
+                        break;
+                    case 'previous':
+                        onPreviousRef.current?.();
+                        break;
+                }
+                return;
+            }
+
+            // OK / Enter: toggle play only when the press is not meant for a
+            // focusable control (a control-bar button, the next-episode prompt,
+            // the diagnostics link). Those activate natively on Enter, so
+            // stealing the key here would make them unclickable by remote.
+            if (isOkKey(e)) {
+                const activeElement = document.activeElement;
+                const onFocusable = activeElement instanceof Element
+                    && activeElement !== document.body
+                    && activeElement.closest('button, a, input, [data-focusable="true"]');
+                if (!onFocusable) {
+                    e.preventDefault();
+                    togglePlay();
+                }
+                return;
+            }
 
             // While focus sits inside the control bar, arrow keys must propagate
             // untouched so useTvNavigation can move the D-pad cursor between its
