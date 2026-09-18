@@ -46,9 +46,7 @@ export function ClientProviders({ children }: { children: React.ReactNode }) {
 
     if (
         pathname === '/debug' ||
-        pathname?.startsWith('/debug/') ||
-        pathname === '/legacy' ||
-        pathname?.startsWith('/legacy/')
+        pathname?.startsWith('/debug/')
     ) {
         return <>{children}</>;
     }

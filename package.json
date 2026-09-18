@@ -6,9 +6,8 @@
   "author": "Janderson Lemos",
   "scripts": {
     "dev": "next dev",
-    "build": "npm run build:polyfills && npm run build:legacy && next build --webpack",
+    "build": "npm run build:polyfills && next build --webpack",
     "build:polyfills": "mkdir -p public && esbuild app/polyfills.ts --bundle --format=iife --target=es2015 --outfile=public/polyfills-legacy.js --minify",
-    "build:legacy": "mkdir -p public/legacy .legacy-tmp && esbuild legacy/src/entry.ts --bundle --format=iife --global-name=XStreamLegacy --target=es2015 --outfile=.legacy-tmp/app.js --jsx=automatic --minify && babel .legacy-tmp/app.js --out-file public/legacy/app.js --config-file ./legacy/babel.config.json --minified",
     "start": "next start",
     "lint": "eslint",
     "tv:assets": "python3 scripts/gen-tv-assets.py",
@@ -30,9 +29,6 @@
     "react-dom": "19.2.3"
   },
   "devDependencies": {
-    "@babel/cli": "^7.28.6",
-    "@babel/core": "^7.29.0",
-    "@babel/preset-env": "^7.29.5",
     "@types/better-sqlite3": "^7.6.13",
     "@types/node": "^20",
     "@types/react": "^19",
@@ -47,5 +43,11 @@
   },
   "browserslist": [
     "chrome >= 53"
-  ]
+  ],
+  "allowScripts": {
+    "better-sqlite3@12.11.1": true,
+    "esbuild@0.28.0": true,
+    "sharp@0.34.5": true,
+    "unrs-resolver@1.11.1": true
+  }
 }

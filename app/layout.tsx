@@ -43,13 +43,13 @@ const polyfillScript = (() => {
 /**
  * First script on the page, before any bundle.
  *
- * Besides the legacy redirect it installs an error trap. A TV has no console you
- * can reach, and on webOS 4 the remote debugger's Log/Runtime domains report
- * nothing — so a startup crash there is completely silent. Collecting into a
- * global lets `/debug`, a remote `Runtime.evaluate`, or `?showErrors=1` say what
- * actually broke. It costs a few lines and runs before anything that could fail.
+ * It installs an error trap. A TV has no console you can reach, and on webOS 4
+ * the remote debugger's Log/Runtime domains report nothing — so a startup
+ * crash there is completely silent. Collecting into a global lets `/debug`, a
+ * remote `Runtime.evaluate`, or `?showErrors=1` say what actually broke. It
+ * costs a few lines and runs before anything that could fail.
  */
-const legacyRedirectScript = `
+const errorTrapScript = `
 (function () {
   window.__XSTREAM_ERRORS = [];
 
@@ -97,23 +97,6 @@ const legacyRedirectScript = `
       return nativeError.apply(console, arguments);
     };
   }
-
-  try {
-    var path = window.location.pathname || '';
-    var search = window.location.search || '';
-    if (path.indexOf('/legacy') === 0 || path.indexOf('/debug') === 0 || path.indexOf('/api') === 0) return;
-    if (search.indexOf('forceModern=1') !== -1) return;
-
-    var ua = String(navigator.userAgent || '').toLowerCase();
-    var isWebOs = ua.indexOf('webos') !== -1 || ua.indexOf('web0s') !== -1;
-    var chromeMatch = ua.match(/chrome\\/(\\d+)/);
-    var chromeVersion = chromeMatch ? parseInt(chromeMatch[1], 10) : 0;
-
-    // Keep this threshold in sync with MODERN_APP_MIN_CHROME in middleware.ts.
-    if (isWebOs && (!chromeVersion || chromeVersion < 53)) {
-      window.location.replace('/legacy/index.html');
-    }
-  } catch (e) {}
 })();
 `;
 
@@ -139,10 +122,10 @@ export default async function RootLayout({
   return (
     <html lang={locale}>
       <body className="antialiased font-sans">
-        {/* Order matters: polyfills first, then the error trap and the legacy
-            redirect. Both run before any application bundle. */}
+        {/* Order matters: polyfills first, then the error trap. Both run
+            before any application bundle. */}
         <script dangerouslySetInnerHTML={{ __html: polyfillScript }} />
-        <script dangerouslySetInnerHTML={{ __html: legacyRedirectScript }} />
+        <script dangerouslySetInnerHTML={{ __html: errorTrapScript }} />
         <I18nProvider initialLocale={locale}>
           {shouldGateRemoteAccess ? (
             <RemoteAccessGate mode={remoteAccess.configured ? "verify" : "setup"} />

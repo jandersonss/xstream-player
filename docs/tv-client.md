@@ -136,6 +136,5 @@ Se a loja não for viável, a distribuição por Developer Mode acima entrega o 
 ## Compatibilidade
 
 O bootstrap é ES5 puro e usa `XMLHttpRequest`, então roda no webOS 5 (Chromium 68) e acima.
-Depois do redirect quem manda é o app do servidor, que exige **webOS 6 (Chromium ~79)** — em
-webOS 5 o `middleware.ts` do servidor redireciona para o app legacy automaticamente, e o
-client de TV herda esse comportamento sem precisar saber dele.
+Depois do redirect quem manda é o app moderno do servidor, cujo piso é **webOS 4
+(Chromium 53)** — ver a seção de compatibilidade com TVs no `CLAUDE.md` do repositório.

@@ -62,4 +62,4 @@ Ao adicionar uma capacidade: crie/estenda a lib server-only, exponha via API rou
 
 ## Antes de commitar
 
-Rode `/build-check` (lint + `npm run build` completo, incluindo `build:legacy`).
+Rode `/build-check` (lint + `npm run build` completo).

@@ -13,8 +13,7 @@ Idioma: **código e comentários sempre em inglês**; **textos de UI via i18n** 
 ## Comandos
 
 - `npm run dev` — servidor de desenvolvimento (http://localhost:3000).
-- `npm run build` — roda `build:legacy` **e depois** `next build`. Sempre use este, não `next build` direto.
-- `npm run build:legacy` — bundla `legacy/src/` com esbuild → babel (target IE11) para `public/legacy/app.js`, via artefato temporário `.legacy-tmp/`.
+- `npm run build` — roda `build:polyfills` **e depois** `next build`. Sempre use este, não `next build` direto.
 - `npm run lint` — ESLint (`eslint-config-next` + typescript).
 
 Não há suíte de testes configurada.
@@ -24,7 +23,6 @@ Não há suíte de testes configurada.
 - **`app/`** — App Router. `app/dashboard/` = UI (rotas de live/movies/series/watch/search/favorites/tv). `app/api/` = backend (todas as chamadas ao provedor Xtream, SQLite, TMDB e OpenSubtitles passam por API routes — o cliente nunca acessa o provedor direto).
 - **`app/lib/`** — lógica server-side. `sqliteCache.ts`, `userStore.ts` e `tvModeStore.ts` (better-sqlite3 — cada um é o **único dono do seu banco**; ninguém mais abre DB), `xtreamSync.ts` (sincroniza catálogo do provedor), `db.ts` (client-side; chama `/api/library`), `liveShare.ts`/`vodBroadcast.ts` (Modo TV), `tmdb.ts`, `remoteAccess.ts`. Módulos server usam `import 'server-only'`.
 - **`components/`** — componentes React compartilhados (VideoPlayer, carousels, modais, navegação TV).
-- **`legacy/`** — app IE11/WebOS antigo, buildado separadamente. `middleware.ts` redireciona WebOS com Chrome < 72 para `/legacy/index.html`. Excluído do tsconfig e do ESLint.
 
 ## Persistência (`data/`)
 
@@ -45,8 +43,7 @@ Tudo em `data/` é **gitignored** (só `data/.keep` versionado) e persiste entre
 - `next.config.ts` usa `output: "standalone"` (Docker) e permite imagens remotas de qualquer host.
 - TypeScript `strict: true`; alias `@/*` → raiz do projeto. Indentação de **4 espaços** nos módulos de `app/lib` e API routes.
 - Rotas de API que usam APIs de Node (ffmpeg, `fs`) precisam de `export const runtime = 'nodejs'`.
-- Ao editar `legacy/`, lembre que roda em IE11 — sem sintaxe/APIs modernas não polyfilladas.
-- **Compatibilidade com TVs (browsers-alvo):** o piso do app moderno é **webOS 4 / Chromium 53** (validado em TV real). `middleware.ts` (`MODERN_APP_MIN_CHROME = 53`, espelhado no script inline de `app/layout.tsx`) manda WebOS com Chrome < 53 para o app legacy. webOS 5 (~Chromium 68) e 6 (~79) rodam o app moderno normalmente.
+- **Compatibilidade com TVs (browsers-alvo):** o piso do app moderno é **webOS 4 / Chromium 53** (validado em TV real). webOS 5 (~Chromium 68) e 6 (~79) rodam o app moderno normalmente.
   - **`browserslist` do `package.json` (`chrome >= 53`) é o que controla o downlevel do bundle** — é ele que faz o SWC remover `async/await`, object spread etc. **Não eleve esse valor sem testar numa TV**; subir para `chrome >= 60`, por exemplo, volta a emitir sintaxe que a webOS 4 não parseia (a tela fica em branco, sem erro útil).
   - **APIs de runtime** que faltam no Chromium 53 vivem em `app/polyfills.ts` (Object.entries/values, padStart/padEnd, flat/flatMap, queueMicrotask, AbortController, structuredClone, replaceAll, at, fromEntries, crypto.randomUUID…). O arquivo é um **client component** renderizado em `app/layout.tsx`: como o layout é server component, um `import` só de efeito colateral nunca chegaria ao browser. Ao usar uma API nova, cheque a versão mínima no caniuse e, se for > 53, adicione o polyfill lá.
   - **CSS:** Tailwind é v3 com browserslist herdado do `package.json`, mas o autoprefixer só adiciona prefixos — não emula recursos ausentes. Regras práticas: **nunca use `gap-*` em flexbox** (exige Chrome 84; use `space-x-*`/`space-y-*` ou margins — `gap` em **grid** é ok, Chrome 66+); **evite `position: sticky` (Chrome 56+)** — na webOS 4 o elemento simplesmente rola junto, então use `fixed`/`absolute` com fallback; evite `aspect-ratio` (Chrome 88+), `:focus-visible` (86+), `backdrop-filter` sem fallback (76+ com ressalvas), `overscroll-behavior` (63+) e `@supports` para detectar flex gap (dá falso positivo, pois o `gap` de grid valida a query).

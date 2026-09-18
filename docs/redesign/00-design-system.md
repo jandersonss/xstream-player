@@ -286,7 +286,7 @@ em inglês explicando *porquê*, texto de UI em pt-BR.
 
 ## 7. Critério de aceite
 
-1. `npm run lint` e `npm run build` (com `build:legacy`) passam.
+1. `npm run lint` e `npm run build` passam.
 2. `grep -rn "grid-cols\|gap-\|aspect-ratio\|position: *sticky\|clamp(\|focus-within\|text-\[10px\]\|text-\[8px\]" app components` → nenhum resultado em código novo.
 3. `grep -rn "focus:ring\|outline:" app components` → só `globals.css`.
 4. Nenhuma cor hex literal fora de `globals.css`/`tailwind.config.ts` (exceto o vermelho da
