@@ -1,12 +1,17 @@
 'use client';
 
-import React from 'react';
+import React, { useState } from 'react';
 import { AlertTriangle, Loader2, Pause, Play } from 'lucide-react';
 import { useT } from '@/app/context/I18nContext';
 import Button from '@/components/ui/Button';
 import EmptyState from '@/components/ui/EmptyState';
+import Modal from '@/components/ui/Modal';
 
-const DEBUG_PATH = '/debug';
+// The diagnostics page is a plain static HTML/JS checklist (public/debug/index.html)
+// designed to run even on browsers too old for this React app — see the comment in
+// app/debug/page.tsx. It is loaded here through an iframe instead of being
+// reimplemented in React so the checklist logic keeps a single source of truth.
+const DEBUG_PATH = '/debug/index.html';
 
 export interface PlayerOverlaysProps {
     isBuffering: boolean;
@@ -19,6 +24,8 @@ export interface PlayerOverlaysProps {
 
 export default function PlayerOverlays({ isBuffering, showBufferingHelp, centerPlayPause, skipIndicator, error }: PlayerOverlaysProps) {
     const t = useT();
+    const [showDiagnostics, setShowDiagnostics] = useState(false);
+
     return (
         <>
             {isBuffering && (
@@ -28,14 +35,15 @@ export default function PlayerOverlays({ isBuffering, showBufferingHelp, centerP
                         {showBufferingHelp && (
                             <div className="mt-4 text-ink text-sm pointer-events-auto">
                                 <p className="mb-2">{t('player.loadingSlow')}</p>
-                                <a
-                                    href={DEBUG_PATH}
+                                <button
+                                    type="button"
+                                    onClick={() => setShowDiagnostics(true)}
                                     data-focusable="true"
                                     tabIndex={0}
                                     className="text-ink-2 underline font-semibold"
                                 >
                                     {t('common.openDiagnostics')}
-                                </a>
+                                </button>
                             </div>
                         )}
                     </div>
@@ -70,7 +78,7 @@ export default function PlayerOverlays({ isBuffering, showBufferingHelp, centerP
                         action={
                             <Button
                                 variant="secondary"
-                                onClick={() => { window.location.href = DEBUG_PATH; }}
+                                onClick={() => setShowDiagnostics(true)}
                             >
                                 {t('common.openDiagnostics')}
                             </Button>
@@ -78,6 +86,21 @@ export default function PlayerOverlays({ isBuffering, showBufferingHelp, centerP
                     />
                 </div>
             )}
+
+            <Modal
+                isOpen={showDiagnostics}
+                onClose={() => setShowDiagnostics(false)}
+                title={t('common.diagnosticsTitle')}
+                size="lg"
+            >
+                <iframe
+                    src={DEBUG_PATH}
+                    title={t('common.diagnosticsTitle')}
+                    data-focusable="true"
+                    tabIndex={0}
+                    className="w-full h-[70vh] rounded-lg border border-line bg-black"
+                />
+            </Modal>
         </>
     );
 }
