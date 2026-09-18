@@ -160,6 +160,37 @@ interface VideoPlayerProps {
      * Sem isso, a barra vira apenas indicador — arrastar não faz nada.
      */
     onSeekBeyondWindow?: (absoluteSeconds: number) => void;
+    /**
+     * Fired once when playback fails in a way that looks like a cross-origin (CORS)
+     * block rather than a real playback error: hls.js fatal NETWORK_ERROR with no
+     * HTTP status on the response (a blocked/opaque response never exposes one), or
+     * a native `<video>` MediaError shaped the same way. Only considered when `src`
+     * itself is cross-origin — a same-origin URL cannot fail on CORS. The caller
+     * typically reacts by switching to a same-origin relay path (Modo TV).
+     */
+    onCorsFallback?: () => void;
+}
+
+/** True when `src` resolves to an origin other than the page's own. */
+function isCrossOriginSrc(src: string): boolean {
+    if (typeof window === 'undefined') return false;
+    try {
+        return new URL(src, window.location.href).origin !== window.location.origin;
+    } catch {
+        return false;
+    }
+}
+
+/**
+ * A native `<video>` MediaError that looks like a CORS block rather than a genuine
+ * decode/format problem: `MEDIA_ERR_SRC_NOT_SUPPORTED` (the browser refused to even
+ * probe the response), or `MEDIA_ERR_NETWORK` with no message (a blocked cross-origin
+ * response carries no diagnostic detail).
+ */
+function looksLikeCorsMediaError(error: MediaError | null): boolean {
+    if (!error) return false;
+    if (error.code === MediaError.MEDIA_ERR_SRC_NOT_SUPPORTED) return true;
+    return error.code === MediaError.MEDIA_ERR_NETWORK && !error.message;
 }
 
 const DEFAULT_SUBTITLE_FONT_SIZE = 1.5;
@@ -188,7 +219,8 @@ export default function VideoPlayer({
     onHlsInstance,
     timeOffset = 0,
     totalDuration = 0,
-    onSeekBeyondWindow
+    onSeekBeyondWindow,
+    onCorsFallback
 }: VideoPlayerProps) {
     const { activeProfile, updatePrefs } = useProfile();
     const t = useT();
@@ -397,6 +429,10 @@ export default function VideoPlayer({
     useEffect(() => { onVideoElementRef.current = onVideoElement; }, [onVideoElement]);
     const onHlsInstanceRef = useRef(onHlsInstance);
     useEffect(() => { onHlsInstanceRef.current = onHlsInstance; }, [onHlsInstance]);
+    const onCorsFallbackRef = useRef(onCorsFallback);
+    useEffect(() => { onCorsFallbackRef.current = onCorsFallback; }, [onCorsFallback]);
+    /** Guards `onCorsFallback` to fire at most once per `src` — never a retry loop. */
+    const corsFallbackFiredForSrcRef = useRef<string | null>(null);
     useEffect(() => {
         onVideoElementRef.current?.(videoRef.current);
         return () => onVideoElementRef.current?.(null);
@@ -964,6 +1000,23 @@ export default function VideoPlayer({
             hls.on(Hls.Events.ERROR, (_event, data) => {
                 console.error('[VideoPlayer] HLS Error:', data.type, data.details, data.fatal ? '(FATAL)' : '');
                 if (data.fatal) {
+                    // A blocked cross-origin request never reaches an HTTP status: hls.js
+                    // reports it as a NETWORK_ERROR on the manifest/level/fragment loader with
+                    // no `response.code`. A real 4xx/5xx from the provider always carries one,
+                    // so this only matches the CORS shape, not ordinary upstream failures.
+                    const looksLikeCors = data.type === Hls.ErrorTypes.NETWORK_ERROR
+                        && (data.details === Hls.ErrorDetails.MANIFEST_LOAD_ERROR
+                            || data.details === Hls.ErrorDetails.LEVEL_LOAD_ERROR
+                            || data.details === Hls.ErrorDetails.FRAG_LOAD_ERROR)
+                        && !data.response?.code;
+
+                    if (looksLikeCors && isCrossOriginSrc(src) && corsFallbackFiredForSrcRef.current !== src) {
+                        corsFallbackFiredForSrcRef.current = src;
+                        console.warn('[VideoPlayer] Cross-origin playback error detected, falling back.');
+                        onCorsFallbackRef.current?.();
+                        return;
+                    }
+
                     setError(t('player.errorPlayback', { message: String(data.details) }));
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
@@ -988,6 +1041,13 @@ export default function VideoPlayer({
 
             video.addEventListener('error', () => {
                 const error = video.error;
+                if (looksLikeCorsMediaError(error) && isCrossOriginSrc(src) && corsFallbackFiredForSrcRef.current !== src) {
+                    corsFallbackFiredForSrcRef.current = src;
+                    console.warn('[VideoPlayer] Cross-origin playback error detected, falling back.');
+                    onCorsFallbackRef.current?.();
+                    setIsBuffering(false);
+                    return;
+                }
                 if (isHLS && !supportsNativeHls && !Hls.isSupported()) {
                     setError(t('player.errorHlsUnsupported'));
                 } else if (!isHLS && !isDirectVideo) {
@@ -1110,6 +1170,13 @@ export default function VideoPlayer({
 
         const handleVideoError = () => {
             const error = video.error;
+            if (looksLikeCorsMediaError(error) && isCrossOriginSrc(src) && corsFallbackFiredForSrcRef.current !== src) {
+                corsFallbackFiredForSrcRef.current = src;
+                console.warn('[VideoPlayer] Cross-origin playback error detected, falling back.');
+                onCorsFallbackRef.current?.();
+                setIsBuffering(false);
+                return;
+            }
             setError(t('player.errorPlayback', { message: error?.message || t('player.errorVideoLoad') }));
             setIsBuffering(false);
         };

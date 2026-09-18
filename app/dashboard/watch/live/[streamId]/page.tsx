@@ -88,6 +88,7 @@ export default function WatchLivePage() {
                     title={title}
                     onVideoElement={setVideoEl}
                     onHlsInstance={setHlsInstance}
+                    onCorsFallback={() => setIsSharing(true)}
                     topRightSlot={
                         <div className="flex items-center space-x-2">
                             {useRelay && canSync && <SyncButton role={isJoining ? 'viewer' : 'broadcaster'} onClick={sync} />}
