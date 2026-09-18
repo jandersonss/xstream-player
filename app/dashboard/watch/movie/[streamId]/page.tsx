@@ -340,6 +340,12 @@ export default function WatchMoviePage() {
             ? relaySrc({ contentType: 'movie', streamId, ext: extension, start: startSeconds })
             : directUrl;
 
+        // Direct-to-provider playback can hit a CORS wall behind a reverse proxy
+        // (the browser reaches our domain fine, but the Xtream host itself sends
+        // no CORS headers). Auto-enabling Modo TV switches to the same-origin
+        // relay, which does the cross-origin fetch server-side instead.
+        const handleCorsFallback = isSharing ? undefined : () => setIsSharing(true);
+
         return (
             <div className="fixed inset-0 bg-bg z-50 flex flex-col">
                 <div className="relative flex-1 flex items-center justify-center">
@@ -357,6 +363,7 @@ export default function WatchMoviePage() {
                         title={movie.info.name}
                         onVideoElement={setVideoEl}
                         onHlsInstance={setHlsInstance}
+                        onCorsFallback={handleCorsFallback}
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {isSharing && canSync && <SyncButton role="broadcaster" onClick={sync} />}

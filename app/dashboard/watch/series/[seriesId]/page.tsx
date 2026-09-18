@@ -634,6 +634,12 @@ export default function WatchSeriesPage() {
             ? relaySrc({ contentType: 'series', streamId: selectedEpisode.id, ext: extension, start: startSeconds })
             : directUrl;
 
+        // Direct-to-provider playback can hit a CORS wall behind a reverse proxy
+        // (the browser reaches our domain fine, but the Xtream host itself sends
+        // no CORS headers). Auto-enabling Modo TV switches to the same-origin
+        // relay, which does the cross-origin fetch server-side instead.
+        const handleCorsFallback = isSharing ? undefined : () => setIsSharing(true);
+
         // Navigation logic
         const allEpisodes: Episode[] = [];
         Object.keys(series.episodes)
@@ -686,6 +692,7 @@ export default function WatchSeriesPage() {
                         subtitle={`T${selectedEpisode.season} · Ep ${selectedEpisode.episode_num}${selectedEpisode.title ? ` - ${selectedEpisode.title}` : ''}`}
                         onVideoElement={setVideoEl}
                         onHlsInstance={setHlsInstance}
+                        onCorsFallback={handleCorsFallback}
                         topRightSlot={
                             <div className="flex items-center space-x-2">
                                 {autoSubLoading && (
