@@ -97,11 +97,24 @@ function looksLikePlaylist(url: string, contentType: string): boolean {
     return url.includes('.m3u8') || contentType.includes('mpegurl');
 }
 
-/** Rewrites an HLS playlist so child playlists/segments also go through the relay. */
-function rewritePlaylist(text: string, baseUrl: string): string {
+/**
+ * Rewrites an HLS playlist so child playlists/segments also go through the relay.
+ *
+ * Live channels often spread variants/segments across several CDN origins (edge
+ * selection, per-bitrate hosts) that differ from the one the master playlist itself
+ * redirected to. Every reference this playlist points at is, by construction, as
+ * trustworthy as the playlist we just fetched from `allowedOrigins` — so we allowlist
+ * it here, immediately, instead of waiting for it to be fetched once on its own.
+ * Without this, the *first* request for a not-yet-seen origin hits the open-proxy
+ * guard in `resolveTarget` before ever reaching `fetchShared` (which is what would
+ * normally register it), and the segment/level load fails — indistinguishable, from
+ * the user's seat, from a CORS block.
+ */
+function rewritePlaylist(text: string, baseUrl: string, trustedOrigins: Set<string>): string {
     const toRelay = (rawRef: string): string => {
         try {
             const abs = new URL(rawRef, baseUrl).toString();
+            trustedOrigins.add(new URL(abs).origin);
             return `/api/relay?src=${encodeURIComponent(abs)}`;
         } catch {
             return rawRef;
@@ -178,7 +191,7 @@ export async function GET(request: Request) {
         if (looksLikePlaylist(entry.finalUrl, entry.contentType)) {
             const text = Buffer.from(entry.body).toString('utf-8');
             // Base = final URL after redirects (where the segments actually live).
-            const rewritten = rewritePlaylist(text, entry.finalUrl);
+            const rewritten = rewritePlaylist(text, entry.finalUrl, allowedOrigins);
             return new NextResponse(rewritten, {
                 status: 200,
                 headers: {
