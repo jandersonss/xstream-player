@@ -14,6 +14,11 @@ export const useTvNavigation = () => {
                 activeElement instanceof HTMLTextAreaElement ||
                 activeElement instanceof HTMLSelectElement;
 
+            // Backspace inside a text field erases text — even once the field is empty,
+            // so holding it down never navigates away. The remote's Back key arrives
+            // with its own codes (see isBackKey) and still leaves the field.
+            if (e.key === 'Backspace' && isTextEntry(activeElement)) return;
+
             const isBack = isBackKey(e);
 
             // Only handle navigation keys
