@@ -110,7 +110,8 @@
             "name-asc": "A-Z",
             "name-desc": "Z-A",
             "added": "Recently added",
-            "year": "Year"
+            "year": "Year",
+            "rating": "Rating"
         }
     },
     "devices": {

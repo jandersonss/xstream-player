@@ -110,7 +110,8 @@
             "name-asc": "A-Z",
             "name-desc": "Z-A",
             "added": "Adicionados",
-            "year": "Ano"
+            "year": "Ano",
+            "rating": "Nota"
         }
     },
     "devices": {

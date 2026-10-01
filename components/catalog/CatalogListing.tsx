@@ -29,8 +29,8 @@ export interface CatalogListingProps {
 // Live channel logos are square; movies/series get a 2:3 poster.
 const SORT_OPTIONS_BY_TYPE: Record<ContentType, SortOption[]> = {
     live: ['name-asc', 'name-desc', 'added'],
-    movie: ['name-asc', 'name-desc', 'added', 'year'],
-    series: ['name-asc', 'name-desc', 'added', 'year'],
+    movie: ['name-asc', 'name-desc', 'added', 'year', 'rating'],
+    series: ['name-asc', 'name-desc', 'added', 'year', 'rating'],
 };
 
 const SKELETON_COUNT = 12;
