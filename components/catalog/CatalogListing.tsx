@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AlertCircle, ArrowLeft } from 'lucide-react';
 import { useData } from '@/app/context/DataContext';
@@ -68,7 +68,8 @@ export default function CatalogListing({ type, categoryId, backHref, fallbackTit
         loadData();
     }, [loadData]);
 
-    const sortedItems = sortCatalogItems(items, sort);
+    // Must keep a stable reference: useInfiniteScroll resets its page whenever the list identity changes.
+    const sortedItems = useMemo(() => sortCatalogItems(items, sort), [items, sort]);
     const { visibleItems, hasMore, sentinelRef } = useInfiniteScroll(sortedItems);
 
     const isLive = type === 'live';

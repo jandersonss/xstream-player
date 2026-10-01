@@ -19,16 +19,25 @@ export function useInfiniteScroll<T>(
     const [visibleCount, setVisibleCount] = useState(initialBatchSize);
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-    // Reset visible count when items change (e.g. after search or sort)
-    useEffect(() => {
+    const [prevItems, setPrevItems] = useState(items);
+
+    // Reset visible count when items change (e.g. after search or sort). Done during
+    // render so the first paint of the new list already uses the reset count.
+    if (items !== prevItems) {
+        setPrevItems(items);
         setVisibleCount(initialBatchSize);
-    }, [items, initialBatchSize]);
+    }
 
     const loadMore = useCallback(() => {
         setVisibleCount((prev) => Math.min(prev + loadBatchSize, items.length));
     }, [loadBatchSize, items.length]);
 
+    // Re-observing after each batch makes the observer fire again when the sentinel is
+    // still on screen (tall viewports/TVs), since it only reports intersection transitions.
     useEffect(() => {
+        const currentSentinel = sentinelRef.current;
+        if (!currentSentinel) return;
+
         const observer = new IntersectionObserver(
             (entries) => {
                 if (entries[0].isIntersecting) {
@@ -37,18 +46,10 @@ export function useInfiniteScroll<T>(
             },
             { threshold }
         );
+        observer.observe(currentSentinel);
 
-        const currentSentinel = sentinelRef.current;
-        if (currentSentinel) {
-            observer.observe(currentSentinel);
-        }
-
-        return () => {
-            if (currentSentinel) {
-                observer.unobserve(currentSentinel);
-            }
-        };
-    }, [loadMore, threshold]);
+        return () => observer.disconnect();
+    }, [loadMore, threshold, visibleCount]);
 
     const visibleItems = items.slice(0, visibleCount);
     const hasMore = visibleCount < items.length;
