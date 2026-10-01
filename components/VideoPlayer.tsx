@@ -1290,6 +1290,9 @@ export default function VideoPlayer({
             // so a fixed height is exact.
             className="relative w-full h-[100vh] max-h-[100vh] bg-black overflow-hidden"
             style={containerStyle}
+            // The player expects nothing focused (OK toggles play, arrows seek/volume);
+            // keeps useAutoFocusMainContent from parking focus on the top bar's Back.
+            data-no-autofocus="true"
             onMouseMove={handleInteraction}
             onMouseLeave={() => isPlaying && setShowControls(false)}
             onTouchStart={handleInteraction}

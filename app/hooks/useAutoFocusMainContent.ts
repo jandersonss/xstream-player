@@ -17,6 +17,9 @@ import { usePathname } from 'next/navigation';
  * `data-autofocus="true"` (ex.: o botão "Assistir" na página de um filme);
  * ele tem prioridade sobre o primeiro focável em ordem DOM.
  *
+ * Telas que preferem não ter foco inicial (o player de vídeo, onde OK com
+ * nada focado alterna play/pause) se marcam com `data-no-autofocus="true"`.
+ *
  * O "primeiro item" pode mudar enquanto a página carrega — por exemplo, o
  * Hero da Home busca seus dados de forma assíncrona e só monta seus botões
  * depois de outros blocos que já estavam no DOM (HomeShortcuts). Enquanto o
@@ -45,6 +48,7 @@ export function useAutoFocusMainContent(mainRef: RefObject<HTMLElement | null>) 
 
         const focusFirst = () => {
             if (userTookOver) return;
+            if (main.querySelector('[data-no-autofocus="true"]')) return;
             // A page can mark its primary action (e.g. "Watch") so it wins over
             // whatever comes first in DOM order (usually a "Back" button).
             const first =
