@@ -13,6 +13,10 @@ import { usePathname } from 'next/navigation';
  * Não interfere quando a própria página já colocou o foco em algo dentro do
  * conteúdo (ex.: um input com `autoFocus`).
  *
+ * Uma página pode indicar sua ação principal marcando o elemento com
+ * `data-autofocus="true"` (ex.: o botão "Assistir" na página de um filme);
+ * ele tem prioridade sobre o primeiro focável em ordem DOM.
+ *
  * O "primeiro item" pode mudar enquanto a página carrega — por exemplo, o
  * Hero da Home busca seus dados de forma assíncrona e só monta seus botões
  * depois de outros blocos que já estavam no DOM (HomeShortcuts). Enquanto o
@@ -41,7 +45,11 @@ export function useAutoFocusMainContent(mainRef: RefObject<HTMLElement | null>) 
 
         const focusFirst = () => {
             if (userTookOver) return;
-            const first = main.querySelector<HTMLElement>('[data-focusable="true"]');
+            // A page can mark its primary action (e.g. "Watch") so it wins over
+            // whatever comes first in DOM order (usually a "Back" button).
+            const first =
+                main.querySelector<HTMLElement>('[data-autofocus="true"][data-focusable="true"]') ??
+                main.querySelector<HTMLElement>('[data-focusable="true"]');
             if (first && first !== autoFocusedElement) {
                 first.focus();
                 autoFocusedElement = first;

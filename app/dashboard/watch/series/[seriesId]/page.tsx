@@ -946,7 +946,7 @@ export default function WatchSeriesPage() {
                     {/* Single-column stack: CSS grid (Chrome 57+) and flex gap (84+) are
                         both missing on WebOS TVs, so a flex column with space-y does it */}
                     <div className="flex flex-col space-y-4">
-                        {currentEpisodes.map((ep) => {
+                        {currentEpisodes.map((ep, index) => {
                             const progress = getProgress(ep.id);
                             const duration = progress?.duration || 0;
                             const currentTime = progress?.progress || 0;
@@ -960,6 +960,9 @@ export default function WatchSeriesPage() {
                                             type="button"
                                             onClick={() => setSelectedEpisode(ep)}
                                             data-focusable="true"
+                                            // Series have no standalone "Watch" button: the first
+                                            // episode is the primary action for initial focus.
+                                            data-autofocus={index === 0 ? 'true' : undefined}
                                             tabIndex={0}
                                             // A dense list row (bare content beside a sibling
                                             // IconButton, inside an already-rounded card): the

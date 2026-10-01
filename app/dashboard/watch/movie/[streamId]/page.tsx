@@ -466,7 +466,7 @@ export default function WatchMoviePage() {
                         </div>
 
                         <div className="flex items-center space-x-3">
-                            <Button variant="primary" size="lg" icon={Play} onClick={handlePlay}>
+                            <Button variant="primary" size="lg" icon={Play} onClick={handlePlay} data-autofocus="true">
                                 {hasProgress ? <>{t('watch.resume')} · <span className="tnum ml-1">{formatDuration(resumeTime)}</span></> : t('watch.watch')}
                             </Button>
                             <Button variant="secondary" size="lg" icon={Subtitles} onClick={() => setShowSubtitlePanel(true)}>
