@@ -634,17 +634,36 @@ export default function VideoPlayer({
         }
     }, [duration, isBroadcastTimeline, seekToAbsolute, totalDuration]);
 
-    const handleInteraction = useCallback(() => {
-        setShowControls(true);
+    // Read through a ref so a hide timer armed while paused (e.g. a mouse move
+    // before autoplay kicks in) still sees the current state when it fires.
+    const isPlayingRef = useRef(isPlaying);
 
+    const scheduleControlsHide = useCallback(() => {
         if (controlsTimeoutRef.current) {
             clearTimeout(controlsTimeoutRef.current);
         }
 
         controlsTimeoutRef.current = setTimeout(() => {
-            if (isPlaying) setShowControls(false);
+            if (isPlayingRef.current) setShowControls(false);
         }, 3000);
-    }, [isPlaying]);
+    }, []);
+
+    const handleInteraction = useCallback(() => {
+        setShowControls(true);
+        scheduleControlsHide();
+    }, [scheduleControlsHide]);
+
+    // Playback starting (autoplay, play key, sync command) is not a user
+    // interaction, so arm the auto-hide here too — otherwise the controls stay
+    // up until the next mouse move/key press.
+    useEffect(() => {
+        isPlayingRef.current = isPlaying;
+        if (isPlaying) scheduleControlsHide();
+    }, [isPlaying, scheduleControlsHide]);
+
+    useEffect(() => () => {
+        if (controlsTimeoutRef.current) clearTimeout(controlsTimeoutRef.current);
+    }, []);
 
     // Keyboard controls
     useEffect(() => {
