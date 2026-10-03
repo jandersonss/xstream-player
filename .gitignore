@@ -48,3 +48,6 @@ next-env.d.ts
 # data persistence
 data/*
 !data/.keep
+
+# claude code agent worktrees
+.claude/worktrees/

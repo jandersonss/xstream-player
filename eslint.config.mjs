@@ -15,6 +15,9 @@ const eslintConfig = defineConfig([
     // The TV bootstrap is a standalone ES5 bundle for old TV browsers: the
     // Next/TypeScript rules here do not describe it.
     "tv/**",
+    // Claude Code agent worktrees: full repo copies (with their own .next
+    // builds) that would otherwise be linted and make the run take minutes.
+    ".claude/worktrees/**",
   ]),
 ]);
 
