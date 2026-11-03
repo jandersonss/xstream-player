@@ -59,6 +59,13 @@ export async function POST(request: Request) {
         return NextResponse.json(data);
 
     } catch (error: any) {
+        if (error instanceof TypeError) {
+            console.error('Provider unreachable:', error.cause ?? error);
+            return NextResponse.json(
+                { error: 'Provider unreachable', code: 'provider_unreachable' },
+                { status: 502 }
+            );
+        }
         console.error('Proxy Error:', error);
         return NextResponse.json(
             { error: 'Internal Server Error', details: error.message },

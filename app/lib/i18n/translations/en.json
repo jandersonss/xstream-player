@@ -199,6 +199,10 @@
             "status": "Account status",
             "activeConnections": "Active connections",
             "serverUrl": "Server URL",
+            "changeHost": "Change server host",
+            "changeHostHint": "Keeps your username and password; only the host changes. The credentials are validated on the new host first.",
+            "updateHost": "Update host",
+            "hostUpdated": "Host updated.",
             "timezone": "Time zone",
             "signOut": "Sign out"
         },
@@ -365,6 +369,7 @@
         "tvMode": "TV Mode",
         "movieNotFound": "Movie not found",
         "seriesNotFound": "Series not found",
+        "providerUnreachable": "Could not reach the IPTV provider. Check that the server host is still correct in Settings.",
         "movieDetailsNotFound": "Movie details not found.",
         "movieDetailsError": "Failed to load movie details.",
         "seriesDetailsNotFound": "Series details not found.",

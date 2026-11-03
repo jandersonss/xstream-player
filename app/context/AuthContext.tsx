@@ -44,6 +44,7 @@ interface AuthState {
     } | null;
     isAuthenticated: boolean;
     login: (serverUrl: string, user: string, pass: string) => Promise<void>;
+    updateHost: (hostUrl: string) => Promise<void>;
     logout: () => void;
     isLoading: boolean;
 }
@@ -189,6 +190,36 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
         }
     };
 
+    /** Re-validates the saved credentials against a new host and persists it, keeping the session. */
+    const updateHost = async (hostUrl: string) => {
+        if (!credentials) throw new Error(t('login.failedShort'));
+        const { username, password } = credentials;
+
+        const res = await apiFetch('/api/auth/login', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ hostUrl, username, password }),
+        });
+        const data = await res.json();
+        if (!res.ok) {
+            throw new Error(data.error || t('login.failedShort'));
+        }
+
+        const authData = {
+            credentials: { hostUrl, username, password },
+            user: data.user_info,
+            server: data.server_info
+        };
+        try {
+            localStorage.setItem('xstream_auth', JSON.stringify(authData));
+        } catch (e) {
+            console.warn("Failed to cache auth", e);
+        }
+        setUser(authData.user);
+        setServer(authData.server);
+        setCredentials(authData.credentials);
+    };
+
     const logout = async () => {
         try {
             await Promise.all([
@@ -211,7 +242,7 @@ export const AuthProvider = ({ children }: { children: ReactNode }) => {
     };
 
     return (
-        <AuthContext.Provider value={{ user, server, credentials, isAuthenticated, login, logout, isLoading }}>
+        <AuthContext.Provider value={{ user, server, credentials, isAuthenticated, login, updateHost, logout, isLoading }}>
             {children}
         </AuthContext.Provider>
     );

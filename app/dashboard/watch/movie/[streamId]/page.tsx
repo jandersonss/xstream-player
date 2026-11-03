@@ -157,6 +157,11 @@ export default function WatchMoviePage() {
                     })
                 });
 
+                if (!res.ok) {
+                    setError(t('watch.providerUnreachable'));
+                    return;
+                }
+
                 const data = await res.json();
                 if (data && data.info && data.movie_data) {
                     setMovie(data);

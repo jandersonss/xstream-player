@@ -119,6 +119,15 @@ export async function POST(request: Request) {
         return NextResponse.json(data);
 
     } catch (error: any) {
+        // Node's fetch rejects with a TypeError ("fetch failed") when the host is down,
+        // unresolvable or refuses the connection — distinct from a bug on our side.
+        if (error instanceof TypeError) {
+            console.error('[Proxy] Provider unreachable:', error.cause ?? error);
+            return NextResponse.json(
+                { error: 'Provider unreachable', code: 'provider_unreachable' },
+                { status: 502 }
+            );
+        }
         console.error('[Proxy] CRITICAL Error:', error);
         return NextResponse.json(
             { error: 'Internal Server Error', details: error.message },

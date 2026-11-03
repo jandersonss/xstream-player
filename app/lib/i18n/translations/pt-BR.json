@@ -199,6 +199,10 @@
             "status": "Status da conta",
             "activeConnections": "Conexões ativas",
             "serverUrl": "URL do servidor",
+            "changeHost": "Alterar host do servidor",
+            "changeHostHint": "Mantém usuário e senha; só o host muda. As credenciais são validadas no novo host antes de salvar.",
+            "updateHost": "Atualizar host",
+            "hostUpdated": "Host atualizado.",
             "timezone": "Fuso horário",
             "signOut": "Sair"
         },
@@ -365,6 +369,7 @@
         "tvMode": "Modo TV",
         "movieNotFound": "Filme não encontrado",
         "seriesNotFound": "Série não encontrada",
+        "providerUnreachable": "Não foi possível se comunicar com o provedor de IPTV. Verifique se o host do servidor ainda está correto em Ajustes.",
         "movieDetailsNotFound": "Detalhes do filme não encontrados.",
         "movieDetailsError": "Falha ao carregar detalhes do filme.",
         "seriesDetailsNotFound": "Detalhes da série não encontrados.",
