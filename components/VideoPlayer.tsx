@@ -1253,7 +1253,8 @@ export default function VideoPlayer({
                         return;
                     }
 
-                    setError(t('player.errorPlayback', { message: String(data.details) }));
+                    // Network/media errors are retried in place, so the error screen is not
+                    // raised for them: it would stay up (covering the video) after a recovery.
                     switch (data.type) {
                         case Hls.ErrorTypes.NETWORK_ERROR:
                             hls?.startLoad();
@@ -1397,7 +1398,10 @@ export default function VideoPlayer({
             setIsMetadataLoaded(true);
         };
 
-        const handlePlaying = () => setIsBuffering(false);
+        const handlePlaying = () => {
+            setIsBuffering(false);
+            setError('');
+        };
 
         const handleProgress = () => {
             updateBufferedFromVideo();
